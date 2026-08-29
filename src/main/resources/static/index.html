@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centinel Fin AI - Intelligent Financial Management & Ingestion</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0a0e17;
+            --bg-surface: #111827;
+            --bg-card: rgba(17, 24, 39, 0.75);
+            --bg-card-hover: rgba(31, 41, 55, 0.85);
+            --border: rgba(255, 255, 255, 0.08);
+            --border-active: rgba(99, 102, 241, 0.4);
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.25);
+            --primary-hover: #4f46e5;
+            --accent: #06b6d4;
+            --accent-glow: rgba(6, 182, 212, 0.25);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.2);
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --text-dim: #6b7280;
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.1) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(12px);
+            background: rgba(10, 14, 23, 0.8);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+        }
+
+        .brand-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .brand-icon svg {
+            width: 24px;
+            height: 24px;
+            color: white;
+        }
+
+        .brand h1 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(to right, #fff, #9ca3af);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.9rem;
+            border-radius: 999px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--success);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        main {
+            flex: 1;
+            padding: 2.5rem 2rem;
+            max-width: 1300px;
+            margin: 0 auto;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            border-color: var(--border-active);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.2rem 0.55rem;
+            border-radius: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-post {
+            background: rgba(99, 102, 241, 0.15);
+            color: #818cf8;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .badge-get {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        input, textarea, select {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.75rem 1rem;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .quick-presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.25rem;
+        }
+
+        .preset-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            border-radius: 6px;
+            padding: 0.35rem 0.65rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .preset-btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            padding: 0.85rem 1.5rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 14px var(--primary-glow);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px var(--primary-glow);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .console-output {
+            background: #060911;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: #10b981;
+            max-height: 240px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .summary-box {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 1rem;
+        }
+
+        .summary-box h4 {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.9rem;
+        }
+
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+
+        .summary-val {
+            font-weight: 600;
+            color: var(--accent);
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <div class="brand-icon">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <div>
+                <h1>Centinel Fin AI</h1>
+            </div>
+        </div>
+        <div class="status-badge" id="backend-status">
+            <div class="status-dot"></div>
+            <span id="status-text">Backend Connected (Supabase)</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Ingestion Section -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>SMS Transaction Ingestion</span>
+                </div>
+                <span class="badge badge-post">POST /api/transactions</span>
+            </div>
+
+            <div class="quick-presets">
+                <label style="width: 100%;">Sample SMS Presets:</label>
+                <button type="button" class="preset-btn" onclick="applyPreset(1)">Keells Super (Rs. 1,500)</button>
+                <button type="button" class="preset-btn" onclick="applyPreset(2)">Uber Ride (Rs. 850)</button>
+                <button type="button" class="preset-btn" onclick="applyPreset(3)">CEB Electricity (Rs. 4,200)</button>
+            </div>
+
+            <form id="tx-form" onsubmit="submitTransaction(event)" style="display: flex; flex-direction: column; gap: 1rem;">
+                <div class="form-group">
+                    <label>User Phone Number</label>
+                    <input type="text" id="tx-phone" value="+94771234567" required>
+                </div>
+                <div class="form-group">
+                    <label>Raw SMS Message</label>
+                    <textarea id="tx-raw" required>Visa Card ****1234 charged Rs. 1500 at Keells Super on 2026-08-16 10:15</textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Amount</label>
+                        <input type="number" step="0.01" id="tx-amount" value="1500.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Currency</label>
+                        <input type="text" id="tx-currency" value="LKR" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Transaction Date (ISO)</label>
+                    <input type="datetime-local" id="tx-date" required>
+                </div>
+
+                <button type="submit" class="btn-primary" id="tx-btn">
+                    <span>Ingest Transaction</span>
+                </button>
+            </form>
+
+            <div class="form-group">
+                <label>Ingestion Response</label>
+                <div class="console-output" id="tx-output">// Transaction response will appear here...</div>
+            </div>
+        </div>
+
+        <!-- Analytics Section -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>Spending Summary Analytics</span>
+                </div>
+                <span class="badge badge-get">GET /api/summary</span>
+            </div>
+
+            <form id="summary-form" onsubmit="fetchSummary(event)" style="display: flex; flex-direction: column; gap: 1rem;">
+                <div class="form-group">
+                    <label>User Phone Number</label>
+                    <input type="text" id="sum-phone" value="+94771234567" required>
+                </div>
+                <div class="form-group">
+                    <label>Summary Period</label>
+                    <select id="sum-period">
+                        <option value="daily">Daily Aggregation (YYYY-MM-DD)</option>
+                        <option value="monthly" selected>Monthly Aggregation (YYYY-MM)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn-primary" id="sum-btn">
+                    <span>Query Spending Summary</span>
+                </button>
+            </form>
+
+            <div class="summary-grid" id="summary-results" style="display: none;">
+                <div class="summary-box">
+                    <h4>Period Breakdown</h4>
+                    <div id="period-breakdown"></div>
+                </div>
+                <div class="summary-box">
+                    <h4>Category Breakdown</h4>
+                    <div id="category-breakdown"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Raw API JSON</label>
+                <div class="console-output" id="sum-output">// Summary response will appear here...</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Set default datetime to now
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('tx-date').value = now.toISOString().slice(0, 16);
+
+        function applyPreset(type) {
+            const date = new Date().toISOString();
+            if (type === 1) {
+                document.getElementById('tx-raw').value = 'Visa Card ****1234 charged Rs. 1500.00 at Keells Super';
+                document.getElementById('tx-amount').value = '1500.00';
+            } else if (type === 2) {
+                document.getElementById('tx-raw').value = 'Uber Trip Rs. 850.00 charged to Master Card ****5678';
+                document.getElementById('tx-amount').value = '850.00';
+            } else if (type === 3) {
+                document.getElementById('tx-raw').value = 'CEB Bill payment of Rs. 4200.00 successful for Acct 1029384';
+                document.getElementById('tx-amount').value = '4200.00';
+            }
+        }
+
+        async function submitTransaction(e) {
+            e.preventDefault();
+            const btn = document.getElementById('tx-btn');
+            const output = document.getElementById('tx-output');
+            
+            const payload = {
+                userPhone: document.getElementById('tx-phone').value,
+                rawMessage: document.getElementById('tx-raw').value,
+                amount: parseFloat(document.getElementById('tx-amount').value),
+                currency: document.getElementById('tx-currency').value,
+                transactionDate: new Date(document.getElementById('tx-date').value).toISOString()
+            };
+
+            btn.disabled = true;
+            output.textContent = "Ingesting transaction...";
+
+            try {
+                const res = await fetch('/api/transactions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                output.textContent = JSON.stringify(data, null, 2);
+                
+                // Auto-refresh summary
+                document.getElementById('sum-phone').value = payload.userPhone;
+                fetchSummary();
+            } catch (err) {
+                output.textContent = "Error: " + err.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function fetchSummary(e) {
+            if (e) e.preventDefault();
+            const phone = encodeURIComponent(document.getElementById('sum-phone').value);
+            const period = document.getElementById('sum-period').value;
+            const output = document.getElementById('sum-output');
+            const grid = document.getElementById('summary-results');
+            const periodBox = document.getElementById('period-breakdown');
+            const categoryBox = document.getElementById('category-breakdown');
+
+            output.textContent = "Fetching summary analytics...";
+
+            try {
+                const res = await fetch(`/api/summary?phone=${phone}&period=${period}`);
+                const data = await res.json();
+                output.textContent = JSON.stringify(data, null, 2);
+
+                if (data.totalsPerPeriod && data.totalsByCategory) {
+                    grid.style.display = 'grid';
+                    
+                    periodBox.innerHTML = Object.entries(data.totalsPerPeriod).map(([k, v]) => `
+                        <div class="summary-item">
+                            <span>${k}</span>
+                            <span class="summary-val">Rs. ${Number(v).toLocaleString()}</span>
+                        </div>
+                    `).join('') || '<div style="color: var(--text-dim);">No period data</div>';
+
+                    categoryBox.innerHTML = Object.entries(data.totalsByCategory).map(([k, v]) => `
+                        <div class="summary-item">
+                            <span>${k}</span>
+                            <span class="summary-val">Rs. ${Number(v).toLocaleString()}</span>
+                        </div>
+                    `).join('') || '<div style="color: var(--text-dim);">No category data</div>';
+                }
+            } catch (err) {
+                output.textContent = "Error: " + err.message;
+            }
+        }
+
+        // Initial summary load
+        fetchSummary();
+    </script>
+</body>
+</html>

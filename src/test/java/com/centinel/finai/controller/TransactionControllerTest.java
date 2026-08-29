@@ -72,7 +72,9 @@ public class TransactionControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(jsonRequest))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.userPhone").exists())
-                .andExpect(jsonPath("$.amount").exists());
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.validationErrors.userPhone").exists())
+                .andExpect(jsonPath("$.validationErrors.amount").exists());
     }
 }
