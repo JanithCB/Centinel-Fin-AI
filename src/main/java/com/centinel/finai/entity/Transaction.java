@@ -131,8 +131,8 @@ public class Transaction {
         return isAiCategorized;
     }
 
-    public void setIsAiCategorized(Boolean aiCategorized) {
-        isAiCategorized = aiCategorized;
+    public void setIsAiCategorized(Boolean isAiCategorized) {
+        this.isAiCategorized = isAiCategorized;
     }
 
     public LocalDateTime getCreatedAt() {
