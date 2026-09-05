@@ -1,0 +1,28 @@
+.card {
+  padding: 20px;
+  background: linear-gradient(135deg,
+    rgba(13, 30, 53, 0.95),
+    rgba(0, 212, 170, 0.06));
+  border-color: rgba(0, 212, 170, 0.2) !important;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.bulb { font-size: 1.1rem; }
+.title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.body {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+.body strong { color: var(--teal-500); }

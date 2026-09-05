@@ -1,0 +1,92 @@
+.wrapper { padding: 24px; }
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.devBadge {
+  padding: 2px 8px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #f59e0b;
+  letter-spacing: 0.1em;
+}
+.title { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
+.desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+.fieldLabel {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.textarea {
+  width: 100%;
+  background: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  font-size: 0.75rem;
+  font-family: 'Courier New', monospace;
+  color: var(--teal-400);
+  resize: vertical;
+  outline: none;
+  line-height: 1.55;
+  transition: border-color var(--transition);
+}
+.textarea:focus { border-color: var(--teal-500); }
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.statusBadge {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.success  { background: rgba(0,212,170,0.12); color: var(--teal-500); border: 1px solid rgba(0,212,170,0.25); }
+.duplicate{ background: rgba(245,158,11,0.12); color: #f59e0b;        border: 1px solid rgba(245,158,11,0.25); }
+.error    { background: rgba(244,63,94,0.12);  color: #f87171;        border: 1px solid rgba(244,63,94,0.25); }
+.loading  {}
+
+.responseBox {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.errorBox { border-color: rgba(244,63,94,0.25); }
+.responseTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.responsePre {
+  font-size: 0.72rem;
+  font-family: 'Courier New', monospace;
+  color: var(--teal-400);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.errorText { font-size: 0.8rem; color: #f87171; margin-bottom: 6px; }
+.errorHint { font-size: 0.72rem; color: var(--text-muted); }

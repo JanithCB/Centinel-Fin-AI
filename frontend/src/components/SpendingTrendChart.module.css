@@ -1,0 +1,42 @@
+.wrapper {
+  padding: 24px;
+  flex: 1;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-right: auto;
+}
+.subtitle {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.chartSkeleton {
+  height: 190px;
+  border-radius: var(--radius-md);
+}
+.tooltip {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.tooltipLabel {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.tooltipValue {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--teal-500);
+}
