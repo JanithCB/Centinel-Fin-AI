@@ -44,8 +44,9 @@ export default function AiAssistantPanel() {
     }, 1000);
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    send();
   }
 
   if (!open) {
@@ -75,7 +76,7 @@ export default function AiAssistantPanel() {
       {/* Messages */}
       <div className={styles.messages}>
         {messages.map((m, i) => (
-          <div key={i} className={`${styles.bubble} ${m.role === 'user' ? styles.userBubble : styles.aiBubble}`}>
+          <div key={i} data-role={m.role} className={`${styles.bubble} ${m.role === 'user' ? styles.userBubble : styles.aiBubble}`}>
             {m.text}
           </div>
         ))}
@@ -88,17 +89,16 @@ export default function AiAssistantPanel() {
       </div>
 
       {/* Input */}
-      <div className={styles.inputRow}>
+      <form onSubmit={handleSubmit} className={styles.inputRow}>
         <input
           id="ai-assistant-input"
           className={styles.input}
           placeholder="Type a message..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
         />
-        <button id="btn-send-ai" className={styles.sendBtn} onClick={send} aria-label="Send">›</button>
-      </div>
+        <button type="submit" id="btn-send-ai" className={styles.sendBtn} aria-label="Send">›</button>
+      </form>
     </div>
   );
 }

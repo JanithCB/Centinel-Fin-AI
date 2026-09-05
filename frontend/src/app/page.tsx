@@ -1,3 +1,5 @@
+'use client';
+import { useEffect, useState } from 'react';
 import Sidebar             from '@/components/Sidebar';
 import DashboardHeader     from '@/components/DashboardHeader';
 import StatsCards          from '@/components/StatsCards';
@@ -10,8 +12,11 @@ import IngestionTrigger    from '@/components/IngestionTrigger';
 import styles              from './page.module.css';
 
 export default function DashboardPage() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-hydrated={mounted ? 'true' : 'false'}>
       <Sidebar />
 
       <div className={styles.main}>
