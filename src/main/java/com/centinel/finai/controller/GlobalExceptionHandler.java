@@ -67,6 +67,18 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.METHOD_NOT_ALLOWED);
     }
 
+    @ExceptionHandler(com.centinel.finai.exception.UnauthorizedException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnauthorized(com.centinel.finai.exception.UnauthorizedException ex) {
+        String correlationId = MDC.get(CORRELATION_ID_LOG_VAR_NAME);
+        ApiErrorResponse response = new ApiErrorResponse(
+                HttpStatus.UNAUTHORIZED.value(),
+                HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                ex.getMessage(),
+                correlationId
+        );
+        return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleAllExceptions(Exception ex) {
         String correlationId = MDC.get(CORRELATION_ID_LOG_VAR_NAME);

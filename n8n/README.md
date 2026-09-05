@@ -22,6 +22,11 @@ The `mock_transaction_ingestion_workflow.json` workflow simulates incoming payme
 [Response Output] ───────────► HTTP 202 Accepted (or HTTP 200 Duplicate)
 ```
 
+### Ingestion Authentication (CEN-9)
+The ingestion endpoint is protected by the `X-INGESTION-API-KEY` header.
+* **Spring Boot Configuration:** Set `CENTINEL_INGESTION_API_KEY=your_secret_key` in `.env.local` or your environment.
+* **n8n Configuration:** The HTTP Request node sends `X-INGESTION-API-KEY`. You can set the `CENTINEL_INGESTION_API_KEY` environment variable in your n8n environment or configure the header value in the node options.
+
 ---
 
 ## 2. Quick Start: Running n8n Locally

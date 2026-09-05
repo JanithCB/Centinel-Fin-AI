@@ -69,6 +69,10 @@
             {
               "name": "Content-Type",
               "value": "application/json"
+            },
+            {
+              "name": "X-INGESTION-API-KEY",
+              "value": "={{ $env.CENTINEL_INGESTION_API_KEY || 'replace-with-local-secret' }}"
             }
           ]
         },

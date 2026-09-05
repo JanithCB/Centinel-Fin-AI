@@ -21,6 +21,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 public class IngestionControllerTest {
 
+    private static final String API_KEY_HEADER = "X-INGESTION-API-KEY";
+    private static final String VALID_TEST_API_KEY = "test-ingestion-secret-key";
+
     private MockMvc mockMvc;
 
     @Autowired
@@ -36,7 +39,54 @@ public class IngestionControllerTest {
     }
 
     @Test
-    void whenValidPayload_thenReturns202AcceptedAndSavesMessage() throws Exception {
+    void whenMissingApiKeyHeader_thenReturns401Unauthorized() throws Exception {
+        String jsonPayload = """
+                {
+                    "source": "mock_n8n",
+                    "externalMessageId": "mock-msg-001",
+                    "userReference": "demo-user-001",
+                    "messageText": "LKR 2,500.00 was spent at Keells Super",
+                    "receivedAt": "2026-09-05T20:30:00+05:30"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/ingestion/transaction-messages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonPayload))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.message").value("Missing required X-INGESTION-API-KEY header."));
+
+        assertThat(ingestedMessageRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void whenInvalidApiKeyHeader_thenReturns401Unauthorized() throws Exception {
+        String jsonPayload = """
+                {
+                    "source": "mock_n8n",
+                    "externalMessageId": "mock-msg-001",
+                    "userReference": "demo-user-001",
+                    "messageText": "LKR 2,500.00 was spent at Keells Super",
+                    "receivedAt": "2026-09-05T20:30:00+05:30"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/ingestion/transaction-messages")
+                        .header(API_KEY_HEADER, "wrong-fraudulent-api-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonPayload))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.message").value("Invalid X-INGESTION-API-KEY header value."));
+
+        assertThat(ingestedMessageRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void whenValidPayloadAndApiKey_thenReturns202AcceptedAndSavesMessage() throws Exception {
         String jsonPayload = """
                 {
                     "source": "mock_n8n",
@@ -48,6 +98,7 @@ public class IngestionControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/ingestion/transaction-messages")
+                        .header(API_KEY_HEADER, VALID_TEST_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload))
                 .andExpect(status().isAccepted())
@@ -77,6 +128,7 @@ public class IngestionControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/ingestion/transaction-messages")
+                        .header(API_KEY_HEADER, VALID_TEST_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload))
                 .andExpect(status().isBadRequest())
@@ -96,6 +148,7 @@ public class IngestionControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/ingestion/transaction-messages")
+                        .header(API_KEY_HEADER, VALID_TEST_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload))
                 .andExpect(status().isBadRequest())
@@ -115,6 +168,7 @@ public class IngestionControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/ingestion/transaction-messages")
+                        .header(API_KEY_HEADER, VALID_TEST_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload))
                 .andExpect(status().isBadRequest())
@@ -134,6 +188,7 @@ public class IngestionControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/ingestion/transaction-messages")
+                        .header(API_KEY_HEADER, VALID_TEST_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload))
                 .andExpect(status().isBadRequest())
@@ -153,6 +208,7 @@ public class IngestionControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/ingestion/transaction-messages")
+                        .header(API_KEY_HEADER, VALID_TEST_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload))
                 .andExpect(status().isBadRequest())
@@ -174,6 +230,7 @@ public class IngestionControllerTest {
 
         // First submission -> Accepted (202)
         mockMvc.perform(post("/api/v1/ingestion/transaction-messages")
+                        .header(API_KEY_HEADER, VALID_TEST_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload))
                 .andExpect(status().isAccepted())
@@ -181,6 +238,7 @@ public class IngestionControllerTest {
 
         // Second submission with exact same externalMessageId -> OK (200) with DUPLICATE status
         mockMvc.perform(post("/api/v1/ingestion/transaction-messages")
+                        .header(API_KEY_HEADER, VALID_TEST_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload))
                 .andExpect(status().isOk())
