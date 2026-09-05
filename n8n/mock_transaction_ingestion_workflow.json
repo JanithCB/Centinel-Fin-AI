@@ -1,0 +1,139 @@
+{
+  "name": "Centinel Fin AI - Mock Transaction Ingestion",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e4f6a112-9c3a-4428-97c3-3d0cf3b10b01",
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f8a1c3d2-7b4e-41a9-91a5-83e742b01234",
+              "name": "source",
+              "value": "mock_n8n",
+              "type": "string"
+            },
+            {
+              "id": "b1a2c3d4-e5f6-47a8-98b9-123456789abc",
+              "name": "externalMessageId",
+              "value": "=mock-msg-{{ $now.toMillis() }}",
+              "type": "string"
+            },
+            {
+              "id": "c2d3e4f5-a6b7-48c9-89d0-23456789abcd",
+              "name": "userReference",
+              "value": "demo-user-001",
+              "type": "string"
+            },
+            {
+              "id": "d3e4f5a6-b7c8-49d0-90e1-3456789abcde",
+              "name": "messageText",
+              "value": "LKR 2,500.00 was spent at Keells Super using card ending 1234 on 2026-09-05.",
+              "type": "string"
+            },
+            {
+              "id": "e4f5a6b7-c8d9-40e1-a1f2-456789abcdef",
+              "name": "receivedAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7b8c9d0e-1f2a-43b5-85c7-6e9f1a2b3c4d",
+      "name": "Set Mock Transaction Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8080/api/v1/ingestion/transaction-messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"source\": \"{{ $json.source }}\",\n  \"externalMessageId\": \"{{ $json.externalMessageId }}\",\n  \"userReference\": \"{{ $json.userReference }}\",\n  \"messageText\": \"{{ $json.messageText }}\",\n  \"receivedAt\": \"{{ $json.receivedAt }}\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "3a4b5c6d-7e8f-41a2-93b4-5c6d7e8f9a0b",
+      "name": "Send to Centinel Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Set Mock Transaction Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Mock Transaction Data": {
+      "main": [
+        [
+          {
+            "node": "Send to Centinel Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "centinel-local-dev"
+  },
+  "id": "CentinelFinAiIngestion01",
+  "tags": [
+    {
+      "createdAt": "2026-09-05T20:30:00.000Z",
+      "updatedAt": "2026-09-05T20:30:00.000Z",
+      "id": "centinel-fin-ai",
+      "name": "Centinel Fin AI"
+    }
+  ]
+}
