@@ -26,7 +26,19 @@ CREATE TABLE IF NOT EXISTS transactions (
       ON DELETE CASCADE
 );
 
--- 3. Sample Insert Script
+-- 3. Create ingested_messages table (for webhook & raw message ingestion events)
+CREATE TABLE IF NOT EXISTS ingested_messages (
+    id BIGSERIAL PRIMARY KEY,
+    source VARCHAR(100) NOT NULL,
+    external_message_id VARCHAR(255) NOT NULL UNIQUE,
+    user_reference VARCHAR(255) NOT NULL,
+    message_text TEXT NOT NULL,
+    received_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 4. Sample Insert Script
 -- Insert a sample user
 INSERT INTO users (phone_number, display_name) 
 VALUES ('+1234567890', 'Test User') 
@@ -43,3 +55,16 @@ VALUES (
     'Food & Beverage',
     NOW()
 );
+
+-- Insert a sample ingested message
+INSERT INTO ingested_messages (source, external_message_id, user_reference, message_text, received_at, status)
+VALUES (
+    'mock_n8n',
+    'mock-msg-001',
+    'demo-user-001',
+    'LKR 2,500.00 was spent at Keells Super using card ending 1234 on 2026-09-05.',
+    NOW(),
+    'PENDING'
+)
+ON CONFLICT (external_message_id) DO NOTHING;
+
