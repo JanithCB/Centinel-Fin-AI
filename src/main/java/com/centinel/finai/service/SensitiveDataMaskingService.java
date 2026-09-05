@@ -1,8 +1,16 @@
-package com.centinel.finai.util;
+package com.centinel.finai.service;
+
+import org.springframework.stereotype.Service;
 
 import java.util.regex.Pattern;
 
-public final class MaskingUtils {
+/**
+ * Service responsible for redacting sensitive financial and personal identifiers
+ * (card numbers, card endings, account numbers, CVVs, and OTPs) from transaction messages
+ * before AI processing, logging, or external forwarding.
+ */
+@Service
+public class SensitiveDataMaskingService {
 
     public static final String REDACTED_PLACEHOLDER = "[REDACTED]";
 
@@ -22,44 +30,31 @@ public final class MaskingUtils {
             "(?i)\\b((?:account|acc(?:ount)?\\s*no\\.?|acc\\b|a/c(?:\\s*no\\.?)?|acc\\s*#)(?:\\s+ending(?:\\s+in)?)?(\\s*[:\\-]?\\s*))(?:[\\*xX\\s]*\\d{4,18})\\b"
     );
 
-    private MaskingUtils() {
-    }
-
     /**
-     * Masks sensitive card numbers and account identifiers in arbitrary transaction texts.
+     * Masks sensitive financial identifiers in the given message text.
      *
-     * @param text raw message string
-     * @return sanitized string with sensitive details masked
+     * @param messageText raw transaction message
+     * @return redacted string where sensitive identifiers are replaced with [REDACTED]
      */
-    public static String maskSensitiveData(String text) {
-        if (text == null || text.isEmpty()) {
-            return text;
+    public String maskSensitiveData(String messageText) {
+        if (messageText == null || messageText.isEmpty()) {
+            return messageText;
         }
 
-        String masked = text;
+        String masked = messageText;
+
+        // 1. Mask full 13-19 digit card numbers
         masked = FULL_CARD_PATTERN.matcher(masked).replaceAll(REDACTED_PLACEHOLDER);
+
+        // 2. Mask CVV / OTP / PIN
         masked = CVV_OTP_PATTERN.matcher(masked).replaceAll("$1$2" + REDACTED_PLACEHOLDER);
+
+        // 3. Mask card ending patterns
         masked = CARD_ENDING_PATTERN.matcher(masked).replaceAll("$1$2" + REDACTED_PLACEHOLDER);
+
+        // 4. Mask account numbers
         masked = ACCOUNT_NUMBER_PATTERN.matcher(masked).replaceAll("$1" + REDACTED_PLACEHOLDER);
 
         return masked;
-    }
-
-    /**
-     * Generates a truncated and masked summary of a raw message suitable for log outputs.
-     *
-     * @param text raw message string
-     * @param maxLength maximum characters to include in the preview
-     * @return safe, masked preview string
-     */
-    public static String getSafePreview(String text, int maxLength) {
-        if (text == null) {
-            return "null";
-        }
-        String masked = maskSensitiveData(text);
-        if (masked.length() <= maxLength) {
-            return masked;
-        }
-        return masked.substring(0, maxLength) + "... (truncated, length=" + masked.length() + ")";
     }
 }
