@@ -1,7 +1,0 @@
-{
-  "eventId": "evt-7f89a1b2-c3d4-4e5f-a6b7-c8d9e0f1a2b3",
-  "externalMessageId": "mock-msg-001",
-  "status": "ACCEPTED",
-  "receivedAt": "2026-09-05T20:30:00+05:30",
-  "message": "Transaction message ingested successfully and queued for processing."
-}
