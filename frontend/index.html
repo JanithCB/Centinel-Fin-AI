@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Centinel Fin AI - Sovereign Financial Enclave</title>
+  
+  <!-- Tailwind CSS v3 with Plugins -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            obsidian: '#080C14',
+            surface: {
+              DEFAULT: '#0F172A',
+              card: '#131C2E',
+              subtle: '#182339'
+            },
+            accent: {
+              emerald: '#10B981',
+              indigo: '#6366F1',
+              cyan: '#06B6D4',
+              amber: '#F59E0B'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+          },
+          boxShadow: {
+            glow: '0 0 25px -5px rgba(16, 185, 129, 0.15)',
+            'glow-indigo': '0 0 25px -5px rgba(99, 102, 241, 0.2)',
+            'phone-bevel': '0 25px 60px -15px rgba(0, 0, 0, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.15)'
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style data-purpose="custom-scrollbars-and-glows">
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #080C14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1E293B;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    .glassmorphism {
+      background: rgba(19, 28, 46, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    .glass-pill {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.98); }
+    }
+    .pulse-indicator {
+      animation: pulse-subtle 2.5s infinite ease-in-out;
+    }
+  </style>
+
+  <script src="app.js" defer></script>
+</head>
+
+<body class="bg-obsidian text-slate-100 font-sans antialiased min-h-screen selection:bg-accent-emerald selection:text-black">
+
+  <!-- BEGIN: MasterHeader -->
+  <header class="sticky top-0 z-40 border-b border-slate-800/80 glassmorphism">
+    <div class="max-w-[1720px] mx-auto px-4 lg:px-8 h-20 flex items-center justify-between gap-4">
+      <!-- Brand & Status Area -->
+      <div class="flex items-center gap-6">
+        <a class="flex items-center gap-3 group" href="#" title="Centinel Fin AI Home">
+          <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-indigo-600 flex items-center justify-center font-bold text-white text-lg shadow-glow">
+            🛡️
+          </div>
+          <div>
+            <div class="text-sm font-bold tracking-tight text-white flex items-center gap-2">
+              CENTINEL FIN AI
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">SOVEREIGN</span>
+            </div>
+            <div class="text-[10px] uppercase tracking-widest font-mono text-emerald-400 font-medium flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+              Enclave Core v4.2
+            </div>
+          </div>
+        </a>
+
+        <!-- Latency Micro-Badge -->
+        <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full glass-pill text-xs font-mono text-slate-300">
+          <span id="enclave-sync-dot" class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10B981]"></span>
+          <span id="enclave-sync-status">Checking Enclave Sync...</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="hidden xl:flex items-center space-x-1 p-1 rounded-xl bg-slate-900/80 border border-slate-800">
+        <a class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-800/90 shadow-sm border border-slate-700/60 flex items-center gap-2" href="#hub">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          Command Hub
+        </a>
+        <a class="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors" href="#transactions">
+          Transactions & Ledger
+        </a>
+        <a class="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1.5" href="#simulator">
+          <span>Smart Ingestion Studio</span>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">LIVE</span>
+        </a>
+        <a class="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors" href="#insights">
+          AI Insights
+        </a>
+      </nav>
+
+      <!-- Right Profile & Currency Controls -->
+      <div class="flex items-center gap-3">
+        <!-- Currency Switcher -->
+        <div class="flex items-center p-1 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-slate-400">
+          <button class="px-2.5 py-1 rounded bg-slate-800 text-emerald-400 font-semibold shadow-xs">USD</button>
+          <button class="px-2.5 py-1 rounded hover:text-slate-200 transition-colors">LKR</button>
+          <button class="px-2.5 py-1 rounded hover:text-slate-200 transition-colors">EUR</button>
+        </div>
+
+        <!-- Node Configuration Pill / Trigger -->
+        <button id="btn-open-settings" class="flex items-center gap-3 pl-2 pr-3 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer text-left" title="Click to configure backend API endpoint">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-indigo-600 flex items-center justify-center font-bold text-white text-xs ring-2 ring-emerald-500/30">
+            SC
+          </div>
+          <div class="text-left hidden sm:block">
+            <div class="text-xs font-semibold text-slate-200">Sarah Chen</div>
+            <div class="text-[10px] text-emerald-400 font-mono">Node Settings ⚙️</div>
+          </div>
+          <svg class="w-4 h-4 text-slate-400 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+  <!-- END: MasterHeader -->
+
+  <!-- BEGIN: MasterWorkspaceGrid -->
+  <main class="max-w-[1720px] mx-auto px-4 lg:px-8 py-8" id="hub">
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+      
+      <!-- ======================================================== -->
+      <!-- LEFT / MAIN COLUMN: Customer Intelligence Hub (7 Cols)   -->
+      <!-- ======================================================== -->
+      <section class="xl:col-span-7 space-y-8" data-purpose="main-financial-hub">
+        
+        <!-- Welcome Hero Banner -->
+        <div class="glassmorphism rounded-2xl p-6 relative overflow-hidden border-emerald-500/20 shadow-glow">
+          <div class="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-emerald-500/10 via-indigo-500/5 to-transparent rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            <div>
+              <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-medium mb-3 border border-emerald-500/20">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Live Ledger Sync Active • Privacy Masking Enabled
+              </div>
+              <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
+                Good morning, Sarah <span class="text-2xl">✨</span>
+              </h1>
+              <p class="text-slate-400 text-sm sm:text-base mt-1.5 leading-relaxed max-w-2xl">
+                Centinel Fin AI is monitoring your permissioned transactions. Safe surplus is on track against your monthly conservative budget.
+              </p>
+            </div>
+
+            <!-- Quick Action Buttons -->
+            <div class="flex items-center gap-3 self-start md:self-center shrink-0">
+              <button onclick="checkBackendHealth()" class="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/80 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all">
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                </svg>
+                Sync Ledger
+              </button>
+              <button id="btn-open-manual-modal" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+                </svg>
+                Add Manual Log
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Hero KPI Glass Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-purpose="kpi-metrics-grid">
+          
+          <!-- Card 1: Total Spent -->
+          <div class="glassmorphism p-5 rounded-2xl relative group hover:border-slate-700 transition-all">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+              <span class="text-xs font-medium uppercase tracking-wider">Total Spent</span>
+              <div class="p-1.5 rounded-lg bg-slate-800 text-slate-300">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                </svg>
+              </div>
+            </div>
+            <div id="kpi-total-spent" class="text-2xl font-bold tracking-tight text-white font-mono">$1,500.50</div>
+            <div class="mt-2.5 flex items-center gap-1.5 text-xs">
+              <span class="text-emerald-400 font-medium flex items-center">
+                <svg class="w-3.5 h-3.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M19 14l-7 7m0 0l-7-7m7 7V3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+                </svg>
+                8% under
+              </span>
+              <span class="text-slate-400">vs target ($2,140)</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Predicted Savings -->
+          <div class="glassmorphism p-5 rounded-2xl relative group hover:border-slate-700 transition-all">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+              <span class="text-xs font-medium uppercase tracking-wider">Predicted Surplus</span>
+              <div class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                </svg>
+              </div>
+            </div>
+            <div class="text-2xl font-bold tracking-tight text-emerald-400 font-mono">+$640.00</div>
+            <div class="mt-2.5 flex items-center gap-1.5 text-xs text-slate-400">
+              <span class="text-emerald-400 font-semibold">+$120 vs</span> last month run rate
+            </div>
+          </div>
+
+          <!-- Card 3: AI Categorization Rate -->
+          <div class="glassmorphism p-5 rounded-2xl relative group hover:border-slate-700 transition-all">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+              <span class="text-xs font-medium uppercase tracking-wider">AI Categorization</span>
+              <div class="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                </svg>
+              </div>
+            </div>
+            <div class="text-2xl font-bold tracking-tight text-indigo-300 font-mono">98.4%</div>
+            <div class="mt-2.5 flex items-center justify-between text-xs text-slate-400">
+              <span>140 auto-labeled</span>
+              <span class="text-amber-400 font-medium">2 pending</span>
+            </div>
+          </div>
+
+          <!-- Card 4: Top Category Outflow -->
+          <div class="glassmorphism p-5 rounded-2xl relative group hover:border-slate-700 transition-all">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+              <span class="text-xs font-medium uppercase tracking-wider">Top Category</span>
+              <div class="p-1.5 rounded-lg bg-slate-800 text-slate-300">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                </svg>
+              </div>
+            </div>
+            <div id="kpi-top-category-name" class="text-xl font-bold tracking-tight text-white truncate">Groceries & Market</div>
+            <div class="mt-2.5 flex items-center justify-between text-xs font-mono">
+              <span id="kpi-top-category-amount" class="text-slate-300 font-semibold">$450.00</span>
+              <span id="kpi-top-category-pct" class="text-slate-500">30.0% of total</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category Health & Velocity Gauges -->
+        <div class="glassmorphism rounded-2xl p-6 space-y-6">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
+            <div>
+              <div class="flex items-center gap-2">
+                <div class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+                  </svg>
+                </div>
+                <h2 class="text-lg font-bold text-white tracking-tight">Live Spending & Smart Categories</h2>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">Real-Time Insights</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1 leading-relaxed">Visual spending trajectory, auto-categorized pacing, and safe-to-spend forecasting.</p>
+            </div>
+
+            <div class="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900 border border-slate-800 text-xs overflow-x-auto select-none">
+              <button class="px-3 py-1.5 rounded-lg font-medium text-xs bg-slate-800 text-emerald-400 border border-slate-700/80 shadow-xs flex items-center gap-1.5 shrink-0 transition-all">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Monthly Cash Flow & Pacing
+              </button>
+              <button class="px-3 py-1.5 rounded-lg font-medium text-xs text-slate-400 hover:text-slate-200 transition-colors shrink-0">
+                Category Split
+              </button>
+            </div>
+          </div>
+
+          <!-- Interactive Cash Flow Chart Card -->
+          <div class="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 relative overflow-hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-semibold text-white">Spend Velocity & Budget Runway</h3>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Optimal Trajectory</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-0.5">Spending progression vs. monthly budget cap ($2,140.00)</p>
+              </div>
+
+              <!-- Chart Legend -->
+              <div class="flex items-center gap-4 text-xs">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-3 h-1 rounded-full bg-emerald-400 shadow-[0_0_8px_#10B981]"></span>
+                  <span class="text-slate-300 font-medium text-[11px]">Actual Spend</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-3 h-0.5 rounded-full bg-slate-500 border-b border-dashed border-slate-400"></span>
+                  <span class="text-slate-400 text-[11px]">Budget Cap ($2,140)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- SVG Visual Cash Flow Chart -->
+            <div class="relative w-full h-44 select-none">
+              <svg class="w-full h-full overflow-visible" viewBox="0 0 680 160" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="actualSpendGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#10B981" stop-opacity="0.35"></stop>
+                    <stop offset="100%" stop-color="#10B981" stop-opacity="0.0"></stop>
+                  </linearGradient>
+                  <linearGradient id="forecastGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#06B6D4" stop-opacity="0.15"></stop>
+                    <stop offset="100%" stop-color="#06B6D4" stop-opacity="0.0"></stop>
+                  </linearGradient>
+                </defs>
+                <line x1="30" y1="20" x2="670" y2="20" stroke="#1E293B" stroke-dasharray="3 3" stroke-width="1"></line>
+                <line x1="30" y1="60" x2="670" y2="60" stroke="#1E293B" stroke-dasharray="3 3" stroke-width="1"></line>
+                <line x1="30" y1="100" x2="670" y2="100" stroke="#1E293B" stroke-dasharray="3 3" stroke-width="1"></line>
+                <line x1="30" y1="140" x2="670" y2="140" stroke="#1E293B" stroke-width="1"></line>
+                
+                <line x1="30" y1="35" x2="670" y2="35" stroke="#F59E0B" stroke-dasharray="4 4" stroke-width="1.5" stroke-opacity="0.7"></line>
+                <text x="665" y="31" fill="#F59E0B" font-size="9" font-family="monospace" text-anchor="end">Budget Cap: $2,140</text>
+
+                <path d="M 480 72 L 530 64 L 590 56 L 660 50 L 660 140 L 480 140 Z" fill="url(#forecastGradient)"></path>
+                <path d="M 480 72 L 530 64 L 590 56 L 660 50" fill="none" stroke="#06B6D4" stroke-width="2" stroke-dasharray="4 3"></path>
+
+                <path d="M 40 140 L 40 135 L 100 125 L 160 118 L 220 108 L 280 96 L 340 88 L 400 80 L 480 72 L 480 140 Z" fill="url(#actualSpendGradient)"></path>
+                <path d="M 40 135 C 80 130, 120 122, 160 118 C 200 114, 240 102, 280 96 C 320 90, 360 84, 400 80 C 440 76, 460 74, 480 72" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round"></path>
+
+                <circle cx="160" cy="118" r="3.5" fill="#10B981" stroke="#0F172A" stroke-width="2"></circle>
+                <circle cx="280" cy="96" r="3.5" fill="#10B981" stroke="#0F172A" stroke-width="2"></circle>
+                <circle cx="400" cy="80" r="3.5" fill="#10B981" stroke="#0F172A" stroke-width="2"></circle>
+
+                <circle cx="480" cy="72" r="5" fill="#10B981" stroke="#ffffff" stroke-width="2" class="pulse-indicator"></circle>
+                <line x1="480" y1="20" x2="480" y2="140" stroke="#10B981" stroke-opacity="0.4" stroke-dasharray="2 2" stroke-width="1"></line>
+
+                <rect x="445" y="46" width="70" height="18" rx="4" fill="#0F172A" stroke="#10B981" stroke-width="1"></rect>
+                <text x="480" y="58" fill="#10B981" font-size="9" font-family="monospace" font-weight="bold" text-anchor="middle">ACTIVE PACING</text>
+
+                <text x="40" y="154" fill="#64748B" font-size="10" font-family="monospace">Week 1</text>
+                <text x="160" y="154" fill="#64748B" font-size="10" font-family="monospace">Week 2</text>
+                <text x="280" y="154" fill="#64748B" font-size="10" font-family="monospace">Week 3</text>
+                <text x="480" y="154" fill="#10B981" font-size="10" font-family="monospace" font-weight="bold">Current</text>
+                <text x="660" y="154" fill="#64748B" font-size="10" font-family="monospace">Target</text>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Category Breakdown Cards -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-semibold text-white">Smart Category Breakdown & Budgets</h3>
+                <span class="text-xs text-slate-400 font-mono">Enclave Envelopes</span>
+              </div>
+              <span class="text-xs text-emerald-400 font-mono flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Healthy Distribution
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Category 1: Groceries -->
+              <div class="p-4 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/40 transition-all space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <span class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-base">🛒</span>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold text-slate-200">Groceries & Market</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">30%</span>
+                      </div>
+                      <div class="text-[11px] text-slate-400">75% consumed • $150 left</div>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-sm font-mono font-bold text-white">$450.00</div>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-400 font-medium">
+                      ● On Track
+                    </span>
+                  </div>
+                </div>
+                <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden flex">
+                  <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" style="width: 75%"></div>
+                </div>
+              </div>
+
+              <!-- Category 2: Transport -->
+              <div class="p-4 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-cyan-500/40 transition-all space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <span class="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 text-base">🚗</span>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold text-slate-200">Transport & Rides</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">12%</span>
+                      </div>
+                      <div class="text-[11px] text-slate-400">72% consumed • $69.70 buffer</div>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-sm font-mono font-bold text-white">$180.30</div>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/15 text-cyan-400 font-medium">
+                      ● Balanced
+                    </span>
+                  </div>
+                </div>
+                <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden flex">
+                  <div class="h-full bg-gradient-to-r from-cyan-500 to-blue-400 rounded-full" style="width: 72%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Plain-English AI Advice Banner -->
+          <div class="flex items-start sm:items-center gap-3.5 p-4 rounded-xl bg-gradient-to-r from-emerald-500/15 via-slate-900 to-indigo-500/10 border border-emerald-500/30 text-xs shadow-sm">
+            <span class="shrink-0 p-2 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg">
+              💡
+            </span>
+            <div class="space-y-0.5">
+              <div class="flex items-center gap-2">
+                <span class="text-white font-semibold text-sm">Smart Spend Forecast & AI Advisor</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300">Confidence 99.4%</span>
+              </div>
+              <p class="text-slate-300 leading-relaxed text-xs">
+                Looking great! At this velocity, you will finish the cycle with <span class="text-emerald-400 font-semibold">~$640.00 surplus</span> to allocate into high-yield savings.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Transaction Stream & Categorization Feed -->
+        <div class="glassmorphism rounded-2xl p-6 space-y-4" id="transactions">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
+            <div>
+              <h2 class="text-lg font-bold text-white">Recent Activity & Live Feed</h2>
+              <p class="text-xs text-slate-400">Decoded from bank notifications & ledger transactions</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="px-2.5 py-1 rounded-md text-xs bg-slate-800 text-slate-200 border border-slate-700">All Ledger Records</button>
+            </div>
+          </div>
+
+          <!-- Transaction List Container -->
+          <div class="divide-y divide-slate-800/80" id="live-transaction-list">
+            
+            <!-- Default Sample Record 1 -->
+            <div class="py-3.5 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition-colors group">
+              <div class="flex items-center gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-200 text-lg border border-slate-700 group-hover:border-cyan-500/50 transition-colors">
+                  🚘
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-semibold text-white">Uber Technologies</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">Transport</span>
+                  </div>
+                  <div class="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                    <span>Oct 25, 2:15 PM</span>
+                    <span>•</span>
+                    <span class="font-mono text-slate-500">Chase Visa *4821</span>
+                    <span>•</span>
+                    <span class="text-emerald-400 flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                      AI Categorized
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-sm font-mono font-bold text-white">-$25.50</div>
+                <div class="text-[11px] font-mono text-slate-400">Settled</div>
+              </div>
+            </div>
+
+            <!-- Default Sample Record 2 -->
+            <div class="py-3.5 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition-colors group">
+              <div class="flex items-center gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-200 text-lg border border-slate-700 group-hover:border-emerald-500/50 transition-colors">
+                  🥗
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-semibold text-white">Whole Foods Market</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Groceries</span>
+                  </div>
+                  <div class="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                    <span>Oct 24, 6:40 PM</span>
+                    <span>•</span>
+                    <span class="font-mono text-slate-500">Amex *1009</span>
+                    <span>•</span>
+                    <span class="text-slate-400">Rule Verified</span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-sm font-mono font-bold text-white">-$84.15</div>
+                <div class="text-[11px] font-mono text-slate-400">Settled</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- RIGHT COLUMN: Interactive Phone Mirror & Ingestion Studio-->
+      <!-- ======================================================== -->
+      <section class="xl:col-span-5 space-y-6" id="simulator" data-purpose="phone-simulator-and-ingestion-engine">
+        
+        <!-- Section Header -->
+        <div class="flex items-center justify-between px-1">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+              Interactive Phone Mirror
+            </h2>
+            <p class="text-xs text-slate-400">On-device telemetry & real-time webhook parsing</p>
+          </div>
+          <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">v4.2-SECURE</span>
+        </div>
+
+        <!-- Realistic 3D Phone Mockup Container -->
+        <div class="mx-auto w-full max-w-[400px] rounded-[52px] p-3.5 bg-gradient-to-b from-slate-700 via-slate-900 to-black shadow-phone-bevel border border-slate-700/60 relative">
+          <div class="w-full bg-[#070B12] rounded-[42px] overflow-hidden border border-slate-800/80 relative flex flex-col min-h-[600px] text-white">
+            
+            <!-- Dynamic Island Capsule -->
+            <div class="pt-3 px-6 flex items-center justify-between text-[11px] font-medium tracking-tight text-slate-400 select-none">
+              <span>9:41</span>
+              <div class="h-6 w-28 bg-black rounded-full flex items-center justify-center border border-slate-800/60 px-2 gap-2 shadow-inner">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                </span>
+                <span class="text-[9px] font-mono text-emerald-300 tracking-tighter">ENCLAVE</span>
+              </div>
+              <div class="flex items-center gap-1.5 font-mono text-[10px]">
+                <span>5G</span>
+                <div class="w-4 h-2 rounded-[2px] border border-slate-400 p-0.5 flex items-center">
+                  <div class="h-full w-full bg-emerald-400 rounded-[1px]"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Phone Top App Bar -->
+            <div class="px-4 py-3 border-b border-slate-800/60 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-base">🛡️</span>
+                <span class="text-xs font-bold tracking-tight text-slate-200">CENTINEL MOBILE</span>
+              </div>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active Ingress</span>
+            </div>
+
+            <!-- Phone Content / Simulated Push Message Area -->
+            <div class="p-4 flex-1 flex flex-col justify-between space-y-4">
+              <div class="space-y-2.5" id="phone-notification-feed">
+                <!-- Notification Card -->
+                <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-700/80 shadow-lg relative overflow-hidden transition-all duration-300" id="current-sms-alert">
+                  <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
+                    <span class="font-semibold text-slate-300 flex items-center gap-1.5">
+                      <span class="text-amber-400">💬</span> MESSAGES • BANK ALERT
+                    </span>
+                    <span class="text-[10px] font-mono text-slate-500" id="sms-timestamp">Just now</span>
+                  </div>
+                  <p class="text-xs font-mono text-slate-200 leading-relaxed" id="sms-text-content">
+                    Chase Alert: Acct *4821 was charged $25.50 at UBER TRIP on 10/25. Avail Bal: $1,489.12
+                  </p>
+                </div>
+
+                <!-- On-Device Result -->
+                <div class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-[11px] space-y-1.5 transition-all" id="ai-parser-badge">
+                  <div class="flex items-center justify-between text-emerald-400 font-medium">
+                    <span class="flex items-center gap-1">
+                      <span>⚡</span> Ingested via API
+                    </span>
+                    <span class="font-mono text-[10px]" id="parser-speed">18ms latency</span>
+                  </div>
+                  <div class="text-slate-300 flex items-center justify-between text-[10px] font-mono">
+                    <span>Centinel Safe-to-Spend</span>
+                    <span class="text-emerald-400 font-bold">$640.00 Surplus</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Phone Privacy Lock Visual -->
+              <div class="p-3 rounded-xl bg-slate-900/40 border border-slate-800 text-[10px] text-slate-400 flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                </svg>
+                <span>On-Device Privacy Engine: Account PAN numbers redacted prior to cloud sync.</span>
+              </div>
+
+              <div class="pt-2 flex justify-center">
+                <div class="w-32 h-1 rounded-full bg-slate-600/60"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Live Trigger Test Scenarios (Simulator Buttons) -->
+        <div class="glassmorphism rounded-2xl p-5 space-y-3" data-purpose="scenario-triggers">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs uppercase font-mono tracking-wider font-semibold text-slate-300 flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+              </svg>
+              Trigger Real API Ingestion (POST /api/v1/ingestion)
+            </h3>
+            <span class="text-[10px] text-emerald-400 font-mono">Real HTTP Ingress</span>
+          </div>
+
+          <!-- Quick Scenario Buttons -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            <button class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/40 text-left transition-all flex items-center justify-between text-xs group cursor-pointer" onclick="simulateSMS('Chase: Charged $4.50 at BLUE BOTTLE COFFEE on 10/26.', 'Blue Bottle Coffee', '-$4.50', 'Dining', '☕')">
+              <span class="font-medium text-slate-300 group-hover:text-amber-300">☕ Coffee Purchase (-$4.50)</span>
+              <span class="text-[10px] text-slate-500 font-mono">Send SMS</span>
+            </button>
+            <button class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 text-left transition-all flex items-center justify-between text-xs group cursor-pointer" onclick="simulateSMS('Amex Alert: Large charge $68.20 at TRADER JOE\'S NYC.', 'Trader Joe\'s Market', '-$68.20', 'Groceries', '🥑')">
+              <span class="font-medium text-slate-300 group-hover:text-emerald-300">🥑 Grocery Trip (-$68.20)</span>
+              <span class="text-[10px] text-slate-500 font-mono">Send SMS</span>
+            </button>
+            <button class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/40 text-left transition-all flex items-center justify-between text-xs group cursor-pointer" onclick="simulateSMS('Payroll Direct Deposit of $3,200.00 from ACME CORP arrived.', 'Acme Corp Payroll', '+$3,200.00', 'Income', '💼')">
+              <span class="font-medium text-slate-300 group-hover:text-indigo-300">💼 Direct Deposit (+$3,200.00)</span>
+              <span class="text-[10px] text-slate-500 font-mono">Send SMS</span>
+            </button>
+            <button class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 text-left transition-all flex items-center justify-between text-xs group cursor-pointer" onclick="simulateSMS('Delta Air Lines: e-Ticket confirmation $412.00 card *4821.', 'Delta Air Lines', '-$412.00', 'Travel', '✈️')">
+              <span class="font-medium text-slate-300 group-hover:text-cyan-300">✈️ Flight Ticket (-$412.00)</span>
+              <span class="text-[10px] text-slate-500 font-mono">Send SMS</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Ingestion Terminal Drawer / Developer Payload Viewer -->
+        <div class="glassmorphism rounded-2xl p-4 font-mono text-xs space-y-2 border border-slate-800">
+          <div class="flex items-center justify-between text-slate-400 text-[11px] pb-1 border-b border-slate-800/80">
+            <span class="flex items-center gap-1.5 text-emerald-400">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              POST /api/v1/ingestion/transaction-messages
+            </span>
+            <span id="ingestion-endpoint-status" class="text-[10px] text-emerald-400 font-mono">202 ACCEPTED</span>
+          </div>
+          <pre class="text-[11px] text-slate-400 leading-relaxed overflow-x-auto p-2 rounded bg-black/40 border border-slate-900 font-mono" id="json-preview">{
+  "endpoint": "POST /api/v1/ingestion/transaction-messages",
+  "status": "READY",
+  "security_header": "X-INGESTION-API-KEY",
+  "idempotency": "externalMessageId verified"
+}</pre>
+        </div>
+
+      </section>
+    </div>
+  </main>
+  <!-- END: MasterWorkspaceGrid -->
+
+  <!-- BEGIN: MasterFooter -->
+  <footer class="border-t border-slate-800/80 mt-12 py-6 text-xs text-slate-500 font-mono glassmorphism">
+    <div class="max-w-[1720px] mx-auto px-4 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="text-slate-400 font-semibold">CENTINEL_FIN_AI :: v4.2.0-SOVEREIGN</span>
+        <span>•</span>
+        <span class="text-emerald-400 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> ENCLAVE_SECURED
+        </span>
+      </div>
+      <div>
+        Autonomous Financial Intelligence Platform © 2026
+      </div>
+    </div>
+  </footer>
+  <!-- END: MasterFooter -->
+
+  <!-- ======================================================== -->
+  <!-- MODAL: Add Manual Log (POST /api/transactions)           -->
+  <!-- ======================================================== -->
+  <div id="manual-entry-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="glassmorphism rounded-2xl border border-slate-700 w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <span class="text-emerald-400">✍️</span> Add Manual Ledger Record
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Posts directly to Spring Boot backend: <code class="text-emerald-400 font-mono">POST /api/transactions</code></p>
+        </div>
+        <button id="btn-close-manual-modal" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+          ✕
+        </button>
+      </div>
+
+      <form id="manual-transaction-form" class="p-5 space-y-4">
+        <div>
+          <label class="block text-xs font-mono text-slate-300 mb-1">User Phone Number</label>
+          <input type="text" id="manual-phone" required class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 transition-colors" placeholder="+94771234567">
+        </div>
+
+        <div>
+          <label class="block text-xs font-mono text-slate-300 mb-1">Raw Transaction Message / Description</label>
+          <input type="text" id="manual-raw-message" required class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 transition-colors" placeholder="e.g. Paid LKR 4,500 at Keells Super on card *1234">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-mono text-slate-300 mb-1">Amount</label>
+            <input type="number" step="0.01" min="0.01" id="manual-amount" required class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 transition-colors" placeholder="25.50">
+          </div>
+          <div>
+            <label class="block text-xs font-mono text-slate-300 mb-1">Currency</label>
+            <select id="manual-currency" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 transition-colors">
+              <option value="USD">USD ($)</option>
+              <option value="LKR">LKR (Rs)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="GBP">GBP (£)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-mono text-slate-300 mb-1">Transaction Date & Time</label>
+          <input type="datetime-local" id="manual-date" required class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 transition-colors">
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-3 border-t border-slate-800">
+          <button type="button" id="btn-cancel-manual-modal" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer">
+            Cancel
+          </button>
+          <button type="submit" id="btn-submit-manual-tx" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition-colors shadow-glow cursor-pointer">
+            Save to Ledger
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: Enclave Node Settings                             -->
+  <!-- ======================================================== -->
+  <div id="settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="glassmorphism rounded-2xl border border-slate-700 w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <span>⚙️</span> Enclave Node Configuration
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Configure backend connection & auth credentials</p>
+        </div>
+        <button id="btn-close-settings" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+          ✕
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-xs font-mono text-slate-300 mb-1">Backend API Base URL</label>
+          <input type="text" id="settings-api-base" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 transition-colors" placeholder="http://localhost:8080">
+          <span class="text-[10px] text-slate-500 mt-1 block">Default: http://localhost:8080</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-mono text-slate-300 mb-1">Ingestion Secret Key (X-INGESTION-API-KEY)</label>
+          <input type="password" id="settings-api-key" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 transition-colors" placeholder="local-dev-ingestion-secret-2026">
+          <span class="text-[10px] text-slate-500 mt-1 block">Matches .env.local on backend</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-mono text-slate-300 mb-1">Active User Phone</label>
+          <input type="text" id="settings-user-phone" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 transition-colors" placeholder="+94771234567">
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-3 border-t border-slate-800">
+          <button id="btn-save-settings" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition-colors shadow-glow cursor-pointer">
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

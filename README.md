@@ -153,7 +153,7 @@ Rule-Based Engine    AI Fallback Engine
 
 ### Week 4: Dashboard and Deployment
 
-- [ ] Build a dashboard for spending analytics and AI chat.
+- [x] Build a dashboard for spending analytics and AI chat (Google Stitch Sovereign Hub).
 - [ ] Add scheduled weekly insights through n8n.
 - [ ] Deploy backend, frontend, and database configuration.
 - [ ] Complete documentation, architecture visuals, and a project demo.

@@ -1,0 +1,12 @@
+{
+  "name": "centinel-fin-ai-frontend",
+  "version": "1.0.0",
+  "description": "Centinel Fin AI - Sovereign Hub Frontend",
+  "scripts": {
+    "start": "npx serve -l 3000 .",
+    "dev": "npx serve -l 3000 ."
+  },
+  "keywords": ["finance", "dashboard", "centinel", "ai"],
+  "author": "",
+  "license": "MIT"
+}
