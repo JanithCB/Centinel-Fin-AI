@@ -319,7 +319,11 @@ function initModalListeners() {
         rawMessage: rawMessage,
         amount: amount,
         currency: currency,
-        transactionDate: dateVal ? new Date(dateVal).toISOString().slice(0, 19) : new Date().toISOString().slice(0, 19)
+        // datetime-local gives "YYYY-MM-DDTHH:mm" — backend LocalDateTime needs "YYYY-MM-DDTHH:mm:ss"
+        // Do NOT use new Date().toISOString() here as that shifts to UTC and corrupts the local time
+        transactionDate: dateVal
+          ? (dateVal.length === 16 ? dateVal + ':00' : dateVal)
+          : new Date().toLocaleDateString('en-CA') + 'T' + new Date().toTimeString().slice(0, 8)
       };
 
       try {
