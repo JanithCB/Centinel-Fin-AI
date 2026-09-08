@@ -128,35 +128,35 @@ Rule-Based Engine    AI Fallback Engine
 
 ### Week 1: Core Ledger Engine
 
-- Set up Java Spring Boot backend with Maven.
-- Learn JVM basics, stack vs heap, objects, dependency injection, REST, JPA, `BigDecimal`, and testing.
-- Connect to Supabase PostgreSQL.
-- Create `users` and `transactions` data models.
-- Build `POST /api/transactions`.
-- Build `GET /api/summary`.
-- Write unit tests for transaction and calculation logic.
+- [x] Set up Java Spring Boot backend with Maven.
+- [x] Learn JVM basics, stack vs heap, objects, dependency injection, REST, JPA, `BigDecimal`, and testing.
+- [x] Connect to Supabase PostgreSQL.
+- [x] Create `users` and `transactions` data models.
+- [x] Build `POST /api/transactions`.
+- [x] Build `GET /api/summary`.
+- [x] Write unit tests for transaction and calculation logic.
 
 ### Week 2: Ingestion and Processing
 
-- Learn webhooks, event-driven architecture, asynchronous processing, `HashMap`, regex, Big O, and privacy masking.
-- Build an n8n webhook ingestion workflow.
-- Implement rule-based merchant categorization.
-- Mask sensitive information.
-- Mark unknown transactions as pending for AI processing.
+- [x] Learn webhooks, event-driven architecture, asynchronous processing, `HashMap`, regex, Big O, and privacy masking.
+- [x] Build an n8n webhook ingestion workflow.
+- [x] Mask sensitive information.
+- [ ] Implement rule-based merchant categorization.
+- [ ] Mark unknown transactions as pending for AI processing.
 
 ### Week 3: AI Agent Integration
 
-- Learn LLM fundamentals, prompts, structured JSON, schemas, and tool calling.
-- Integrate Gemini with the Spring Boot backend.
-- Add AI fallback categorization for unknown messages.
-- Build a chat API backed by safe Java query tools.
+- [ ] Learn LLM fundamentals, prompts, structured JSON, schemas, and tool calling.
+- [ ] Integrate Gemini with the Spring Boot backend.
+- [ ] Add AI fallback categorization for unknown messages.
+- [ ] Build a chat API backed by safe Java query tools.
 
 ### Week 4: Dashboard and Deployment
 
-- Build a dashboard for spending analytics and AI chat.
-- Add scheduled weekly insights through n8n.
-- Deploy backend, frontend, and database configuration.
-- Complete documentation, architecture visuals, and a project demo.
+- [ ] Build a dashboard for spending analytics and AI chat.
+- [ ] Add scheduled weekly insights through n8n.
+- [ ] Deploy backend, frontend, and database configuration.
+- [ ] Complete documentation, architecture visuals, and a project demo.
 
 ## Project Structure
 
@@ -196,9 +196,9 @@ Centinel Fin AI is a learning and portfolio project, not a production banking ap
 
 ## Current Status
 
-**Active development — Week 1: Core Ledger Engine**
+**Active development — Week 2 & 4: Ingestion Processing & Dashboard**
 
-The initial focus is a correct, testable Java Spring Boot transaction ledger before adding automation, AI features, or a dashboard.
+We have completed the Core Ledger Engine and built out the webhook ingestion and data masking components. The focus is now on finalizing the message processing pipeline and optionally building out the frontend dashboard using Stitch.
 
 ## License
 
