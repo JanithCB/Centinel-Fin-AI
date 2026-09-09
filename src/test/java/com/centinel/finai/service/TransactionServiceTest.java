@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -29,6 +30,12 @@ public class TransactionServiceTest {
 
     @Mock
     private TransactionRepository transactionRepository;
+
+    @Spy
+    private MerchantCategorizationService categorizationService = new MerchantCategorizationService();
+
+    @Spy
+    private TransactionMessageParserService parserService = new TransactionMessageParserService();
 
     @InjectMocks
     private TransactionService transactionService;
@@ -85,5 +92,28 @@ public class TransactionServiceTest {
         assertThat(userCaptor.getValue().getPhoneNumber()).isEqualTo("+94771234567");
         
         verify(transactionRepository, times(1)).save(any(Transaction.class));
+    }
+
+    @Test
+    void saveTransaction_whenKnownMerchantInRawMessage_thenAutoCategorizesWithRuleBased() {
+        User existingUser = new User("+94771234567", "John Doe");
+        existingUser.setId(1L);
+
+        TransactionRequest keellsRequest = new TransactionRequest();
+        keellsRequest.setUserPhone("+94771234567");
+        keellsRequest.setRawMessage("LKR 2,500.00 spent at Keells Super using card *1234");
+        keellsRequest.setAmount(new BigDecimal("2500.00"));
+        keellsRequest.setCurrency("LKR");
+        keellsRequest.setTransactionDate(LocalDateTime.now());
+
+        when(userRepository.findByPhoneNumber("+94771234567")).thenReturn(Optional.of(existingUser));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        Transaction savedTx = transactionService.saveTransaction(keellsRequest);
+
+        assertThat(savedTx.getMerchant()).isEqualTo("Keells Super");
+        assertThat(savedTx.getCategory()).isEqualTo("Groceries");
+        assertThat(savedTx.getPendingForAi()).isFalse();
+        assertThat(savedTx.getIsAiCategorized()).isFalse();
     }
 }

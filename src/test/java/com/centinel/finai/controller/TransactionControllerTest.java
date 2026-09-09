@@ -57,7 +57,9 @@ public class TransactionControllerTest {
         assertThat(transactionRepository.findAll()).hasSize(1);
         Transaction savedTransaction = transactionRepository.findAll().get(0);
         assertThat(savedTransaction.getAmount()).isEqualByComparingTo(new BigDecimal("1500.00"));
-        assertThat(savedTransaction.getPendingForAi()).isTrue();
+        assertThat(savedTransaction.getMerchant()).isEqualTo("Keells Super");
+        assertThat(savedTransaction.getCategory()).isEqualTo("Groceries");
+        assertThat(savedTransaction.getPendingForAi()).isFalse();
 
         Optional<User> user = userRepository.findByPhoneNumber("+94771234567");
         assertThat(user).isPresent();

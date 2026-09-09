@@ -1,5 +1,7 @@
 package com.centinel.finai.service;
 
+import com.centinel.finai.dto.CategorizationResult;
+import com.centinel.finai.dto.ParsedTransactionData;
 import com.centinel.finai.dto.TransactionRequest;
 import com.centinel.finai.entity.Transaction;
 import com.centinel.finai.entity.User;
@@ -13,10 +15,18 @@ public class TransactionService {
 
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
+    private final MerchantCategorizationService categorizationService;
+    private final TransactionMessageParserService parserService;
 
-    public TransactionService(UserRepository userRepository, TransactionRepository transactionRepository) {
+    public TransactionService(
+            UserRepository userRepository,
+            TransactionRepository transactionRepository,
+            MerchantCategorizationService categorizationService,
+            TransactionMessageParserService parserService) {
         this.userRepository = userRepository;
         this.transactionRepository = transactionRepository;
+        this.categorizationService = categorizationService;
+        this.parserService = parserService;
     }
 
     @Transactional
@@ -35,10 +45,32 @@ public class TransactionService {
         transaction.setAmount(request.getAmount());
         transaction.setCurrency(request.getCurrency());
         transaction.setTransactionDate(request.getTransactionDate());
-        
-        // Default flags (set automatically by @PrePersist in Transaction entity, but we can explicitly set them if we want to be sure)
-        transaction.setPendingForAi(true);
-        transaction.setIsAiCategorized(false);
+
+        // Attempt rule-based parsing and categorization
+        String merchant = null;
+        if (request.getRawMessage() != null && !request.getRawMessage().isBlank()) {
+            ParsedTransactionData parsed = parserService.parseMessage(request.getRawMessage());
+            if (parsed.isSuccess()) {
+                merchant = parsed.getMerchant();
+            }
+        }
+
+        if (merchant != null) {
+            transaction.setMerchant(merchant);
+            CategorizationResult catResult = categorizationService.categorize(merchant);
+            if (catResult.isCategorized()) {
+                transaction.setCategory(catResult.getCategoryName());
+                transaction.setPendingForAi(false);
+                transaction.setIsAiCategorized(false);
+            } else {
+                transaction.setCategory("Uncategorized");
+                transaction.setPendingForAi(true);
+                transaction.setIsAiCategorized(false);
+            }
+        } else {
+            transaction.setPendingForAi(true);
+            transaction.setIsAiCategorized(false);
+        }
 
         return transactionRepository.save(transaction);
     }
