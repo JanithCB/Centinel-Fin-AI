@@ -33,12 +33,12 @@ public class MerchantCategorizationService {
 
         // Transport
         registerRule(Category.TRANSPORT, "uber", "uber trip", "uber bv", "pickme", "pick me",
-                "pickme food", "bolt", "lyft", "taxi", "transit", "fuel", "petrol",
+                "bolt", "lyft", "taxi", "transit", "fuel", "petrol",
                 "ceypetco", "ioc", "metro", "airline", "delta air lines", "emirates");
 
         // Food and Dining
-        registerRule(Category.FOOD_AND_DINING, "starbucks", "starbucks coffee", "blue bottle",
-                "blue bottle coffee", "mcdonald's", "mcdonalds", "kfc", "domino's", "dominos",
+        registerRule(Category.FOOD_AND_DINING, "uber eats", "pickme food", "starbucks", "starbucks coffee",
+                "blue bottle", "blue bottle coffee", "mcdonald's", "mcdonalds", "kfc", "domino's", "dominos",
                 "pizza hut", "burger king", "subway", "cafe", "restaurant", "bakery", "diner", "coffee");
 
         // Bills and Utilities
@@ -65,6 +65,9 @@ public class MerchantCategorizationService {
         // Education
         registerRule(Category.EDUCATION, "coursera", "udemy", "school", "university",
                 "tuition", "edx", "skillshare");
+
+        // Sort keyword rules descending by length so most specific keywords match first
+        keywordRules.sort((a, b) -> Integer.compare(b.keyword.length(), a.keyword.length()));
     }
 
     private void registerRule(Category category, String... merchantKeywords) {

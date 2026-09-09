@@ -71,7 +71,7 @@ public class MerchantCategorizationServiceTest {
             "Glomark|Groceries",
             "Whole Foods Market|Groceries",
             "PickMe|Transport",
-            "PickMe Food|Transport",
+            "PickMe Food|Food and Dining",
             "Delta Air Lines|Transport",
             "Dialog Axiata|Bills and Utilities",
             "Mobitel|Bills and Utilities",

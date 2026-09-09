@@ -1,0 +1,534 @@
+{
+  "version": "1.0.0",
+  "description": "Realistic, fully synthetic transaction message dataset for Centinel Fin AI testing and demonstration. Contains zero real PII or live financial data.",
+  "totalRecords": 31,
+  "records": [
+    {
+      "id": "mock-tx-001",
+      "description": "Standard debit with card ending suffix - Keells Super (Groceries)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000001",
+      "externalMessageId": "mock-sms-keells-001",
+      "rawMessage": "LKR 4,500.00 was spent at Keells Super using card ending 1234 on 2026-09-01.",
+      "expected": {
+        "maskedMessage": "LKR 4,500.00 was spent at Keells Super using card ending [REDACTED] on 2026-09-01.",
+        "parsedAmount": 4500.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Keells Super",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Groceries",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-002",
+      "description": "Account debit with Rs currency format - Cargills Food City (Groceries)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000001",
+      "externalMessageId": "mock-sms-cargills-002",
+      "rawMessage": "Your account 001234567890 was debited by Rs. 2,150.50 at Cargills Food City on 2026-09-02.",
+      "expected": {
+        "maskedMessage": "Your account [REDACTED] was debited by Rs. 2,150.50 at Cargills Food City on 2026-09-02.",
+        "parsedAmount": 2150.50,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Cargills Food City",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Groceries",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-003",
+      "description": "Supermarket chain with full card PAN masking - Spar Supermarket (Groceries)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000002",
+      "externalMessageId": "mock-sms-spar-003",
+      "rawMessage": "Visa card 4111-2222-3333-4444 charged LKR 8,900.00 at Spar Supermarket on 2026-09-03.",
+      "expected": {
+        "maskedMessage": "Visa card [REDACTED] charged LKR 8,900.00 at Spar Supermarket on 2026-09-03.",
+        "parsedAmount": 8900.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Spar Supermarket",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Groceries",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-004",
+      "description": "Whole Foods Market international groceries debit",
+      "source": "n8n_email_webhook",
+      "userPhone": "+94770000002",
+      "externalMessageId": "mock-email-wholefoods-004",
+      "rawMessage": "Spent USD 84.20 at Whole Foods Market using card ending 9876 on 2026-09-04.",
+      "expected": {
+        "maskedMessage": "Spent USD 84.20 at Whole Foods Market using card ending [REDACTED] on 2026-09-04.",
+        "parsedAmount": 84.20,
+        "parsedCurrency": "USD",
+        "parsedMerchant": "Whole Foods Market",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Groceries",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-005",
+      "description": "Ride hailing transit debit - Uber (Transport)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000003",
+      "externalMessageId": "mock-sms-uber-005",
+      "rawMessage": "Payment of LKR 1,450.00 completed to Uber for ride on 2026-09-05.",
+      "expected": {
+        "maskedMessage": "Payment of LKR 1,450.00 completed to Uber for ride on 2026-09-05.",
+        "parsedAmount": 1450.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Uber",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Transport",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-006",
+      "description": "Local taxi app debit - PickMe (Transport)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000003",
+      "externalMessageId": "mock-sms-pickme-006",
+      "rawMessage": "Your account was debited by Rs. 850.00 at PickMe on 2026-09-05.",
+      "expected": {
+        "maskedMessage": "Your account was debited by Rs. 850.00 at PickMe on 2026-09-05.",
+        "parsedAmount": 850.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "PickMe",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Transport",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-007",
+      "description": "Fuel station pump payment - Ceypetco (Transport)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000004",
+      "externalMessageId": "mock-sms-ceypetco-007",
+      "rawMessage": "LKR 7,500.00 was spent at Ceypetco Petrol using card ending 5555 on 2026-09-06.",
+      "expected": {
+        "maskedMessage": "LKR 7,500.00 was spent at Ceypetco Petrol using card ending [REDACTED] on 2026-09-06.",
+        "parsedAmount": 7500.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Ceypetco",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Transport",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-008",
+      "description": "Airline booking - Emirates (Transport)",
+      "source": "n8n_email_webhook",
+      "userPhone": "+94770000004",
+      "externalMessageId": "mock-email-emirates-008",
+      "rawMessage": "Card ending 7788 was charged USD 620.00 at Emirates on 2026-09-06.",
+      "expected": {
+        "maskedMessage": "Card ending [REDACTED] was charged USD 620.00 at Emirates on 2026-09-06.",
+        "parsedAmount": 620.00,
+        "parsedCurrency": "USD",
+        "parsedMerchant": "Emirates",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Transport",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-009",
+      "description": "Food delivery service - Uber Eats (Food and Dining)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000005",
+      "externalMessageId": "mock-sms-ubereats-009",
+      "rawMessage": "Payment of LKR 2,450.00 completed to Uber Eats on 2026-09-07.",
+      "expected": {
+        "maskedMessage": "Payment of LKR 2,450.00 completed to Uber Eats on 2026-09-07.",
+        "parsedAmount": 2450.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Uber Eats",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Food and Dining",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-010",
+      "description": "Fast food restaurant - McDonald's (Food and Dining)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000005",
+      "externalMessageId": "mock-sms-mcdonalds-010",
+      "rawMessage": "Card ending 3344 charged LKR 3,100.00 at McDonald's on 2026-09-07.",
+      "expected": {
+        "maskedMessage": "Card ending [REDACTED] charged LKR 3,100.00 at McDonald's on 2026-09-07.",
+        "parsedAmount": 3100.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "McDonald's",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Food and Dining",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-011",
+      "description": "Coffee shop chain - Starbucks Coffee (Food and Dining)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000005",
+      "externalMessageId": "mock-sms-starbucks-011",
+      "rawMessage": "Spent USD 6.75 at Starbucks Coffee with card ending 1122 on 2026-09-07.",
+      "expected": {
+        "maskedMessage": "Spent USD 6.75 at Starbucks Coffee with card ending [REDACTED] on 2026-09-07.",
+        "parsedAmount": 6.75,
+        "parsedCurrency": "USD",
+        "parsedMerchant": "Starbucks",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Food and Dining",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-012",
+      "description": "Pizza takeaway restaurant - Domino's Pizza (Food and Dining)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000006",
+      "externalMessageId": "mock-sms-dominos-012",
+      "rawMessage": "Payment of Rs. 4,200.00 completed to Domino's on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Payment of Rs. 4,200.00 completed to Domino's on 2026-09-08.",
+        "parsedAmount": 4200.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Domino's",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Food and Dining",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-013",
+      "description": "Telecom mobile bill payment - Dialog Axiata (Bills and Utilities)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000006",
+      "externalMessageId": "mock-sms-dialog-013",
+      "rawMessage": "Bill payment of LKR 3,500.00 completed to Dialog Axiata on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Bill payment of LKR 3,500.00 completed to Dialog Axiata on 2026-09-08.",
+        "parsedAmount": 3500.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Dialog Axiata",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Bills and Utilities",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-014",
+      "description": "Broadband and mobile bill - Mobitel (Bills and Utilities)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000007",
+      "externalMessageId": "mock-sms-mobitel-014",
+      "rawMessage": "Your account 005544332211 was debited by Rs. 1,500.00 at Mobitel on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Your account [REDACTED] was debited by Rs. 1,500.00 at Mobitel on 2026-09-08.",
+        "parsedAmount": 1500.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Mobitel",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Bills and Utilities",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-015",
+      "description": "Electricity utility bill - CEB (Bills and Utilities)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000007",
+      "externalMessageId": "mock-sms-ceb-015",
+      "rawMessage": "Bill payment of LKR 12,400.00 completed to CEB on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Bill payment of LKR 12,400.00 completed to CEB on 2026-09-08.",
+        "parsedAmount": 12400.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "CEB",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Bills and Utilities",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-016",
+      "description": "Water utility bill - Water Board (Bills and Utilities)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000007",
+      "externalMessageId": "mock-sms-water-016",
+      "rawMessage": "Payment of Rs. 2,100.00 completed to Water Board on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Payment of Rs. 2,100.00 completed to Water Board on 2026-09-08.",
+        "parsedAmount": 2100.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Water Board",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Bills and Utilities",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-017",
+      "description": "Streaming video subscription - Netflix (Subscriptions)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000008",
+      "externalMessageId": "mock-sms-netflix-017",
+      "rawMessage": "Visa card ending 4321 charged USD 9.99 at Netflix on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Visa card ending [REDACTED] charged USD 9.99 at Netflix on 2026-09-08.",
+        "parsedAmount": 9.99,
+        "parsedCurrency": "USD",
+        "parsedMerchant": "Netflix",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Subscriptions",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-018",
+      "description": "Music streaming subscription - Spotify (Subscriptions)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000008",
+      "externalMessageId": "mock-sms-spotify-018",
+      "rawMessage": "Card ending 8899 was charged USD 4.99 at Spotify on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Card ending [REDACTED] was charged USD 4.99 at Spotify on 2026-09-08.",
+        "parsedAmount": 4.99,
+        "parsedCurrency": "USD",
+        "parsedMerchant": "Spotify",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Subscriptions",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-019",
+      "description": "Digital platform media subscription - YouTube (Subscriptions)",
+      "source": "n8n_email_webhook",
+      "userPhone": "+94770000008",
+      "externalMessageId": "mock-email-youtube-019",
+      "rawMessage": "Monthly payment of USD 7.99 completed to YouTube on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Monthly payment of USD 7.99 completed to YouTube on 2026-09-08.",
+        "parsedAmount": 7.99,
+        "parsedCurrency": "USD",
+        "parsedMerchant": "YouTube",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Subscriptions",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-020",
+      "description": "E-commerce marketplace purchase - Daraz (Shopping)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000009",
+      "externalMessageId": "mock-sms-daraz-020",
+      "rawMessage": "Payment of LKR 5,600.00 completed to Daraz on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Payment of LKR 5,600.00 completed to Daraz on 2026-09-08.",
+        "parsedAmount": 5600.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Daraz",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Shopping",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-021",
+      "description": "Global e-commerce purchase - Amazon (Shopping)",
+      "source": "n8n_email_webhook",
+      "userPhone": "+94770000009",
+      "externalMessageId": "mock-email-amazon-021",
+      "rawMessage": "Spent USD 42.50 at Amazon using card ending 6677 on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Spent USD 42.50 at Amazon using card ending [REDACTED] on 2026-09-08.",
+        "parsedAmount": 42.50,
+        "parsedCurrency": "USD",
+        "parsedMerchant": "Amazon",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Shopping",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-022",
+      "description": "Private hospital and lab charges - Asiri Hospital (Healthcare)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000010",
+      "externalMessageId": "mock-sms-asiri-022",
+      "rawMessage": "Card ending 2345 debited LKR 18,500.00 at Asiri Hospital on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Card ending [REDACTED] debited LKR 18,500.00 at Asiri Hospital on 2026-09-08.",
+        "parsedAmount": 18500.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Asiri Hospital",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Healthcare",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-023",
+      "description": "Online learning course fee - Coursera (Education)",
+      "source": "n8n_email_webhook",
+      "userPhone": "+94770000010",
+      "externalMessageId": "mock-email-coursera-023",
+      "rawMessage": "Payment of USD 49.00 completed to Coursera on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Payment of USD 49.00 completed to Coursera on 2026-09-08.",
+        "parsedAmount": 49.00,
+        "parsedCurrency": "USD",
+        "parsedMerchant": "Coursera",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Education",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-024",
+      "description": "Unrecognized boutique roastery - Artisan Roastery (Pending AI)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000001",
+      "externalMessageId": "mock-sms-artisan-024",
+      "rawMessage": "Spent LKR 1,750.00 at Artisan Roastery with card ending 9911 on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Spent LKR 1,750.00 at Artisan Roastery with card ending [REDACTED] on 2026-09-08.",
+        "parsedAmount": 1750.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Artisan Roastery",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Other",
+        "expectedStatus": "PENDING_AI"
+      }
+    },
+    {
+      "id": "mock-tx-025",
+      "description": "Unrecognized boutique merchant - Mystery Vintage Studio (Pending AI)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000002",
+      "externalMessageId": "mock-sms-vintage-025",
+      "rawMessage": "Card ending 7812 debited USD 65.00 at Mystery Vintage Studio on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Card ending [REDACTED] debited USD 65.00 at Mystery Vintage Studio on 2026-09-08.",
+        "parsedAmount": 65.00,
+        "parsedCurrency": "USD",
+        "parsedMerchant": "Mystery Vintage Studio",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Other",
+        "expectedStatus": "PENDING_AI"
+      }
+    },
+    {
+      "id": "mock-tx-026",
+      "description": "Salary deposit credit inflow - Apex Systems (Income Credit)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000001",
+      "externalMessageId": "mock-sms-salary-026",
+      "rawMessage": "Your account 001234567890 was credited with LKR 150,000.00 from Apex Systems on 2026-09-01.",
+      "expected": {
+        "maskedMessage": "Your account [REDACTED] was credited with LKR 150,000.00 from Apex Systems on 2026-09-01.",
+        "parsedAmount": 150000.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Apex Systems",
+        "parsedDirection": "CREDIT",
+        "expectedCategory": "Other",
+        "expectedStatus": "PENDING_AI"
+      }
+    },
+    {
+      "id": "mock-tx-027",
+      "description": "E-commerce refund credit inflow - Daraz (Income Credit)",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000009",
+      "externalMessageId": "mock-sms-refund-027",
+      "rawMessage": "Your account was credited by Rs. 2,500.00 from Daraz on 2026-09-08.",
+      "expected": {
+        "maskedMessage": "Your account was credited by Rs. 2,500.00 from Daraz on 2026-09-08.",
+        "parsedAmount": 2500.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Daraz",
+        "parsedDirection": "CREDIT",
+        "expectedCategory": "Shopping",
+        "expectedStatus": "RULE_CATEGORIZED"
+      }
+    },
+    {
+      "id": "mock-tx-028",
+      "description": "Duplicate event of mock-tx-001 for idempotency testing",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000001",
+      "externalMessageId": "mock-sms-keells-001",
+      "rawMessage": "LKR 4,500.00 was spent at Keells Super using card ending 1234 on 2026-09-01.",
+      "expected": {
+        "maskedMessage": "LKR 4,500.00 was spent at Keells Super using card ending [REDACTED] on 2026-09-01.",
+        "parsedAmount": 4500.00,
+        "parsedCurrency": "LKR",
+        "parsedMerchant": "Keells Super",
+        "parsedDirection": "DEBIT",
+        "expectedCategory": "Groceries",
+        "expectedStatus": "DUPLICATE"
+      }
+    },
+    {
+      "id": "mock-tx-029",
+      "description": "Invalid message: Bank OTP security authentication code",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000001",
+      "externalMessageId": "mock-sms-otp-029",
+      "rawMessage": "Your OTP for Online Banking login is 839201. Valid for 5 minutes. Do not share with anyone.",
+      "expected": {
+        "maskedMessage": "Your OTP for Online Banking login is 839201. Valid for 5 minutes. Do not share with anyone.",
+        "parsedAmount": null,
+        "parsedCurrency": null,
+        "parsedMerchant": null,
+        "parsedDirection": null,
+        "expectedCategory": null,
+        "expectedStatus": "PARSE_FAILED"
+      }
+    },
+    {
+      "id": "mock-tx-030",
+      "description": "Invalid message: Promotional marketing SMS offer",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000002",
+      "externalMessageId": "mock-sms-promo-030",
+      "rawMessage": "Enjoy 20% discount on dining at selected partner restaurants with your credit card this weekend!",
+      "expected": {
+        "maskedMessage": "Enjoy 20% discount on dining at selected partner restaurants with your credit card this weekend!",
+        "parsedAmount": null,
+        "parsedCurrency": null,
+        "parsedMerchant": null,
+        "parsedDirection": null,
+        "expectedCategory": null,
+        "expectedStatus": "PARSE_FAILED"
+      }
+    },
+    {
+      "id": "mock-tx-031",
+      "description": "Invalid message: Customer support resolution ticket notification",
+      "source": "n8n_sms_webhook",
+      "userPhone": "+94770000003",
+      "externalMessageId": "mock-sms-support-031",
+      "rawMessage": "Dear Customer, your inquiry ticket #98214 has been resolved. Thank you for banking with us.",
+      "expected": {
+        "maskedMessage": "Dear Customer, your inquiry ticket #98214 has been resolved. Thank you for banking with us.",
+        "parsedAmount": null,
+        "parsedCurrency": null,
+        "parsedMerchant": null,
+        "parsedDirection": null,
+        "expectedCategory": null,
+        "expectedStatus": "PARSE_FAILED"
+      }
+    }
+  ]
+}
