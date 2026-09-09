@@ -16,17 +16,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
-                .allowedOrigins(
-                        "http://localhost:3000",
-                        "http://127.0.0.1:3000",
-                        "http://localhost:5173",
-                        "http://127.0.0.1:5173",
-                        "http://localhost:5500",
-                        "http://127.0.0.1:5500"
-                )
+        registry.addMapping("/**")
+                .allowedOriginPatterns("*")
                 .allowedMethods("GET", "POST", "OPTIONS")
-                .allowedHeaders("Content-Type", "X-INGESTION-API-KEY")
+                .allowedHeaders("*")
                 .maxAge(3600);
     }
 

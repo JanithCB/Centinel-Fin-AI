@@ -1,23 +1,29 @@
-# Centinel Fin AI Frontend (Sovereign Hub)
+# Centinel Fin AI Frontend
 
-A cybernetic, institutional dark-mode financial intelligence dashboard generated with **Google Stitch** and wired directly to the **Centinel Fin AI** Spring Boot backend.
+A sleek, modern dark-mode financial intelligence dashboard connected directly to the **Centinel Fin AI** Spring Boot backend and Supabase PostgreSQL database.
 
-## Features
+## System Features
 
-- **Live Enclave Sync**: Automatically tests connectivity against `http://localhost:8080/api/summary`.
-- **KPI Metrics & Velocity Charts**: Visualizes monthly spend, predicted surplus, and AI categorization rates.
-- **Interactive Phone Mirror**: Simulates incoming bank SMS notifications and dispatches live HTTP POST requests to `/api/v1/ingestion/transaction-messages` with the configured `X-INGESTION-API-KEY`.
-- **Manual Ledger Logging**: Modal form allowing direct writes to `/api/transactions`.
-- **Node Settings**: Configurable backend URL and ingestion API key persisted in local storage.
+- **Live Backend & DB Health**: Continuously checks latency and connectivity against `GET /health` and `GET /api/summary`.
+- **Dynamic Spending Analytics**:
+  - Live Total Outflow and Top Spending Category calculated from backend data.
+  - Category Spending Breakdown dynamically rendered from `totalsByCategory`.
+  - Period Timeline Breakdown with **Monthly / Daily** toggle dynamically rendered from `totalsPerPeriod`.
+- **Message Ingestion Simulator**:
+  - Ingests raw bank SMS and webhook events via `POST /api/v1/ingestion/transaction-messages` with `X-INGESTION-API-KEY`.
+  - Live Webhook & API Response Inspector showing exact HTTP Status (202 Accepted, 200 Duplicate on idempotency, 401 Unauthorized, etc.) and JSON payloads.
+- **Manual Ledger Logging**:
+  - Form to record manual transactions directly into the ledger via `POST /api/transactions`.
+- **Session Activity Feed**:
+  - Real-time stream of transactions and ingested events created during the active browser session, with CSV export.
+- **Node Settings**:
+  - Configurable Backend Base URL, Ingestion Secret Key, and Active User Phone stored in `localStorage`.
 
 ## How to Run
 
 ### Option 1: Using `npx serve` (Port 3000)
-Run this command from inside the `frontend/` directory or project root:
+Run this command from inside the `frontend/` directory:
 ```bash
-# From d:\Centinel Fin AI\frontend
-npm start
-# OR directly
 npx serve -l 3000 .
 ```
 Then visit: `http://localhost:3000`
@@ -29,4 +35,4 @@ python -m http.server 3000
 
 ### Option 3: VS Code / IDE Live Server
 Right-click on `index.html` and select **Open with Live Server**.
-*(Note: If using another port, you can customize the Backend URL in the node settings pill in the top-right corner).*
+*(Note: If using another port, you can customize the Backend URL in the Node Settings in the top-right corner).*
