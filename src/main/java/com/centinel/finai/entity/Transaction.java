@@ -5,7 +5,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "transactions")
+@Table(name = "transactions", indexes = {
+    @Index(name = "idx_transactions_user_phone", columnList = "user_id"),
+    @Index(name = "idx_transactions_external_id", columnList = "external_message_id")
+})
 public class Transaction {
 
     @Id
@@ -35,6 +38,15 @@ public class Transaction {
 
     @Column(name = "is_ai_categorized")
     private Boolean isAiCategorized = false;
+
+    @Column(name = "processing_status", length = 50)
+    private String processingStatus;
+
+    @Column(name = "source", length = 100)
+    private String source;
+
+    @Column(name = "external_message_id")
+    private String externalMessageId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -133,6 +145,30 @@ public class Transaction {
 
     public void setIsAiCategorized(Boolean isAiCategorized) {
         this.isAiCategorized = isAiCategorized;
+    }
+
+    public String getProcessingStatus() {
+        return processingStatus;
+    }
+
+    public void setProcessingStatus(String processingStatus) {
+        this.processingStatus = processingStatus;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
+
+    public String getExternalMessageId() {
+        return externalMessageId;
+    }
+
+    public void setExternalMessageId(String externalMessageId) {
+        this.externalMessageId = externalMessageId;
     }
 
     public LocalDateTime getCreatedAt() {

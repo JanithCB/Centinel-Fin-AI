@@ -23,12 +23,28 @@ public class TransactionMessageIngestionResponse {
         this.ingestedAt = ingestedAt;
     }
 
+    public static TransactionMessageIngestionResponse of(String status, Long messageId, String externalMessageId, String message) {
+        return new TransactionMessageIngestionResponse(status, messageId, externalMessageId, message, OffsetDateTime.now());
+    }
+
+    public static TransactionMessageIngestionResponse ruleCategorized(Long messageId, String externalMessageId, String message) {
+        return of("RULE_CATEGORIZED", messageId, externalMessageId, message);
+    }
+
+    public static TransactionMessageIngestionResponse pendingAi(Long messageId, String externalMessageId, String message) {
+        return of("PENDING_AI", messageId, externalMessageId, message);
+    }
+
+    public static TransactionMessageIngestionResponse parseFailed(Long messageId, String externalMessageId, String message) {
+        return of("PARSE_FAILED", messageId, externalMessageId, message);
+    }
+
     public static TransactionMessageIngestionResponse accepted(Long messageId, String externalMessageId, String message) {
-        return new TransactionMessageIngestionResponse("ACCEPTED", messageId, externalMessageId, message, OffsetDateTime.now());
+        return of("ACCEPTED", messageId, externalMessageId, message);
     }
 
     public static TransactionMessageIngestionResponse duplicate(Long messageId, String externalMessageId, String message) {
-        return new TransactionMessageIngestionResponse("DUPLICATE", messageId, externalMessageId, message, OffsetDateTime.now());
+        return of("DUPLICATE", messageId, externalMessageId, message);
     }
 
     public String getStatus() {
