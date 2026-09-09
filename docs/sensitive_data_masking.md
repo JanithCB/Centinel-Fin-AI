@@ -1,5 +1,9 @@
 # Sensitive Data Masking & Privacy Architecture (CEN-10)
 
+> **Jira Epic:** [SCRUM-15](https://janiya2k04.atlassian.net/browse/SCRUM-15)  
+> **Story:** CEN-10 – Implement sensitive-data masking utility  
+> **Component:** `SensitiveDataMaskingService.java` & `MaskingUtils.java`
+
 This document details the design, regex patterns, lifecycle integration, limitations, and future improvements of the sensitive-data masking engine in **Centinel Fin AI**.
 
 ---
@@ -10,6 +14,7 @@ Centinel Fin AI adheres to **Privacy by Design**:
 * Sensitive financial identifiers (primary account numbers, card endings, account numbers, security codes) are **never sent to external AI models (e.g. Gemini LLM)** in plaintext.
 * Detailed application logs never output raw financial numbers.
 * Redaction occurs in-memory before any outbound network call or log statement.
+* Raw input handling is deliberately kept limited to secure local ingestion storage, preventing leakage to downstream services.
 
 ---
 
@@ -39,10 +44,10 @@ graph TD
 
 ---
 
-## 4. Current Limitations
+## 4. Current Limitations & Architectural Decisions
 
 1. **Unlabeled Account Numbers**:
-   * If a transaction notification mentions a 10-digit number without an accompanying label (such as `Account`, `A/C`, `Acc No`), regex heuristics avoid aggressive replacement to prevent redacting non-sensitive reference IDs or invoice numbers.
+   * If a transaction notification mentions a 10-digit number without an accompanying label (such as `Account`, `A/C`, `Acc No`), regex heuristics avoid aggressive replacement to prevent redacting non-sensitive reference IDs, tracking codes, or invoice numbers.
 2. **International IBAN / Non-standard SWIFT Formats**:
    * Current regex patterns target standard retail banking SMS patterns (Sri Lankan, US, UK, SEPA cards/accounts). Complex international IBANs (e.g. `GB29 XAAA 2014 5612 3456 78`) with custom spaces require labeled prefixes.
 3. **Language Support**:
