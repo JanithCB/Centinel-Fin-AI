@@ -39,7 +39,7 @@ It provides **31 synthetic transaction messages** designed for automated testing
 Centinel Fin AI receives ingestion webhooks via the following contract:
 
 ```http
-POST /api/v1/ingest/message
+POST /api/v1/ingestion/transaction-messages
 Content-Type: application/json
 
 {
