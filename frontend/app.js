@@ -9,7 +9,10 @@
 
 const CONFIG = {
   get apiBase() {
-    return localStorage.getItem('centinel_api_base') || (window.location.origin.startsWith('http') ? window.location.origin : 'http://localhost:8080');
+    const stored = localStorage.getItem('centinel_api_base');
+    if (stored) return stored;
+    if (window.location.port === '8080') return window.location.origin;
+    return 'http://localhost:8080';
   },
   set apiBase(val) {
     localStorage.setItem('centinel_api_base', val.trim());
