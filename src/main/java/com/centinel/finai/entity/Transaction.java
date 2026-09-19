@@ -1,6 +1,7 @@
 package com.centinel.finai.entity;
 
 import jakarta.persistence.*;
+import com.centinel.finai.identity.User;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 

@@ -1,9 +1,9 @@
 package com.centinel.finai.controller;
 
 import com.centinel.finai.entity.Transaction;
-import com.centinel.finai.entity.User;
+import com.centinel.finai.identity.User;
 import com.centinel.finai.repository.TransactionRepository;
-import com.centinel.finai.repository.UserRepository;
+import com.centinel.finai.identity.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

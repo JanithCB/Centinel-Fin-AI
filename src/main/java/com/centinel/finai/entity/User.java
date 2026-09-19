@@ -1,82 +1,23 @@
 package com.centinel.finai.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.*;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-
-@Entity
-@Table(name = "users")
-public class User {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "phone_number", nullable = false, unique = true)
-    private String phoneNumber;
-
-    @Column(name = "display_name")
-    private String displayName;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @JsonIgnore
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Transaction> transactions = new ArrayList<>();
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-    }
+/**
+ * @deprecated Moved to {@link com.centinel.finai.identity.User}.
+ * This type alias is retained only for backward compatibility during the PG-BE-1A
+ * refactor. All new code must use {@code com.centinel.finai.identity.User}.
+ * This class will be deleted after all references are migrated.
+ *
+ * <p>Note: The {@code @Entity} mapping now lives exclusively in
+ * {@code com.centinel.finai.identity.User} to avoid duplicate JPA mapping errors.
+ */
+@Deprecated(since = "PG-BE-1A", forRemoval = true)
+public class User extends com.centinel.finai.identity.User {
 
     public User() {
+        super();
     }
 
+    /** Legacy constructor used by SMS ingestion pipeline. */
     public User(String phoneNumber, String displayName) {
-        this.phoneNumber = phoneNumber;
-        this.displayName = displayName;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
-
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public void setDisplayName(String displayName) {
-        this.displayName = displayName;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public List<Transaction> getTransactions() {
-        return transactions;
-    }
-
-    public void setTransactions(List<Transaction> transactions) {
-        this.transactions = transactions;
+        super(phoneNumber, displayName);
     }
 }
