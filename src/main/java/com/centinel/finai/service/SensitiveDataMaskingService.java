@@ -57,4 +57,31 @@ public class SensitiveDataMaskingService {
 
         return masked;
     }
+
+    /**
+     * Extracts the domain from a URL to minimize data collection.
+     * For example, "https://www.amazon.com/dp/12345?ref=xyz" becomes "amazon.com"
+     *
+     * @param url the full URL
+     * @return the base domain
+     */
+    public String maskUrl(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            String domain = url.trim();
+            if (!domain.startsWith("http://") && !domain.startsWith("https://")) {
+                domain = "http://" + domain;
+            }
+            java.net.URI uri = new java.net.URI(domain);
+            String host = uri.getHost();
+            if (host != null) {
+                return host.replaceFirst("^www\\.", "");
+            }
+        } catch (java.net.URISyntaxException e) {
+            // fallback
+        }
+        return url;
+    }
 }
