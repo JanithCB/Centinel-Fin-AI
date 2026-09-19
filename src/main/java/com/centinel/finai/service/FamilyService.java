@@ -93,4 +93,11 @@ public class FamilyService {
                 .distinct()
                 .collect(Collectors.toList());
     }
+
+    @Transactional(readOnly = true)
+    public boolean isParentOfFamily(Long parentUserId, Long familyId) {
+        return familyMemberRepository.findByFamilyIdAndUserId(familyId, parentUserId)
+                .map(m -> m.getRelationshipRole() == UserRole.PARENT)
+                .orElse(false);
+    }
 }

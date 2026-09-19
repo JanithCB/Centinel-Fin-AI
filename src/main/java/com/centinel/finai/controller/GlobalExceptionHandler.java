@@ -79,6 +79,33 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
     }
 
+    @ExceptionHandler({
+        com.centinel.finai.common.exception.ForbiddenOperationException.class,
+        com.centinel.finai.common.exception.RequestOwnershipException.class
+    })
+    public ResponseEntity<ApiErrorResponse> handleForbidden(Exception ex) {
+        String correlationId = MDC.get(CORRELATION_ID_LOG_VAR_NAME);
+        ApiErrorResponse response = new ApiErrorResponse(
+                HttpStatus.FORBIDDEN.value(),
+                HttpStatus.FORBIDDEN.getReasonPhrase(),
+                ex.getMessage(),
+                correlationId
+        );
+        return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(com.centinel.finai.common.exception.IllegalStateTransitionException.class)
+    public ResponseEntity<ApiErrorResponse> handleConflict(Exception ex) {
+        String correlationId = MDC.get(CORRELATION_ID_LOG_VAR_NAME);
+        ApiErrorResponse response = new ApiErrorResponse(
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                correlationId
+        );
+        return new ResponseEntity<>(response, HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleAllExceptions(Exception ex) {
         String correlationId = MDC.get(CORRELATION_ID_LOG_VAR_NAME);
