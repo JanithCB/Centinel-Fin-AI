@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -30,6 +32,9 @@ public class IngestionControllerTest {
     private static final String VALID_TEST_API_KEY = "test-ingestion-secret-key";
 
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @Autowired
     private WebApplicationContext webApplicationContext;

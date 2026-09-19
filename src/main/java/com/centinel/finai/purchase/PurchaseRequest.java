@@ -71,12 +71,24 @@ public class PurchaseRequest {
         return id;
     }
 
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public Family getFamily() {
         return family;
     }
 
     public User getChild() {
         return child;
+    }
+
+    public void setFamily(Family family) {
+        this.family = family;
+    }
+
+    public void setChild(User child) {
+        this.child = child;
     }
 
     public String getSiteDomain() {

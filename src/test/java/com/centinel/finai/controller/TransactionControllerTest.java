@@ -20,9 +20,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
 public class TransactionControllerTest {
+
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     private MockMvc mockMvc;
 
