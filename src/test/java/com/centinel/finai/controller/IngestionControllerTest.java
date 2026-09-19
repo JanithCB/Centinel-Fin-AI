@@ -4,7 +4,7 @@ import com.centinel.finai.entity.IngestedMessage;
 import com.centinel.finai.entity.Transaction;
 import com.centinel.finai.repository.IngestedMessageRepository;
 import com.centinel.finai.repository.TransactionRepository;
-import com.centinel.finai.repository.UserRepository;
+import com.centinel.finai.identity.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

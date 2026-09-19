@@ -4,9 +4,9 @@ import com.centinel.finai.dto.CategorizationResult;
 import com.centinel.finai.dto.ParsedTransactionData;
 import com.centinel.finai.dto.TransactionRequest;
 import com.centinel.finai.entity.Transaction;
-import com.centinel.finai.entity.User;
+import com.centinel.finai.identity.User;
+import com.centinel.finai.identity.UserRepository;
 import com.centinel.finai.repository.TransactionRepository;
-import com.centinel.finai.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
