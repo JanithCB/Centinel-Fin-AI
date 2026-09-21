@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #151515;
+  --color-paper: #FFFDF7;
+  --color-surface: #FFFFFF;
+  --color-lime: #D9FF3F;
+  --color-violet: #B9A7FF;
+  --color-coral: #FF8F7C;
+  --color-sky: #8DDAFF;
+  --color-sun: #FFD64A;
+  --color-mint: #8EF0C0;
+  --color-muted: #E9E6DD;
+  --color-danger: #E5484D;
+
+  --color-primary: #D9FF3F;
+  --color-primary-container: #D9FF3F;
+  --color-on-primary-fixed: #151515;
+  --color-secondary-container: #B9A7FF;
+  --color-secondary-fixed: #B9A7FF;
+  --color-on-secondary-fixed: #151515;
+  --color-tertiary-container: #8DDAFF;
+  --color-tertiary-fixed: #8DDAFF;
+  --color-on-tertiary-container: #151515;
+  --color-on-tertiary-fixed: #151515;
+  --color-surface-container: #F0EDEC;
+  --color-surface-container-lowest: #FFFFFF;
+  --color-on-surface: #151515;
+  --color-on-surface-variant: #454934;
+  --color-outline: #757962;
+
+  --font-display-lg: var(--font-space-grotesk), sans-serif;
+  --font-headline-lg: var(--font-space-grotesk), sans-serif;
+  --font-headline-md: var(--font-space-grotesk), sans-serif;
+  --font-headline-sm: var(--font-space-grotesk), sans-serif;
+  --font-body-lg: var(--font-inter), sans-serif;
+  --font-body-sm: var(--font-inter), sans-serif;
+  --font-label-md: var(--font-inter), sans-serif;
+  --font-label-sm: var(--font-inter), sans-serif;
+  --font-caption: var(--font-inter), sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-body-lg);
+  }
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined', sans-serif !important;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none !important;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
