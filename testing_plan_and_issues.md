@@ -72,56 +72,37 @@ flowchart TD
 
 ---
 
-## 4. GitHub Issues for Review
+## 4. Live GitHub Issues
 
-Below are the structured GitHub issues ready to be tracked and implemented:
+All 6 issues have been created and published to the GitHub repository:
 
-### Issue #1: Fix Supabase JWT Subject Resolution & User Entity Mapping in Backend
-- **Type:** `bug`, `backend`, `security`
-- **Priority:** High
-- **Description:**
-  `CurrentUserResolver` assumes `jwt.getSubject()` is a `Long`. In Supabase, `sub` is a UUID string.
-  1. Add a `supabase_user_id` (UUID/String) or `auth_id` column to `users` table and `User.java`.
-  2. Update `CurrentUserResolver` to resolve the current user by UUID `sub` or email claim rather than parsing as `Long`.
-  3. Update existing controller unit tests to verify UUID subjects.
+### [Issue #4: Fix Supabase JWT Subject Resolution & User Entity Mapping in Backend](https://github.com/JanithCB/Centinel-Fin-AI/issues/4)
+- **Status:** Resolved (Implemented & Tested)
+- **Labels:** `bug`, `security`
+- **Link:** https://github.com/JanithCB/Centinel-Fin-AI/issues/4
 
-### Issue #2: Connect Supabase Authentication Logic in Frontend Sign-In & Sign-Up Forms
-- **Type:** `feature`, `frontend`, `auth`
-- **Priority:** High
-- **Description:**
-  Connect the Next.js auth pages to the Supabase client:
-  1. In `frontend/src/app/auth/sign-in/page.tsx`, handle form submit via `supabase.auth.signInWithPassword`.
-  2. In `frontend/src/app/auth/sign-up/page.tsx`, handle form submit via `supabase.auth.signUp` passing `data.role`.
-  3. Add loading indicators, field validation errors, and redirect on successful authentication.
+### [Issue #5: Connect Supabase Authentication Logic in Frontend Sign-In & Sign-Up Forms](https://github.com/JanithCB/Centinel-Fin-AI/issues/5)
+- **Status:** Resolved (Implemented & Tested)
+- **Labels:** `enhancement`
+- **Link:** https://github.com/JanithCB/Centinel-Fin-AI/issues/5
 
-### Issue #3: Implement Backend User Registration / Sync Endpoint (`/api/v1/users/register`)
-- **Type:** `feature`, `backend`
-- **Priority:** Medium
-- **Description:**
-  Implement `UserController` with `POST /api/v1/users/register`:
-  1. Accepts user role and creates or links the internal `User` entity to the authenticated Supabase user ID.
-  2. Protect endpoint with JWT authentication so the user ID is extracted from the verified token.
+### [Issue #6: Implement Backend User Registration / Sync Endpoint (`/api/v1/users/register`)](https://github.com/JanithCB/Centinel-Fin-AI/issues/6)
+- **Status:** Resolved (Implemented & Tested)
+- **Labels:** `enhancement`
+- **Link:** https://github.com/JanithCB/Centinel-Fin-AI/issues/6
 
-### Issue #4: Setup Frontend Automated Test Suite (Vitest + React Testing Library)
-- **Type:** `enhancement`, `frontend`, `testing`
-- **Priority:** High
-- **Description:**
-  1. Install and configure Vitest, `@testing-library/react`, and `@testing-library/user-event`.
-  2. Add test scripts in `package.json` (`npm run test`).
-  3. Add component unit tests for `SignInPage`, `SignUpPage`, and `ApiClient`.
+### [Issue #7: Setup Frontend Automated Test Suite (Vitest + React Testing Library)](https://github.com/JanithCB/Centinel-Fin-AI/issues/7)
+- **Status:** Resolved (Implemented & Tested)
+- **Labels:** `enhancement`
+- **Link:** https://github.com/JanithCB/Centinel-Fin-AI/issues/7
 
-### Issue #5: Setup Playwright E2E Test Suite for Auth and Purchase Request Flow
-- **Type:** `enhancement`, `testing`, `e2e`
-- **Priority:** Medium
-- **Description:**
-  1. Setup Playwright in `frontend/` or root directory.
-  2. Write automated browser tests covering:
-     - Sign-in with valid and invalid credentials.
-     - Role-based redirection.
-     - Submitting and reviewing purchase requests.
+### [Issue #8: Implement Next.js Auth Middleware for Protected Routes](https://github.com/JanithCB/Centinel-Fin-AI/issues/8)
+- **Status:** Resolved (Implemented & Tested)
+- **Labels:** `security`
+- **Link:** https://github.com/JanithCB/Centinel-Fin-AI/issues/8
 
-### Issue #6: Implement Next.js Auth Middleware for Protected Routes
-- **Type:** `security`, `frontend`
-- **Priority:** Medium
-- **Description:**
-  Create `frontend/src/middleware.ts` using `@supabase/ssr` to check session state on protected routes (`/dashboard`, `/family`, etc.) and redirect unauthenticated sessions to `/auth/sign-in`.
+### [Issue #9: Setup Playwright E2E Test Suite for Auth and Purchase Request Flow](https://github.com/JanithCB/Centinel-Fin-AI/issues/9)
+- **Status:** Open (Ready for implementation)
+- **Labels:** `enhancement`
+- **Link:** https://github.com/JanithCB/Centinel-Fin-AI/issues/9
+
