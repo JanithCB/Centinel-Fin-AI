@@ -1,11 +1,46 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function SignInPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("alex.turner@familyguard.internal");
+  const [password, setPassword] = useState("12345678");
   const [showPassword, setShowPassword] = useState(false);
-  const [showError, setShowError] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setIsLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setErrorMessage(error.message || "Invalid email or password.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (data?.session) {
+        router.push("/");
+        router.refresh();
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || "An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="flex flex-col w-full items-center p-6 mt-10">
@@ -53,12 +88,12 @@ export default function SignInPage() {
               SIGN IN
             </h1>
             <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Access your ParentGuard space.
+              Access your ParentGuard space with verified credentials.
             </p>
           </div>
 
-          {/* Realistic Validation / Error Strip */}
-          {showError && (
+          {/* Error Banner */}
+          {errorMessage && (
             <div className="mb-6 p-3 bg-coral border-[3px] border-ink shadow-[4px_4px_0px_#151515] rounded flex items-start gap-3 animate-[fadeIn_0.2s_ease-out]">
               <span
                 className="material-symbols-outlined text-ink text-[20px] shrink-0 mt-0.5"
@@ -71,13 +106,13 @@ export default function SignInPage() {
                   Authentication Failed
                 </p>
                 <p className="font-caption text-caption text-ink font-medium leading-snug">
-                  We could not sign you in with those details.
+                  {errorMessage}
                 </p>
               </div>
               <button
                 aria-label="Dismiss alert"
-                className="text-ink hover:opacity-75"
-                onClick={() => setShowError(false)}
+                className="text-ink hover:opacity-75 cursor-pointer"
+                onClick={() => setErrorMessage(null)}
                 type="button"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
@@ -86,7 +121,7 @@ export default function SignInPage() {
           )}
 
           {/* Form */}
-          <form className="flex flex-col space-y-5" onSubmit={(e) => e.preventDefault()}>
+          <form className="flex flex-col space-y-5" onSubmit={handleSignIn}>
             {/* Email Field */}
             <div className="flex flex-col space-y-1.5">
               <div className="flex items-center justify-between">
@@ -108,7 +143,9 @@ export default function SignInPage() {
                   placeholder="parent@example.com or child@example.com"
                   required
                   type="email"
-                  defaultValue="alex.turner@familyguard.internal"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -137,11 +174,13 @@ export default function SignInPage() {
                   placeholder="Enter your security passkey"
                   required
                   type={showPassword ? "text" : "password"}
-                  defaultValue="12345678"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
                 />
                 <button
                   aria-label="Toggle password visibility"
-                  className="absolute right-3 text-on-surface-variant hover:text-ink flex items-center justify-center p-1"
+                  className="absolute right-3 text-on-surface-variant hover:text-ink flex items-center justify-center p-1 cursor-pointer"
                   onClick={() => setShowPassword(!showPassword)}
                   type="button"
                 >
@@ -152,44 +191,13 @@ export default function SignInPage() {
               </div>
             </div>
 
-            {/* Role Context Radio Bar */}
-            <div className="p-2.5 bg-paper rounded border-2 border-ink flex items-center justify-between">
-              <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
-                Default Portal
-              </span>
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    defaultChecked
-                    className="accent-[#151515] w-3.5 h-3.5 cursor-pointer"
-                    name="account_mode"
-                    type="radio"
-                    value="parent"
-                  />
-                  <span className="font-label-sm text-label-sm uppercase px-1.5 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed border border-ink">
-                    Guardian
-                  </span>
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    className="accent-[#151515] w-3.5 h-3.5 cursor-pointer"
-                    name="account_mode"
-                    type="radio"
-                    value="child"
-                  />
-                  <span className="font-label-sm text-label-sm uppercase px-1.5 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed border border-ink">
-                    Child
-                  </span>
-                </label>
-              </div>
-            </div>
-
             {/* Primary CTA Button */}
             <button
-              className="w-full mt-2 bg-primary-container text-ink font-label-md text-label-md tracking-wider uppercase py-3.5 px-4 rounded border-[3px] border-ink shadow-[6px_6px_0px_#151515] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[8px_8px_0px_#151515] active:translate-x-1 active:translate-y-1 active:shadow-[1px_1px_0px_#151515] transition-all flex items-center justify-center gap-2 font-bold cursor-pointer"
+              className="w-full mt-2 bg-primary-container text-ink font-label-md text-label-md tracking-wider uppercase py-3.5 px-4 rounded border-[3px] border-ink shadow-[6px_6px_0px_#151515] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[8px_8px_0px_#151515] active:translate-x-1 active:translate-y-1 active:shadow-[1px_1px_0px_#151515] transition-all flex items-center justify-center gap-2 font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               type="submit"
+              disabled={isLoading}
             >
-              <span>[ SIGN IN ]</span>
+              <span>{isLoading ? "[ SIGNING IN... ]" : "[ SIGN IN ]"}</span>
               <span className="material-symbols-outlined text-[18px]">
                 arrow_forward
               </span>

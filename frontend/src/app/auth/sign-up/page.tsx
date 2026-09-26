@@ -1,10 +1,74 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { ApiClient } from "@/lib/api-client";
 
 export default function SignUpPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<"PARENT" | "CHILD">("PARENT");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match. Please verify and try again.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setErrorMessage("Password must be at least 8 characters long.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            role: role,
+          },
+        },
+      });
+
+      if (error) {
+        setErrorMessage(error.message || "Failed to create account.");
+        setIsLoading(false);
+        return;
+      }
+
+      // If user session is established immediately, sync with backend
+      if (data?.session) {
+        try {
+          await ApiClient.registerUser(role);
+        } catch (syncErr: any) {
+          console.warn("Backend user registration sync warning:", syncErr);
+        }
+        router.push("/");
+        router.refresh();
+      } else {
+        setSuccessMessage("Account created successfully! Please check your email inbox to verify your account before signing in.");
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || "An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="flex flex-col w-full items-center p-6 mt-10">
@@ -37,10 +101,55 @@ export default function SignUpPage() {
             </p>
           </div>
 
-          <form
-            className="flex flex-col gap-6"
-            onSubmit={(e) => e.preventDefault()}
-          >
+          {/* Error Banner */}
+          {errorMessage && (
+            <div className="p-3 bg-coral border-[3px] border-ink shadow-[4px_4px_0px_#151515] rounded flex items-start gap-3 animate-[fadeIn_0.2s_ease-out]">
+              <span
+                className="material-symbols-outlined text-ink text-[20px] shrink-0 mt-0.5"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                error
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="font-label-sm text-label-sm uppercase tracking-wider text-ink font-bold">
+                  Registration Error
+                </p>
+                <p className="font-caption text-caption text-ink font-medium leading-snug">
+                  {errorMessage}
+                </p>
+              </div>
+              <button
+                aria-label="Dismiss alert"
+                className="text-ink hover:opacity-75 cursor-pointer"
+                onClick={() => setErrorMessage(null)}
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+          )}
+
+          {/* Success Banner */}
+          {successMessage && (
+            <div className="p-3 bg-mint border-[3px] border-ink shadow-[4px_4px_0px_#151515] rounded flex items-start gap-3 animate-[fadeIn_0.2s_ease-out]">
+              <span
+                className="material-symbols-outlined text-ink text-[20px] shrink-0 mt-0.5"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                check_circle
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="font-label-sm text-label-sm uppercase tracking-wider text-ink font-bold">
+                  Registration Successful
+                </p>
+                <p className="font-caption text-caption text-ink font-medium leading-snug">
+                  {successMessage}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <form className="flex flex-col gap-6" onSubmit={handleSignUp}>
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label
@@ -59,6 +168,9 @@ export default function SignUpPage() {
                     placeholder="e.g. alex@familyguard.org"
                     required
                     type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -77,6 +189,9 @@ export default function SignUpPage() {
                     placeholder="••••••••••••"
                     required
                     type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
                   />
                   <span className="font-caption text-caption text-outline">
                     Minimum 8 characters
@@ -96,12 +211,15 @@ export default function SignUpPage() {
                     placeholder="••••••••••••"
                     required
                     type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={isLoading}
                   />
                   <span
                     className="font-caption text-caption text-outline"
                     id="match-hint"
                   >
-                    Re-enter your secret
+                    Re-enter your password
                   </span>
                 </div>
               </div>
@@ -147,8 +265,8 @@ export default function SignUpPage() {
                     Family Lead
                   </p>
                   <p className="font-caption text-caption text-on-surface-variant leading-relaxed">
-                    Create and manage a family space, invite children, and set
-                    future purchase boundaries.
+                    Create and manage a family space, invite children, and review
+                    purchase requests.
                   </p>
                 </label>
                 <label
@@ -198,17 +316,18 @@ export default function SignUpPage() {
                 </span>
                 <p className="font-caption text-caption text-on-surface-variant leading-normal">
                   The backend enforces verified roles and family relationships.
-                  Role permissions are verified on the server via Spring Boot API.
+                  Role permissions are cryptographically signed in the Supabase JWT.
                 </p>
               </div>
             </div>
 
             <div className="flex flex-col gap-4 pt-2">
               <button
-                className="w-full bg-primary-container text-ink border-[3px] border-ink shadow-[6px_6px_0px_#151515] font-label-md text-label-md tracking-wider uppercase py-4 rounded-lg font-bold flex items-center justify-center gap-2 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[8px_8px_0px_#151515] active:translate-x-1 active:translate-y-1 active:shadow-[1px_1px_0px_#151515] transition-all cursor-pointer"
+                className="w-full bg-primary-container text-ink border-[3px] border-ink shadow-[6px_6px_0px_#151515] font-label-md text-label-md tracking-wider uppercase py-4 rounded-lg font-bold flex items-center justify-center gap-2 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[8px_8px_0px_#151515] active:translate-x-1 active:translate-y-1 active:shadow-[1px_1px_0px_#151515] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 type="submit"
+                disabled={isLoading}
               >
-                <span>Continue to Setup</span>
+                <span>{isLoading ? "[ CREATING ACCOUNT... ]" : "[ CREATE ACCOUNT ]"}</span>
                 <span className="material-symbols-outlined text-lg font-bold">
                   arrow_forward
                 </span>

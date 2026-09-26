@@ -23,6 +23,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /** ParentGuard lookup for web-app email-based authentication. */
     Optional<User> findByEmail(String email);
 
+    /** ParentGuard lookup by Supabase Auth UUID. */
+    Optional<User> findByAuthId(String authId);
+
     /**
      * Verifies that a user with the given ID has the expected role.
      * Useful for authorization checks without loading the full entity first.

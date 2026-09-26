@@ -38,6 +38,10 @@ public class User {
     @Column(name = "display_name")
     private String displayName;
 
+    /** Supabase Auth UUID identifier. */
+    @Column(name = "auth_id", unique = true)
+    private String authId;
+
     /**
      * The role of this user within the ParentGuard system.
      * Defaults to {@link UserRole#CHILD} for safety; must be explicitly
@@ -76,6 +80,14 @@ public class User {
         this.role = role;
     }
 
+    /** ParentGuard constructor with Supabase Auth ID. */
+    public User(String authId, String email, String displayName, UserRole role) {
+        this.authId = authId;
+        this.email = email;
+        this.displayName = displayName;
+        this.role = role;
+    }
+
     // ── Getters and Setters ───────────────────────────────────────────────────
 
     public Long getId() {
@@ -84,6 +96,14 @@ public class User {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getAuthId() {
+        return authId;
+    }
+
+    public void setAuthId(String authId) {
+        this.authId = authId;
     }
 
     public String getPhoneNumber() {
