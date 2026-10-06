@@ -102,7 +102,8 @@ All 6 issues have been created and published to the GitHub repository:
 - **Link:** https://github.com/JanithCB/Centinel-Fin-AI/issues/8
 
 ### [Issue #9: Setup Playwright E2E Test Suite for Auth and Purchase Request Flow](https://github.com/JanithCB/Centinel-Fin-AI/issues/9)
-- **Status:** Open (Ready for implementation)
+- **Status:** Resolved (Implemented & Tested)
 - **Labels:** `enhancement`
 - **Link:** https://github.com/JanithCB/Centinel-Fin-AI/issues/9
+- **Summary:** Installed `@playwright/test` and Chromium runtime. Configured [`playwright.config.ts`](file:///d:/Centinel%20Fin%20AI/frontend/playwright.config.ts) and authored [`frontend/e2e/auth-multi-portal.spec.ts`](file:///d:/Centinel%20Fin%20AI/frontend/e2e/auth-multi-portal.spec.ts) covering client-side security criteria, Parent portal account creation & sync, Child portal account creation in an isolated browser session, live Supabase authentication failure mode, and concurrent dual-portal authenticated sign-in with zero state collisions (5/5 tests passing).
 
