@@ -10,6 +10,8 @@ export interface UserProfile {
   phoneNumber?: string;
   role: 'PARENT' | 'CHILD';
   createdAt: string;
+  familyId?: number | null;
+  familyName?: string | null;
 }
 
 export interface FamilyResponse {

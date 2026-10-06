@@ -66,6 +66,13 @@ public class CurrentUserResolver {
     }
 
     public UserRole getCurrentUserRole() {
+        // 1. Database is the authoritative source of truth for application role (AC-82)
+        Optional<User> user = getCurrentUser();
+        if (user.isPresent() && user.get().getRole() != null) {
+            return user.get().getRole();
+        }
+
+        // 2. Fallback for unpersisted test contexts that provide app_metadata
         Jwt jwt = getJwt();
         if (jwt != null) {
             Map<String, Object> appMetadata = jwt.getClaimAsMap("app_metadata");
@@ -76,11 +83,6 @@ public class CurrentUserResolver {
                 } catch (IllegalArgumentException ignored) {
                 }
             }
-        }
-
-        Optional<User> user = getCurrentUser();
-        if (user.isPresent() && user.get().getRole() != null) {
-            return user.get().getRole();
         }
 
         return null;

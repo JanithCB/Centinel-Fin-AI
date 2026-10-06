@@ -124,4 +124,30 @@ class CurrentUserResolverTest {
         UserRole role = currentUserResolver.getCurrentUserRole();
         assertThat(role).isEqualTo(UserRole.PARENT);
     }
+
+    @Test
+    void getCurrentUserRole_databaseRoleOverridesJwtMetadata() {
+        String uuid = "user-tamper-attempt";
+        Jwt jwt = Jwt.withTokenValue("mock-token")
+                .header("alg", "none")
+                .subject(uuid)
+                .claim("app_metadata", Map.of("role", "PARENT")) // Tampered metadata claims PARENT
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+
+        setSecurityContextWithJwt(jwt);
+
+        User mockUser = new User();
+        mockUser.setId(50L);
+        mockUser.setAuthId(uuid);
+        mockUser.setRole(UserRole.CHILD); // DB actually stores CHILD
+
+        when(userRepository.findByAuthId(uuid)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findById(50L)).thenReturn(Optional.of(mockUser));
+
+        UserRole role = currentUserResolver.getCurrentUserRole();
+        // AC-82 & AC-05: DB role is the authority, tampered metadata is completely ignored
+        assertThat(role).isEqualTo(UserRole.CHILD);
+    }
 }

@@ -12,11 +12,17 @@ public class UserResponseDTO {
     private String phoneNumber;
     private UserRole role;
     private LocalDateTime createdAt;
+    private Long familyId;
+    private String familyName;
 
     public UserResponseDTO() {
     }
 
     public UserResponseDTO(Long id, String authId, String email, String displayName, String phoneNumber, UserRole role, LocalDateTime createdAt) {
+        this(id, authId, email, displayName, phoneNumber, role, createdAt, null, null);
+    }
+
+    public UserResponseDTO(Long id, String authId, String email, String displayName, String phoneNumber, UserRole role, LocalDateTime createdAt, Long familyId, String familyName) {
         this.id = id;
         this.authId = authId;
         this.email = email;
@@ -24,6 +30,8 @@ public class UserResponseDTO {
         this.phoneNumber = phoneNumber;
         this.role = role;
         this.createdAt = createdAt;
+        this.familyId = familyId;
+        this.familyName = familyName;
     }
 
     public Long getId() {
@@ -80,5 +88,21 @@ public class UserResponseDTO {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Long getFamilyId() {
+        return familyId;
+    }
+
+    public void setFamilyId(Long familyId) {
+        this.familyId = familyId;
+    }
+
+    public String getFamilyName() {
+        return familyName;
+    }
+
+    public void setFamilyName(String familyName) {
+        this.familyName = familyName;
     }
 }

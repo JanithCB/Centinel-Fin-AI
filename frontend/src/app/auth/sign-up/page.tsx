@@ -58,10 +58,11 @@ export default function SignUpPage() {
         } catch (syncErr: any) {
           console.warn("Backend user registration sync warning:", syncErr);
         }
-        router.push("/");
+        router.push("/dashboard");
         router.refresh();
       } else {
-        setSuccessMessage("Account created successfully! Please check your email inbox to verify your account before signing in.");
+        // AC-36: When signup does not return an authenticated session, route to verify-email
+        router.push(`/auth/verify-email?email=${encodeURIComponent(email)}`);
       }
     } catch (err: any) {
       setErrorMessage(err?.message || "An unexpected error occurred. Please try again.");
