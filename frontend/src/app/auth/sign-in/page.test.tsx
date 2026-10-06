@@ -61,7 +61,7 @@ describe('SignInPage Component', () => {
         email: 'alex.turner@familyguard.internal',
         password: '12345678',
       })
-      expect(mockPush).toHaveBeenCalledWith('/')
+      expect(mockPush).toHaveBeenCalledWith('/dashboard')
     })
   })
 

@@ -91,7 +91,7 @@ describe('SignUpPage Component', () => {
           },
         },
       })
-      expect(mockPush).toHaveBeenCalledWith('/')
+      expect(mockPush).toHaveBeenCalledWith('/dashboard')
     })
   })
 })

@@ -7,10 +7,13 @@ import com.centinel.finai.dto.UserResponseDTO;
 import com.centinel.finai.identity.User;
 import com.centinel.finai.identity.UserRepository;
 import com.centinel.finai.identity.UserRole;
+import com.centinel.finai.family.FamilyMember;
+import com.centinel.finai.family.FamilyMemberRepository;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -18,18 +21,30 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final CurrentUserResolver currentUserResolver;
+    private final FamilyMemberRepository familyMemberRepository;
 
-    public UserService(UserRepository userRepository, CurrentUserResolver currentUserResolver) {
+    public UserService(UserRepository userRepository, CurrentUserResolver currentUserResolver, FamilyMemberRepository familyMemberRepository) {
         this.userRepository = userRepository;
         this.currentUserResolver = currentUserResolver;
+        this.familyMemberRepository = familyMemberRepository;
     }
 
-    @Transactional
     public UserResponseDTO registerOrSyncUser(RegisterUserDTO dto, Jwt jwt) {
         if (jwt == null) {
             throw new ForbiddenOperationException("Authentication token required for user registration.");
         }
 
+        String authId = jwt.getSubject();
+        String lockKey = (authId != null && !authId.isBlank()) ? authId.intern() : "global_register_lock";
+
+        // Synchronize on authId to guarantee concurrency safety and idempotency (AC-07, AC-91)
+        synchronized (lockKey) {
+            return doRegisterOrSyncUser(dto, jwt);
+        }
+    }
+
+    @Transactional
+    protected UserResponseDTO doRegisterOrSyncUser(RegisterUserDTO dto, Jwt jwt) {
         String authId = jwt.getSubject();
         String email = jwt.getClaimAsString("email");
         
@@ -51,9 +66,7 @@ public class UserService {
             if (email != null && !email.isBlank()) {
                 user.setEmail(email);
             }
-            if (dto.getRole() != null) {
-                user.setRole(dto.getRole());
-            }
+            // Do not overwrite existing role during sync to prevent privilege escalation (AC-06, AC-94)
             if (dto.getDisplayName() != null && !dto.getDisplayName().isBlank()) {
                 user.setDisplayName(dto.getDisplayName());
             }
@@ -89,6 +102,19 @@ public class UserService {
     }
 
     private UserResponseDTO mapToDTO(User user) {
+        Long familyId = null;
+        String familyName = null;
+        if (user.getId() != null) {
+            List<FamilyMember> memberships = familyMemberRepository.findByUserId(user.getId());
+            if (!memberships.isEmpty()) {
+                FamilyMember member = memberships.get(0);
+                if (member.getFamily() != null) {
+                    familyId = member.getFamily().getId();
+                    familyName = member.getFamily().getName();
+                }
+            }
+        }
+
         return new UserResponseDTO(
                 user.getId(),
                 user.getAuthId(),
@@ -96,7 +122,9 @@ public class UserService {
                 user.getDisplayName(),
                 user.getPhoneNumber(),
                 user.getRole(),
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                familyId,
+                familyName
         );
     }
 }

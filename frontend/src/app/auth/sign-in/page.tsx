@@ -26,13 +26,17 @@ export default function SignInPage() {
       });
 
       if (error) {
+        if (error.message?.toLowerCase().includes("not confirmed") || error.message?.toLowerCase().includes("unconfirmed")) {
+          router.push(`/auth/verify-email?email=${encodeURIComponent(email)}`);
+          return;
+        }
         setErrorMessage(error.message || "Invalid email or password.");
         setIsLoading(false);
         return;
       }
 
       if (data?.session) {
-        router.push("/");
+        router.push("/dashboard");
         router.refresh();
       }
     } catch (err: any) {
@@ -162,7 +166,7 @@ export default function SignInPage() {
                 </label>
                 <Link
                   className="font-label-sm text-label-sm uppercase tracking-wider text-secondary hover:underline font-bold"
-                  href="#"
+                  href="/auth/forgot-password"
                 >
                   Forgot Password?
                 </Link>

@@ -45,21 +45,46 @@ export async function middleware(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    const isAuthPage = request.nextUrl.pathname.startsWith('/auth')
-    if (isAuthPage && user) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/'
-      return NextResponse.redirect(url)
-    }
+    const pathname = request.nextUrl.pathname
 
+    // Check if user's email is confirmed (Supabase sets email_confirmed_at or confirmed_at)
+    const isEmailConfirmed = Boolean(user && (user.email_confirmed_at || (user as any).confirmed_at))
+
+    // Protected application paths
     const isProtectedPath = ['/dashboard', '/family', '/requests', '/settings'].some((path) =>
-      request.nextUrl.pathname.startsWith(path)
+      pathname.startsWith(path)
     )
 
+    // Unauthenticated user trying to access protected paths -> redirect to sign-in
     if (isProtectedPath && !user) {
       const url = request.nextUrl.clone()
       url.pathname = '/auth/sign-in'
-      url.searchParams.set('redirect', request.nextUrl.pathname)
+      url.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(url)
+    }
+
+    // Authenticated user with unverified email accessing protected paths -> redirect to verify-email (AC-03, AC-35)
+    if (isProtectedPath && user && !isEmailConfirmed) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/verify-email'
+      if (user.email) {
+        url.searchParams.set('email', user.email)
+      }
+      return NextResponse.redirect(url)
+    }
+
+    // Authenticated & verified user visiting verify-email -> redirect to dashboard
+    if (pathname === '/auth/verify-email' && user && isEmailConfirmed) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
+
+    // Authenticated & verified user visiting sign-in or sign-up -> redirect to dashboard
+    const isLoginOrSignup = pathname === '/auth/sign-in' || pathname === '/auth/sign-up'
+    if (isLoginOrSignup && user && isEmailConfirmed) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
       return NextResponse.redirect(url)
     }
   } catch (error) {
