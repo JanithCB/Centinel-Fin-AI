@@ -81,14 +81,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
         com.centinel.finai.common.exception.ForbiddenOperationException.class,
-        com.centinel.finai.common.exception.RequestOwnershipException.class
+        com.centinel.finai.common.exception.RequestOwnershipException.class,
+        org.springframework.security.access.AccessDeniedException.class
     })
     public ResponseEntity<ApiErrorResponse> handleForbidden(Exception ex) {
         String correlationId = MDC.get(CORRELATION_ID_LOG_VAR_NAME);
+        String message = ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "Access denied.";
         ApiErrorResponse response = new ApiErrorResponse(
                 HttpStatus.FORBIDDEN.value(),
                 HttpStatus.FORBIDDEN.getReasonPhrase(),
-                ex.getMessage(),
+                message,
                 correlationId
         );
         return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
@@ -104,6 +106,18 @@ public class GlobalExceptionHandler {
                 correlationId
         );
         return new ResponseEntity<>(response, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+        String correlationId = MDC.get(CORRELATION_ID_LOG_VAR_NAME);
+        ApiErrorResponse response = new ApiErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                ex.getMessage(),
+                correlationId
+        );
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(Exception.class)

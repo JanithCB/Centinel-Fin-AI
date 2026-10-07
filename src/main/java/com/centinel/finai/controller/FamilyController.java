@@ -30,12 +30,12 @@ public class FamilyController {
         Long currentUserId = currentUserResolver.getCurrentUserId();
         UserRole currentRole = currentUserResolver.getCurrentUserRole();
 
-        if (currentRole != UserRole.PARENT) {
+        if (currentUserId == null || currentRole != UserRole.PARENT) {
             throw new ForbiddenOperationException("Only a PARENT can create a family.");
         }
 
         // Parent can only create a family for themselves
-        if (!createFamilyDTO.getParentUserId().equals(currentUserId)) {
+        if (!java.util.Objects.equals(createFamilyDTO.getParentUserId(), currentUserId)) {
             throw new RequestOwnershipException("Cannot create a family for another user.");
         }
 
@@ -48,7 +48,7 @@ public class FamilyController {
         Long currentUserId = currentUserResolver.getCurrentUserId();
         UserRole currentRole = currentUserResolver.getCurrentUserRole();
 
-        if (currentRole != UserRole.PARENT) {
+        if (currentUserId == null || currentRole != UserRole.PARENT) {
             throw new ForbiddenOperationException("Only a PARENT can manage family members.");
         }
 
