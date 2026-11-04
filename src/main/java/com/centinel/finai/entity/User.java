@@ -12,11 +12,13 @@ package com.centinel.finai.entity;
 @Deprecated(since = "PG-BE-1A", forRemoval = true)
 public class User extends com.centinel.finai.identity.User {
 
+    @Deprecated(since = "PG-BE-1A", forRemoval = true)
     public User() {
         super();
     }
 
     /** Legacy constructor used by SMS ingestion pipeline. */
+    @Deprecated(since = "PG-BE-1A", forRemoval = true)
     public User(String phoneNumber, String displayName) {
         super(phoneNumber, displayName);
     }

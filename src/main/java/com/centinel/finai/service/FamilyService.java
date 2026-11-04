@@ -82,6 +82,7 @@ public class FamilyService {
     }
 
     @Transactional(readOnly = true)
+    @SuppressWarnings("null")
     public List<User> getChildrenOfParent(Long parentUserId) {
         List<FamilyMember> parentMemberships = familyMemberRepository.findByUserId(parentUserId).stream()
                 .filter(m -> m.getRelationshipRole() == UserRole.PARENT)
@@ -89,7 +90,7 @@ public class FamilyService {
 
         return parentMemberships.stream()
                 .flatMap(pMem -> familyMemberRepository.findByFamilyIdAndRelationshipRole(pMem.getFamily().getId(), UserRole.CHILD).stream())
-                .map(FamilyMember::getUser)
+                .map(member -> member.getUser())
                 .distinct()
                 .collect(Collectors.toList());
     }

@@ -10,7 +10,6 @@ import com.centinel.finai.identity.UserRepository;
 import com.centinel.finai.purchase.dto.CreatePurchaseRequestDTO;
 import com.centinel.finai.service.SensitiveDataMaskingService;
 import com.centinel.finai.identity.UserRole;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
