@@ -24,6 +24,7 @@ public class SummaryService {
         this.transactionRepository = transactionRepository;
     }
 
+    @SuppressWarnings("null")
     public SummaryResponse getSummary(String phoneNumber, String period) {
         List<Transaction> transactions = transactionRepository.findByUserPhoneNumber(phoneNumber);
 
@@ -38,7 +39,7 @@ public class SummaryService {
                         t -> t.getTransactionDate() != null ? t.getTransactionDate().format(formatter) : "Unknown",
                         Collectors.reducing(BigDecimal.ZERO,
                                 t -> t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO,
-                                BigDecimal::add)
+                                (a, b) -> a.add(b))
                 ));
 
         Map<String, BigDecimal> totalsByCategory = transactions.stream()
@@ -49,7 +50,7 @@ public class SummaryService {
                         },
                         Collectors.reducing(BigDecimal.ZERO,
                                 t -> t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO,
-                                BigDecimal::add)
+                                (a, b) -> a.add(b))
                 ));
 
         return new SummaryResponse(totalsPerPeriod, totalsByCategory);
