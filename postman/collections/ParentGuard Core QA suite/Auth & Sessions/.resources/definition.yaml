@@ -1,0 +1,14 @@
+$kind: collection
+description: |-
+  ### 📁 01. Auth & Session Management
+
+  Handles identity token acquisition and automated session harvesting.
+
+  #### Purpose
+
+  - Communicates directly with Supabase Identity Cloud (`/auth/v1/token`).
+      
+  - Issues cryptographically signed ES256 Bearer JWTs for test accounts (`parent.test@example.com` and `child.test@example.com`).
+      
+  - Executes post-response test scripts to automatically populate `{{parentToken}}` and `{{childToken}}` environment variables for downstream request chaining.
+order: 1000

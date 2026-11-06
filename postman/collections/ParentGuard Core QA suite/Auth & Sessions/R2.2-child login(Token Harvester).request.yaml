@@ -1,0 +1,42 @@
+$kind: http-request
+url: "{{supabaseUrl}}/auth/v1/token?grant_type=password"
+method: POST
+headers:
+  - key: apikey
+    value: "{{supabaseUrl}}"
+    disabled: false
+    description: application/json
+queryParams:
+  grant_type: password
+body:
+  type: json
+  content: "{\r
+
+    \    \"email\": \"child.test@example.com\",\r
+
+    \    \"password\": \"Password123!\"\r
+
+    }\r\n"
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Status code is 200 OK\", function () {\r
+
+      \    pm.response.to.have.status(200);\r
+
+      });\r
+
+      \r
+
+      pm.test(\"Child JWT captured and saved to environment\", function () {\r
+
+      \    const json = pm.response.json();\r
+
+      \    pm.expect(json).to.have.property(\"access_token\");\r
+
+      \    pm.environment.set(\"childToken\", json.access_token);\r
+
+      \    console.log(\"✅ Child token successfully updated!\");\r
+
+      });\r\n"
+    language: text/javascript
+order: 2000

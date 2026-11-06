@@ -1,0 +1,16 @@
+name: ParentGuard-Local
+values:
+  - key: baseURL
+    value: ''
+  - key: supabaseUrl
+    value: ''
+  - key: supabaseApiKey
+    value: ''
+  - key: parentToken
+    value: ''
+  - key: childToken
+    value: ''
+  - key: familyId
+    value: ''
+  - key: 'requestId '
+    value: ''

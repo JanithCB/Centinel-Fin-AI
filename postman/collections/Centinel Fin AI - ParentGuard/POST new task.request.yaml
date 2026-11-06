@@ -1,0 +1,21 @@
+$kind: http-request
+url: "{{baseURL}}/tasks"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \r
+
+    \    \"title\" : \"update jira tickets\",\r
+
+    \    \"completed\" : false \r
+
+    }"
+scripts:
+  - type: afterResponse
+    code: "const data = pm.response.json();\r
+
+      pm.environment.set(\"taskId\", data.id);"
+    language: text/javascript
+order: 4000

@@ -1,0 +1,14 @@
+$kind: collection
+description: |-
+  ### 📁 03. Security & Boundary Tests
+
+  Negative testing suite enforcing Role-Based Access Control (RBAC), data validation, and authentication gates.
+
+  #### Test Cases
+
+  - **SEC-01 (Privilege Escalation):** Asserts that a `CHILD` token attempting to execute `approve` or `deny` is blocked with `403 Forbidden`.
+      
+  - **VAL-01 (Input Validation):** Asserts that negative prices or malformed payloads fail Bean Validation with `400 Bad Request`.
+      
+  - **AUTH-01 (Missing Credentials):** Asserts that unauthenticated requests to protected resources are rejected with `401 Unauthorized`.
+order: 3000

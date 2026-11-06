@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{baseURL}}/tasks/{{taskId}}"
+method: PUT
+body:
+  type: json
+  content: "{\r
+
+    \  \"title\": \"Update Jira tickets\",\r
+
+    \  \"completed\": true\r
+
+    }"
+order: 5000

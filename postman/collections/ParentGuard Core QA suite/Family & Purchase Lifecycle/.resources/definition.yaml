@@ -1,0 +1,18 @@
+$kind: collection
+description: |-
+  ### 📁 02. Family & Purchase Lifecycle
+
+  Validates the end-to-end positive "Happy Path" workflows across the Parent and Child portals.
+
+  #### Workflow Steps
+
+  1. **System Health Check:** Verifies PostgreSQL database connectivity and latency under 500ms.
+      
+  2. **Profile Sync:** Registers and maps Supabase UUIDs to internal `User` records with roles.
+      
+  3. **Family Space Creation:** Parent provisions a family group and saves `{{familyId}}`.
+      
+  4. **Child Purchase Submission:** Simulates the Chrome extension submitting an online checkout attempt with initial status `PENDING`.
+      
+  5. **Parent Decision:** Parent evaluates and transitions the purchase request to `APPROVED`.
+order: 2000
