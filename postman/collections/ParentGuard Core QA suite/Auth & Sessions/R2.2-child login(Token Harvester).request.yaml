@@ -3,7 +3,7 @@ url: "{{supabaseUrl}}/auth/v1/token?grant_type=password"
 method: POST
 headers:
   - key: apikey
-    value: "{{supabaseUrl}}"
+    value: "{{supabaseApiKey}}"
     disabled: false
     description: application/json
 queryParams:

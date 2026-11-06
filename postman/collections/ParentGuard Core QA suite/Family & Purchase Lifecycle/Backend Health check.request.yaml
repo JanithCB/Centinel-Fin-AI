@@ -1,4 +1,32 @@
 $kind: http-request
-url: ""
+url: "{{baseURL}}/api/health"
 method: GET
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Health Status code is 200 OK\", function () {\r
+
+      \    pm.response.to.have.status(200);\r
+
+      });\r
+
+      \r
+
+      pm.test(\"Database is connected and up \", function() {\r
+
+      \    const data = pm.response.json();\r
+
+      \    pm.expect(data.status).to.eql(\"UP\");\r
+
+      \    pm.expect(data.database).to.include(\"Supabase Postgres\");\r
+
+      });\r
+
+      \r
+
+      pm.test(\"Response time is healthy (<500ms)\",function() {\r
+
+      \    pm.expect(pm.response.responseTime).to.be.below(500);\r
+
+      });"
+    language: text/javascript
 order: 1000

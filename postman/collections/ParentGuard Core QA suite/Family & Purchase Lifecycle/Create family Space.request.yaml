@@ -1,0 +1,39 @@
+$kind: http-request
+url: "{{baseURL}}/api/v1/families"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"name\": \"Miller Household\",\r
+
+    \    \"parentUserId\": {{parentUserId}}\r
+
+    }\r\n"
+auth:
+  type: bearer
+  credentials:
+    token: "{{parentToken}}"
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Family successfully created (201 Created)\", function( ){\r
+
+      \    pm.response.to.have.status(201);\r
+
+      });\r
+
+      \r
+
+      pm.test(\"Family ID captured dynamically\", function () {\r
+
+      \    const family = pm.response.json();\r
+
+      \    pm.expect(family).to.have.property(\"id\");\r
+
+      \    pm.environment.set(\"familyId\", family.id);\r
+
+      \    console.log(\"Family ID created:\", family.id);\r
+
+      });\r\n"
+    language: text/javascript
+order: 3000

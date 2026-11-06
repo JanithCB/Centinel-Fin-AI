@@ -1,0 +1,37 @@
+$kind: http-request
+url: "{{baseURL}}/api/v1/users/register"
+method: POST
+body:
+  type: json
+  content: "{\r\n    \"role\":\"PARENT\"\r\n}"
+auth:
+  type: bearer
+  credentials:
+    token: "{{parentToken}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Profile synced with status 200 or 201", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 201]);
+      });
+
+      pm.test("User role is verified as PARENT", function () {
+          pm.response.to.be.json;
+          const user = pm.response.json();
+          pm.expect(user.role).to.eql("PARENT");
+          pm.environment.set("parentUserId", user.id);
+      });
+
+      pm.test("Response time is under 2000ms", function () {
+          pm.expect(pm.response.responseTime).to.be.below(2000);
+      });
+
+      pm.test("Response contains required profile fields", function () {
+          const user = pm.response.json();
+          pm.expect(user).to.have.property("id").that.is.a("number");
+          pm.expect(user).to.have.property("authId").that.is.a("string");
+          pm.expect(user).to.have.property("email").that.is.a("string");
+          pm.expect(user).to.have.property("displayName").that.is.a("string");
+      });
+    language: text/javascript
+order: 2000
