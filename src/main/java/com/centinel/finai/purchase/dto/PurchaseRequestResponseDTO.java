@@ -10,6 +10,8 @@ public class PurchaseRequestResponseDTO {
     private Long id;
     private Long familyId;
     private Long childId;
+    private String childName;
+    private String childEmail;
     private String siteDomain;
     private String itemName;
     private BigDecimal amount;
@@ -42,6 +44,22 @@ public class PurchaseRequestResponseDTO {
 
     public void setChildId(Long childId) {
         this.childId = childId;
+    }
+
+    public String getChildName() {
+        return childName;
+    }
+
+    public void setChildName(String childName) {
+        this.childName = childName;
+    }
+
+    public String getChildEmail() {
+        return childEmail;
+    }
+
+    public void setChildEmail(String childEmail) {
+        this.childEmail = childEmail;
     }
 
     public String getSiteDomain() {

@@ -5,6 +5,7 @@ import com.centinel.finai.common.exception.ForbiddenOperationException;
 import com.centinel.finai.common.exception.RequestOwnershipException;
 import com.centinel.finai.dto.AddFamilyMemberDTO;
 import com.centinel.finai.dto.CreateFamilyDTO;
+import com.centinel.finai.dto.FamilyMemberResponseDTO;
 import com.centinel.finai.dto.FamilyResponseDTO;
 import com.centinel.finai.identity.UserRole;
 import com.centinel.finai.service.FamilyService;
@@ -12,6 +13,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/families")
@@ -58,5 +61,20 @@ public class FamilyController {
 
         familyService.addChild(id, addFamilyMemberDTO.getChildUserId());
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{id}/members")
+    public ResponseEntity<List<FamilyMemberResponseDTO>> getFamilyMembers(@PathVariable Long id) {
+        Long currentUserId = currentUserResolver.getCurrentUserId();
+        if (currentUserId == null) {
+            throw new ForbiddenOperationException("User not authenticated.");
+        }
+
+        if (!familyService.isParentOfFamily(currentUserId, id)) {
+            throw new RequestOwnershipException("You are not authorized to view this family's members.");
+        }
+
+        List<FamilyMemberResponseDTO> members = familyService.getFamilyMembers(id);
+        return ResponseEntity.ok(members);
     }
 }

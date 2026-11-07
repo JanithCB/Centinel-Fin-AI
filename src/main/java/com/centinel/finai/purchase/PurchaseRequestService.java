@@ -145,6 +145,11 @@ public class PurchaseRequestService {
         dto.setId(req.getId());
         dto.setFamilyId(req.getFamily().getId());
         dto.setChildId(req.getChild().getId());
+        if (req.getChild() != null) {
+            String name = req.getChild().getDisplayName();
+            dto.setChildName(name != null && !name.isBlank() ? name : req.getChild().getEmail());
+            dto.setChildEmail(req.getChild().getEmail());
+        }
         dto.setSiteDomain(req.getSiteDomain());
         dto.setItemName(req.getItemName());
         dto.setAmount(req.getAmount());

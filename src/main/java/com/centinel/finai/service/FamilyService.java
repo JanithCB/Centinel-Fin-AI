@@ -1,5 +1,6 @@
 package com.centinel.finai.service;
 
+import com.centinel.finai.dto.FamilyMemberResponseDTO;
 import com.centinel.finai.dto.FamilyResponseDTO;
 import com.centinel.finai.family.Family;
 import com.centinel.finai.family.FamilyMember;
@@ -100,5 +101,24 @@ public class FamilyService {
         return familyMemberRepository.findByFamilyIdAndUserId(familyId, parentUserId)
                 .map(m -> m.getRelationshipRole() == UserRole.PARENT)
                 .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FamilyMemberResponseDTO> getFamilyMembers(Long familyId) {
+        return familyMemberRepository.findByFamilyId(familyId).stream()
+                .map(m -> {
+                    User u = m.getUser();
+                    String name = u.getDisplayName();
+                    String display = (name != null && !name.isBlank()) ? name : u.getEmail();
+                    return new FamilyMemberResponseDTO(
+                            m.getId(),
+                            u.getId(),
+                            display,
+                            u.getEmail(),
+                            m.getRelationshipRole().name(),
+                            m.getCreatedAt()
+                    );
+                })
+                .collect(Collectors.toList());
     }
 }

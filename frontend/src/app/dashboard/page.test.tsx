@@ -40,6 +40,7 @@ vi.mock('@/lib/api-client', () => ({
     getMyPurchaseRequests: vi.fn().mockResolvedValue([]),
     createFamily: vi.fn(),
     addFamilyMember: vi.fn(),
+    getFamilyMembers: vi.fn().mockResolvedValue([]),
   },
 }))
 

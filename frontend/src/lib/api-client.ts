@@ -20,10 +20,21 @@ export interface FamilyResponse {
   createdAt: string;
 }
 
+export interface FamilyMemberDTO {
+  id: number;
+  userId: number;
+  displayName: string;
+  email: string;
+  role: 'PARENT' | 'CHILD';
+  joinedAt: string;
+}
+
 export interface PurchaseRequestDTO {
   id: number;
   familyId: number;
   childId: number;
+  childName?: string;
+  childEmail?: string;
   siteDomain: string;
   itemName: string;
   amount: number;
@@ -109,6 +120,10 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify({ childUserId }),
     });
+  }
+
+  static async getFamilyMembers(familyId: number): Promise<FamilyMemberDTO[]> {
+    return this.request<FamilyMemberDTO[]>(`/families/${familyId}/members`);
   }
 
   // Purchase Requests Endpoints

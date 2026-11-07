@@ -25,6 +25,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -522,5 +523,31 @@ public class FamilyControllerTest {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.error").value("Bad Request"))
                 .andExpect(jsonPath("$.message").value("User not found or is not a CHILD"));
+    }
+
+    @Test
+    @DisplayName("Get family members returns list of members for parent of family")
+    void testGetFamilyMembers_Success() throws Exception {
+        User parent = new User("parent-list@test.com", "Parent Lister", UserRole.PARENT);
+        User savedParent = userRepository.save(parent);
+
+        User child = new User("child-list@test.com", "Child Lister", UserRole.CHILD);
+        User savedChild = userRepository.save(child);
+
+        Family family = new Family("Lister Family");
+        Family savedFamily = familyRepository.save(family);
+
+        familyMemberRepository.save(new FamilyMember(savedFamily, savedParent, UserRole.PARENT));
+        familyMemberRepository.save(new FamilyMember(savedFamily, savedChild, UserRole.CHILD));
+
+        mockMvc.perform(get("/api/v1/families/" + savedFamily.getId() + "/members")
+                .with(jwt().jwt(builder -> builder
+                        .subject(savedParent.getId().toString())
+                        .claim("app_metadata", java.util.Map.of("role", "PARENT")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].displayName").value("Parent Lister"))
+                .andExpect(jsonPath("$[1].displayName").value("Child Lister"))
+                .andExpect(jsonPath("$[1].role").value("CHILD"));
     }
 }

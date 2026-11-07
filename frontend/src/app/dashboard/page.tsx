@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { ApiClient, UserProfile, PurchaseRequestDTO } from "@/lib/api-client";
+import { ApiClient, UserProfile, PurchaseRequestDTO, FamilyMemberDTO } from "@/lib/api-client";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -26,6 +26,10 @@ export default function DashboardPage() {
   const [isAddingChild, setIsAddingChild] = useState<boolean>(false);
   const [addChildMessage, setAddChildMessage] = useState<string | null>(null);
   const [addChildError, setAddChildError] = useState<string | null>(null);
+
+  // Family members state
+  const [familyMembers, setFamilyMembers] = useState<FamilyMemberDTO[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState<boolean>(false);
 
   // Purchase requests state
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequestDTO[]>([]);
@@ -95,6 +99,18 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const loadFamilyMembers = useCallback(async (familyId: number) => {
+    setLoadingMembers(true);
+    try {
+      const members = await ApiClient.getFamilyMembers(familyId);
+      setFamilyMembers(members);
+    } catch (err: any) {
+      console.warn("Failed to load family members:", err);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
@@ -102,8 +118,11 @@ export default function DashboardPage() {
   useEffect(() => {
     if (profile && profile.familyId) {
       loadRequests(profile.role);
+      if (profile.role === "PARENT") {
+        loadFamilyMembers(profile.familyId);
+      }
     }
-  }, [profile, loadRequests]);
+  }, [profile, loadRequests, loadFamilyMembers]);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -162,6 +181,7 @@ export default function DashboardPage() {
       await ApiClient.addFamilyMember(profile.familyId, childId);
       setAddChildMessage(`Successfully added child (ID #${childId}) to your family!`);
       setChildUserIdInput("");
+      await loadFamilyMembers(profile.familyId);
       await loadRequests(profile.role);
     } catch (err: any) {
       setAddChildError(err?.message || "Failed to add child to family. Verify the Child User ID.");
@@ -473,6 +493,44 @@ export default function DashboardPage() {
                   Enter the numeric ID displayed on the child&apos;s waiting screen.
                 </p>
               </form>
+
+              {/* Linked Children Roster */}
+              <div className="border-t-2 border-ink pt-3 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-label-sm font-bold text-ink uppercase text-[11px]">
+                    Linked Children ({familyMembers.filter(m => m.role === "CHILD").length})
+                  </span>
+                  {loadingMembers && <span className="font-mono text-[10px] text-outline">Refreshing...</span>}
+                </div>
+
+                {familyMembers.filter(m => m.role === "CHILD").length === 0 ? (
+                  <p className="font-caption text-xs text-outline italic py-2 text-center bg-surface-container/40 rounded border border-dashed border-outline/40">
+                    No children linked yet. Enter their Child ID above to link them.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {familyMembers.filter(m => m.role === "CHILD").map((member) => (
+                      <div
+                        key={member.id}
+                        className="p-2.5 bg-surface-container/60 rounded border-2 border-ink shadow-[2px_2px_0px_#151515] flex items-center justify-between gap-2"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-sun border border-ink flex items-center justify-center font-bold text-xs shrink-0 text-ink">
+                            {(member.displayName || member.email).charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-body-sm font-bold text-xs text-ink truncate">{member.displayName}</span>
+                            <span className="font-caption text-[10px] text-outline truncate">{member.email}</span>
+                          </div>
+                        </div>
+                        <span className="px-1.5 py-0.5 bg-surface border border-ink rounded font-mono text-[10px] font-bold text-ink shrink-0">
+                          ID: {member.userId}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -524,6 +582,12 @@ export default function DashboardPage() {
                         <p className="font-caption text-xs text-outline">
                           Store: <strong className="text-ink">{req.siteDomain}</strong> | Category: {req.category || "General"}
                         </p>
+                        <div className="flex items-center gap-1.5 text-xs text-outline">
+                          <span>Requested by:</span>
+                          <span className="font-bold text-ink bg-surface-container px-1.5 py-0.5 rounded border border-ink/30 text-[11px]">
+                            {req.childName || `Child #${req.childId}`}
+                          </span>
+                        </div>
                         {req.note && <p className="font-body-sm text-xs text-ink/80 italic">&quot;{req.note}&quot;</p>}
                       </div>
 
