@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{mockURL}}/api/v1/browsing-events"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"url\": \"https://store.steampowered.com/checkout\",\r
+
+    \    \"domain\": \"store.steampowered.com\",\r
+
+    \    \"isPaymentPage\": true,\r
+
+    \    \"timestamp\": \"2026-11-05T12:00:00Z\"\r
+
+    }\r\n"
+examples: .resources/POST browsing event(Mock).resources/examples
+order: 4000

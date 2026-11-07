@@ -1,0 +1,15 @@
+id: 01a1b5b8-51cf-70d2-8b74-79c473ca9555
+version: 1
+name: mock engine
+slug: new-mock-934ed
+enableSession: true
+protocol: http
+port: 4500
+autoRestartOnChange: true
+logging:
+  level: verbose
+  showBody: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

@@ -1,0 +1,47 @@
+$kind: http-request
+url: "{{baseURL}}/api/v1/purchase-requests"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"siteDomain\": \"store.steampowered.com\",\r
+
+    \    \"itemName\": \"Xbox Game Pass 1-Month\",\r
+
+    \    \"amount\": 29.99,\r
+
+    \    \"currency\": \"USD\",\r
+
+    \    \"category\": \"ENTERTAINMENT\",\r
+
+    \    \"note\": \"Weekend gaming with friends\"\r
+
+    \r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: "{{childToken}}"
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Purchase request submitted(201 created)\", function(){\r
+
+      \    pm.response.to.have.status(201);\r
+
+      });\r
+
+      \r
+
+      pm.test(\"Initial status is strictly PENDING\",function(){\r
+
+      \    const req = pm.response.json();\r
+
+      \    pm.expect(req.status).to.equal(\"PENDING\");\r
+
+      \    pm.environment.set(\"requestId\",req.id);\r
+
+      });"
+    language: text/javascript
+order: 4000
