@@ -1,0 +1,20 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/families"
+  method: POST
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "name": "string",
+        "parentUserId": 6366
+      }
+response:
+  statusCode: 201
+  statusText: Created
+  body:
+    type: text
+    content: ""
+order: 1000

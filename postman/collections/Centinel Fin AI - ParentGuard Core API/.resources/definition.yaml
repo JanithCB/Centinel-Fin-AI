@@ -1,0 +1,4 @@
+$kind: collection
+description: Secure family finance, purchase request lifecycle, and RBAC governance.
+variables:
+  baseUrl: /

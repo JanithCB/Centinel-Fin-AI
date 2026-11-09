@@ -1,0 +1,32 @@
+$kind: http-request
+description: ""
+url: "{{baseUrl}}/api/v1/families"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "string",
+      "parentUserId": 6366
+    }
+  $type: |-
+    {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "parentUserId": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "parentUserId"
+      ]
+    }
+settings: {}
+examples: ./.resources/Create family space.resources/examples
+order: 1000

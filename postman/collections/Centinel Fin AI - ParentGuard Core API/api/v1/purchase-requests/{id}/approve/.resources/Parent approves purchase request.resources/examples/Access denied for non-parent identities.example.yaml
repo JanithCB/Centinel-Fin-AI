@@ -1,0 +1,16 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/purchase-requests/:id/approve"
+  method: POST
+  pathVariables:
+    id: "1990"
+  body:
+    type: text
+    content: ""
+response:
+  statusCode: 403
+  statusText: Forbidden
+  body:
+    type: text
+    content: ""
+order: 2000

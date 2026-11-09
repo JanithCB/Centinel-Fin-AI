@@ -1,0 +1,57 @@
+$kind: http-request
+description: ""
+url: "{{baseUrl}}/api/v1/purchase-requests"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "siteDomain": "string",
+      "itemName": "string",
+      "amount": 3782.039171294953,
+      "currency": "GBP",
+      "category": "string",
+      "note": "string"
+    }
+  $type: |-
+    {
+      "type": "object",
+      "properties": {
+        "siteDomain": {
+          "type": "string"
+        },
+        "itemName": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number",
+          "minimum": 0.01
+        },
+        "currency": {
+          "type": "string",
+          "enum": [
+            "USD",
+            "EUR",
+            "GBP",
+            "LKR"
+          ]
+        },
+        "category": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "siteDomain",
+        "itemName",
+        "amount",
+        "currency"
+      ]
+    }
+settings: {}
+examples: ./.resources/Child dispatches purchase request.resources/examples
+order: 1000

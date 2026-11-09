@@ -1,0 +1,31 @@
+$kind: http-request
+description: ""
+url: "{{baseUrl}}/api/v1/users/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "role": "CHILD"
+    }
+  $type: |-
+    {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "PARENT",
+            "CHILD"
+          ]
+        }
+      },
+      "required": [
+        "role"
+      ]
+    }
+settings: {}
+examples: ./.resources/Synchronize Supabase identity with internal user entity.resources/examples
+order: 1000

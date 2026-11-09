@@ -1,0 +1,24 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/purchase-requests"
+  method: POST
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "siteDomain": "string",
+        "itemName": "string",
+        "amount": 3782.039171294953,
+        "currency": "GBP",
+        "category": "string",
+        "note": "string"
+      }
+response:
+  statusCode: 201
+  statusText: Created
+  body:
+    type: text
+    content: ""
+order: 1000
