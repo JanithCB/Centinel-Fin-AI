@@ -1,0 +1,53 @@
+[
+  {
+    "testCase": "TC01 - Small Gaming Purchase",
+    "siteDomain": "store.steampowered.com",
+    "itemName": "Indie Game Pass",
+    "amount": 9.99,
+    "currency": "USD",
+    "category": "ENTERTAINMENT",
+    "expectedStatus": 201,
+    "expectedOutcome": "PENDING"
+  },
+  {
+    "testCase": "TC02 - Educational Book Purchase",
+    "siteDomain": "amazon.com",
+    "itemName": "Java Concurrency in Practice",
+    "amount": 42.50,
+    "currency": "USD",
+    "category": "EDUCATION",
+    "expectedStatus": 201,
+    "expectedOutcome": "PENDING"
+  },
+  {
+    "testCase": "TC03 - Subscription in GBP",
+    "siteDomain": "spotify.com",
+    "itemName": "Spotify Student 1-Month",
+    "amount": 5.99,
+    "currency": "GBP",
+    "category": "SUBSCRIPTION",
+    "expectedStatus": 201,
+    "expectedOutcome": "PENDING"
+  },
+  {
+    "testCase": "TC04 - Micro-Transaction in LKR",
+    "siteDomain": "daraz.lk",
+    "itemName": "Ballpoint Pens Pack",
+    "amount": 450.00,
+    "currency": "LKR",
+    "category": "SUPPLIES",
+    "expectedStatus": 201,
+    "expectedOutcome": "PENDING"
+  },
+  {
+    "testCase": "TC05 - Illegal Zero Amount Violation",
+    "siteDomain": "steam.com",
+    "itemName": "Free Item Glitch",
+    "amount": 0.00,
+    "currency": "USD",
+    "category": "ENTERTAINMENT",
+    "expectedStatus": 400,
+    "expectedOutcome": "VALIDATION_FAILED"
+  }
+]
+

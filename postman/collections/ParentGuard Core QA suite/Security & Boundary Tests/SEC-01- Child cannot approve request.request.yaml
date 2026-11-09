@@ -1,0 +1,33 @@
+$kind: http-request
+name: "SEC-01: Child cannot approve request"
+url: "{{baseURL}}/api/v1/purchase-requests/{{requestId}}/approve"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{childToken}}"
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Security Gate: Child token is blocked with 403 Forbidden\", function (){\r
+
+      \    pm.response.to.have.status(403);\r
+
+      });\r
+
+      \r
+
+      pm.test(\"Security Audit: Error response contains error and status details\", function () {\r
+
+      \    const errorJson = pm.response.json();\r
+
+      \    pm.expect(errorJson).to.have.property(\"status\");\r
+
+      \    pm.expect(errorJson.status).to.eql(403);\r
+
+      \    pm.expect(errorJson).to.have.property(\"error\");\r
+
+      \    pm.expect(errorJson.error).to.include(\"Forbidden\");\r
+
+      });"
+    language: text/javascript
+order: 3000

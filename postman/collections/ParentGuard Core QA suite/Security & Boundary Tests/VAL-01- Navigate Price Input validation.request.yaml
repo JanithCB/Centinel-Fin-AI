@@ -1,0 +1,44 @@
+$kind: http-request
+name: "VAL-01: Navigate Price Input validation"
+url: "{{baseURL}}/api/v1/purchase-requests"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: "{\r
+
+    \  \"siteDomain\": \"amazon.com\",\r
+
+    \  \"itemName\": \"Gaming Headset\",\r
+
+    \  \"amount\": -50.00,\r
+
+    \  \"currency\": \"USD\",\r
+
+    \  \"category\": \"HARDWARE\"\r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: "{{childToken}}"
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Validation Gate: Negative amount rejected with 400 Bad Request\", function () {\r
+
+      \    pm.response.to.have.status(400);\r
+
+      });\r
+
+      pm.test(\"Validation error specifies 'amount' field constraint\", function () {\r
+
+      \    const errorJson = pm.response.json();\r
+
+      \    pm.expect(errorJson).to.have.property(\"validationErrors\");\r
+
+      \    pm.expect(errorJson.validationErrors).to.have.property(\"amount\");\r
+
+      });"
+    language: text/javascript
+order: 5000
