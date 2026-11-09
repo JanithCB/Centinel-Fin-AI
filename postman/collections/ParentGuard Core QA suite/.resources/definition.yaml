@@ -1,1 +1,47 @@
 $kind: collection
+scripts:
+  - type: http:afterResponse
+    code: "// Baseline 01: Status code check\r
+
+      pm.test(\"Status code is within 2xx range\", function () {\r
+
+      \    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);\r
+
+      });\r
+
+      \r
+
+      // Baseline 02: JSON Header verification\r
+
+      pm.test(\"Response header specifies application/json\", function () {\r
+
+      \    pm.response.to.have.header(\"content-type\");\r
+
+      \    pm.expect(pm.response.headers.get(\"content-type\")).to.include(\"application/json\");\r
+
+      });\r
+
+      \r
+
+      // Baseline 03: Latency SLA Check\r
+
+      pm.test(\"Latency is within acceptable threshold (< 500ms)\", function () {\r
+
+      \    pm.expect(pm.response.responseTime).to.be.below(500);\r
+
+      });\r
+
+      \r
+
+      // Baseline 04: JSON Payload Integrity\r
+
+      pm.test(\"Response payload is valid, parseable JSON\", function () {\r
+
+      \    pm.expect(function () {\r
+
+      \        pm.response.json();\r
+
+      \    }).to.not.throw();\r
+
+      });"
+    language: text/javascript
