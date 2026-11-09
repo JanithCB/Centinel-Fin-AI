@@ -26,21 +26,133 @@ auth:
     token: "{{childToken}}"
 scripts:
   - type: afterResponse
-    code: "pm.test(\"Purchase request submitted(201 created)\", function(){\r
+    code: "// 1. Define complete JSON Schema for PurchaseRequestResponseDTO\r
 
-      \    pm.response.to.have.status(201);\r
+      const purchaseSchema = {\r
+
+      \    \"$schema\": \"http://json-schema.org/draft-07/schema#\",\r
+
+      \    \"title\": \"PurchaseRequestResponseDTO\",\r
+
+      \    \"type\": \"object\",\r
+
+      \    \"required\": [\"id\", \"siteDomain\", \"itemName\", \"amount\", \"currency\", \"status\", \"createdAt\"],\r
+
+      \    \"properties\": {\r
+
+      \        \"id\": {\r
+
+      \            \"type\": \"integer\",\r
+
+      \            \"minimum\": 1\r
+
+      \        },\r
+
+      \        \"siteDomain\": {\r
+
+      \            \"type\": \"string\"\r
+
+      \        },\r
+
+      \        \"itemName\": {\r
+
+      \            \"type\": \"string\",\r
+
+      \            \"minLength\": 1\r
+
+      \        },\r
+
+      \        \"amount\": {\r
+
+      \            \"type\": \"number\",\r
+
+      \            \"minimum\": 0.01\r
+
+      \        },\r
+
+      \        \"currency\": {\r
+
+      \            \"type\": \"string\",\r
+
+      \            \"enum\": [\"USD\", \"EUR\", \"GBP\", \"LKR\"]\r
+
+      \        },\r
+
+      \        \"category\": {\r
+
+      \            \"type\": \"string\"\r
+
+      \        },\r
+
+      \        \"status\": {\r
+
+      \            \"type\": \"string\",\r
+
+      \            \"enum\": [\"PENDING\", \"APPROVED\", \"DENIED\", \"FLAGGED\"]\r
+
+      \        },\r
+
+      \        \"note\": {\r
+
+      \            \"type\": [\"string\", \"null\"]\r
+
+      \        },\r
+
+      \        \"createdAt\": {\r
+
+      \            \"type\": \"string\"\r
+
+      \        }\r
+
+      \    },\r
+
+      \    \"additionalProperties\": true\r
+
+      };\r
+
+      \r
+
+      // 2. Initialize Postman's built-in Ajv validator\r
+
+      const Ajv = require(\"ajv\");\r
+
+      const ajv = new Ajv({ allErrors: true });\r
+
+      \r
+
+      pm.test(\"Schema Integrity: Response strictly adheres to PurchaseRequest JSON Schema\", function () {\r
+
+      \    const responseData = pm.response.json();\r
+
+      \    const validate = ajv.compile(purchaseSchema);\r
+
+      \    const valid = validate(responseData);\r
+
+      \r
+
+      \    if (!valid) {\r
+
+      \        console.error(\"AJV Validation Errors:\", validate.errors);\r
+
+      \    }\r
+
+      \    pm.expect(valid, JSON.stringify(validate.errors)).to.be.true;\r
 
       });\r
 
       \r
 
-      pm.test(\"Initial status is strictly PENDING\",function(){\r
+      // 3. Harvest dynamic ID for downstream lifecycle actions\r
 
-      \    const req = pm.response.json();\r
+      pm.test(\"Capture dynamic purchase requestId\", function () {\r
 
-      \    pm.expect(req.status).to.equal(\"PENDING\");\r
+      \    const res = pm.response.json();\r
 
-      \    pm.environment.set(\"requestId\",req.id);\r
+      \    pm.expect(res.status).to.eql(\"PENDING\");\r
+
+      \    pm.environment.set(\"requestId\", res.id);\r
+
+      \    console.log(\"Captured requestId:\", res.id);\r
 
       });"
     language: text/javascript
