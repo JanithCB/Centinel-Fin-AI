@@ -1,0 +1,99 @@
+openapi: 3.0.3
+info:
+  title: Centinel Fin AI - ParentGuard Core API
+  version: 1.0.0
+  description: Secure family finance, purchase request lifecycle, and RBAC governance.
+paths:
+  /api/health:
+    get:
+      summary: Health & Database probe
+      responses:
+        '200':
+          description: System operational
+  /api/v1/users/register:
+    post:
+      summary: Synchronize Supabase identity with internal user entity
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [PARENT, CHILD]
+      responses:
+        '200':
+          description: Profile synced
+        '201':
+          description: User registered
+  /api/v1/families:
+    post:
+      summary: Create family space
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, parentUserId]
+              properties:
+                name:
+                  type: string
+                parentUserId:
+                  type: integer
+      responses:
+        '201':
+          description: Family provisioned
+  /api/v1/purchase-requests:
+    post:
+      summary: Child dispatches purchase request
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [siteDomain, itemName, amount, currency]
+              properties:
+                siteDomain:
+                  type: string
+                itemName:
+                  type: string
+                amount:
+                  type: number
+                  minimum: 0.01
+                currency:
+                  type: string
+                  enum: [USD, EUR, GBP, LKR]
+                category:
+                  type: string
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Request recorded in PENDING state
+  /api/v1/purchase-requests/{id}/approve:
+    post:
+      summary: Parent approves purchase request
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Transitioned to APPROVED
+        '403':
+          description: Access denied for non-parent identities
