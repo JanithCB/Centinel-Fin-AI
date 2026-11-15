@@ -3,15 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Centinel Fin AI - Interactive Architecture & Dev Log</title>
+  <title>Centinel Fin AI - System Architecture (Neo-Brutalist)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <style>
+    :root {
+      --ink: #151515;
+      --paper: #FFFDF7;
+      --surface: #FFFFFF;
+      --lime: #D9FF3F;
+      --violet: #B9A7FF;
+      --coral: #FF8F7C;
+      --sky: #8DDAFF;
+      --sun: #FFD64A;
+      --mint: #8EF0C0;
+      --muted: #E9E6DD;
+    }
     body {
       margin: 0;
       overflow: hidden;
-      background-color: #060913;
+      background-color: var(--paper);
+      color: var(--ink);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
     #canvas-container {
@@ -22,122 +35,139 @@
       left: 0;
       z-index: 1;
     }
-    .glass-panel {
-      background: rgba(10, 15, 30, 0.88);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+    .neo-box {
+      background: #FFFFFF;
+      border: 3px solid var(--ink);
+      box-shadow: 4px 4px 0px var(--ink);
+    }
+    .neo-box-lg {
+      background: #FFFFFF;
+      border: 3px solid var(--ink);
+      box-shadow: 8px 8px 0px var(--ink);
+    }
+    .neo-btn {
+      border: 2px solid var(--ink);
+      box-shadow: 3px 3px 0px var(--ink);
+      transition: all 0.1s ease-in-out;
+    }
+    .neo-btn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0px var(--ink);
+    }
+    .neo-btn:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px var(--ink);
     }
   </style>
 </head>
-<body class="text-slate-100 select-none">
+<body class="select-none">
 
   <!-- 3D Canvas -->
   <div id="canvas-container"></div>
 
   <!-- HUD: Header Bar -->
-  <header class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-8 py-5 pointer-events-none">
-    <div class="pointer-events-auto flex items-center gap-4">
-      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
-        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+  <header class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 lg:px-10 py-5 pointer-events-none">
+    <div class="pointer-events-auto flex items-center gap-3 neo-box px-4 py-2 bg-white">
+      <div class="w-8 h-8 bg-[#D9FF3F] border-2 border-[#151515] flex items-center justify-center shadow-[2px_2px_0px_#151515]">
+        <svg class="w-5 h-5 text-[#151515]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
         </svg>
       </div>
       <div>
-        <h1 class="text-xl font-bold tracking-wider text-white flex items-center gap-2">
+        <h1 class="text-sm font-black tracking-wider uppercase text-[#151515] flex items-center gap-2">
           CENTINEL FIN AI
-          <span class="text-xs px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800">GEMINI 3.8 FLASH</span>
+          <span class="text-[10px] px-2 py-0.5 bg-[#8EF0C0] border border-[#151515] font-bold">SYSTEM SPEC 3D</span>
         </h1>
-        <p class="text-xs text-slate-400">ParentGuard & Personal Expense Intelligence Architecture</p>
+        <p class="text-[11px] font-mono text-[#555]">NEO-BRUTALIST ARCHITECTURAL MODEL</p>
       </div>
     </div>
 
     <!-- Quick Station Switcher -->
-    <div class="pointer-events-auto hidden lg:flex items-center gap-2 glass-panel px-3 py-1.5 rounded-xl">
-      <span class="text-xs text-slate-400 font-semibold px-2">CLICK POD OR JUMP:</span>
-      <button onclick="focusStation('security')" class="px-2.5 py-1 text-xs rounded-lg bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 transition">🛡️ Security</button>
-      <button onclick="focusStation('ai_engine')" class="px-2.5 py-1 text-xs rounded-lg bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition">🧠 Gemini AI</button>
-      <button onclick="focusStation('ingestion_pipeline')" class="px-2.5 py-1 text-xs rounded-lg bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition">⚡ n8n Webhook</button>
-      <button onclick="focusStation('ledger_db')" class="px-2.5 py-1 text-xs rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition">💾 PostgreSQL</button>
-      <button onclick="focusStation('parentguard_ui')" class="px-2.5 py-1 text-xs rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition">🖥️ Next.js UI</button>
+    <div class="pointer-events-auto hidden md:flex items-center gap-2 neo-box px-3 py-2 bg-[#FFFDF7]">
+      <span class="text-[11px] text-[#151515] font-black uppercase tracking-wider pr-1">PODS:</span>
+      <button onclick="focusStation('security')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#8EF0C0] text-[#151515]">🛡️ Security</button>
+      <button onclick="focusStation('ai_engine')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#D9FF3F] text-[#151515]">🧠 Gemini AI</button>
+      <button onclick="focusStation('ingestion_pipeline')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#8DDAFF] text-[#151515]">⚡ Ingestion</button>
+      <button onclick="focusStation('ledger_db')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#FFD64A] text-[#151515]">💾 Ledger DB</button>
+      <button onclick="focusStation('parentguard_ui')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#FF8F7C] text-[#151515]">🖥️ Next.js UI</button>
     </div>
   </header>
 
   <!-- Instructions Overlay (Bottom Left) -->
-  <div class="absolute bottom-6 left-6 z-20 glass-panel px-4 py-3 rounded-xl max-w-sm text-xs text-slate-300 pointer-events-none">
-    <div class="font-bold text-slate-200 mb-1 flex items-center gap-1.5">
-      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-      Centinel 3D Architecture Engine
+  <div class="absolute bottom-6 left-6 z-20 neo-box px-4 py-3 rounded max-w-sm text-xs bg-white pointer-events-none">
+    <div class="font-black text-[#151515] mb-1 flex items-center gap-1.5 uppercase tracking-wider">
+      <span class="w-2.5 h-2.5 bg-[#D9FF3F] border border-[#151515] animate-ping"></span>
+      Interactive System Schema
     </div>
-    <p>• Left-click + drag to orbit the isometric scene.</p>
-    <p>• Click any station pod to inspect its live code files, security controls & data flows.</p>
+    <p class="text-[#333] leading-snug">• Left-click + drag to orbit & inspect the physical modules.</p>
+    <p class="text-[#333] leading-snug mt-1">• Click any architectural pod to open the technical drawer.</p>
   </div>
 
   <!-- Slide-Over Architecture Drawer (Right) -->
-  <aside id="drawer" class="fixed top-0 right-0 h-full w-full max-w-md glass-panel z-30 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col shadow-2xl border-l border-slate-700/50">
+  <aside id="drawer" class="fixed top-0 right-0 h-full w-full max-w-md bg-white border-l-[3px] border-[#151515] z-30 transform translate-x-full transition-transform duration-200 ease-in-out flex flex-col shadow-[-8px_0px_0px_#151515]">
     <!-- Drawer Header -->
-    <div class="p-6 border-b border-slate-800 flex items-start justify-between">
+    <div class="p-6 border-b-[3px] border-[#151515] bg-[#FFFDF7] flex items-start justify-between">
       <div>
-        <div class="flex items-center gap-2">
-          <span id="drawer-badge" class="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">OPERATIONAL</span>
-          <span id="drawer-id" class="text-xs font-mono text-slate-500">STATION_ID</span>
+        <div class="flex items-center gap-2 mb-1">
+          <span id="drawer-badge" class="px-2 py-0.5 text-[10px] font-black tracking-widest uppercase border-2 border-[#151515] bg-[#8EF0C0] text-[#151515]">OPERATIONAL</span>
+          <span id="drawer-id" class="text-xs font-mono font-bold text-[#666]">STATION_ID</span>
         </div>
-        <h2 id="drawer-title" class="text-xl font-bold text-white mt-1">Station Name</h2>
-        <p id="drawer-tagline" class="text-xs text-slate-400 mt-0.5">Tagline description</p>
+        <h2 id="drawer-title" class="text-xl font-black text-[#151515] uppercase tracking-tight">Station Name</h2>
+        <p id="drawer-tagline" class="text-xs text-[#555] font-medium mt-1">Tagline description</p>
       </div>
-      <button onclick="closeDrawer()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/60 transition">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      <button onclick="closeDrawer()" class="neo-btn p-1.5 bg-[#FF8F7C] text-[#151515]">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
     </div>
 
     <!-- Drawer Content -->
-    <div class="p-6 overflow-y-auto space-y-6 flex-1 text-sm">
+    <div class="p-6 overflow-y-auto space-y-6 flex-1 text-sm bg-white">
       <!-- Implementation Files -->
       <div>
-        <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-2 flex items-center gap-1.5">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
-          Active Repository Classes / Files
+        <h3 class="text-xs font-black uppercase tracking-wider text-[#151515] mb-2 flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 bg-[#B9A7FF] border border-[#151515]"></span>
+          Java & Next.js Repository Classes
         </h3>
-        <div id="drawer-files" class="space-y-1 font-mono text-[11px] text-slate-300"></div>
+        <div id="drawer-files" class="space-y-1.5 font-mono text-[11px]"></div>
       </div>
 
       <!-- Live Metrics Card -->
       <div>
-        <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-1.5">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          Telemetric & Architecture Indicators
+        <h3 class="text-xs font-black uppercase tracking-wider text-[#151515] mb-2 flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 bg-[#D9FF3F] border border-[#151515]"></span>
+          Technical & Security Specifications
         </h3>
         <div id="drawer-metrics" class="grid grid-cols-1 gap-2"></div>
       </div>
 
       <!-- Trust Boundary & Data Flows -->
       <div>
-        <h3 class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-3 flex items-center gap-1.5">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+        <h3 class="text-xs font-black uppercase tracking-wider text-[#151515] mb-2 flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 bg-[#8DDAFF] border border-[#151515]"></span>
           Trust Boundary & Data Flows
         </h3>
-        <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-800 space-y-2 text-xs">
+        <div class="neo-box p-3 space-y-2 text-xs bg-[#FFFDF7]">
           <div>
-            <span class="text-slate-400 font-semibold">Boundary Zone:</span>
-            <p id="drawer-boundary" class="text-indigo-300 font-mono mt-0.5">External ➔ Internal</p>
+            <span class="text-[#151515] font-black uppercase tracking-wider text-[10px]">Boundary:</span>
+            <p id="drawer-boundary" class="text-[#151515] font-mono font-bold mt-0.5"></p>
           </div>
-          <div class="pt-2 border-t border-slate-800">
-            <span class="text-slate-400 font-semibold">Ingress Data:</span>
-            <p id="drawer-inputs" class="text-slate-200 mt-0.5"></p>
+          <div class="pt-2 border-t-2 border-[#151515]">
+            <span class="text-[#151515] font-black uppercase tracking-wider text-[10px]">Ingress Data:</span>
+            <p id="drawer-inputs" class="text-[#333] mt-0.5"></p>
           </div>
-          <div class="pt-2 border-t border-slate-800">
-            <span class="text-slate-400 font-semibold">Egress Outputs:</span>
-            <p id="drawer-outputs" class="text-slate-200 mt-0.5"></p>
+          <div class="pt-2 border-t-2 border-[#151515]">
+            <span class="text-[#151515] font-black uppercase tracking-wider text-[10px]">Egress Outputs:</span>
+            <p id="drawer-outputs" class="text-[#333] mt-0.5"></p>
           </div>
         </div>
       </div>
 
       <!-- Security Controls List -->
       <div>
-        <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-3 flex items-center gap-1.5">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        <h3 class="text-xs font-black uppercase tracking-wider text-[#151515] mb-2 flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 bg-[#8EF0C0] border border-[#151515]"></span>
           Security Controls & Milestones
         </h3>
         <div id="drawer-controls" class="space-y-2.5"></div>
@@ -152,7 +182,7 @@
         displayName: "Security & Privacy Perimeter",
         tagline: "Spring Security, Supabase JWT, API Key Interceptor & PII Masking",
         status: "operational",
-        color: 0x00ffcc,
+        color: 0x8EF0C0, // Mint
         position: [0, 0.6, 0],
         files: [
           "com.centinel.finai.common.SecurityConfig.java",
@@ -166,7 +196,7 @@
           "Privacy Masking": "PAN & Account Number Regex Masking",
           "Role Security": "PARENT vs CHILD Role-Aware Authorization"
         },
-        boundary: "Public Network / Webhook ➔ Spring Security Filter Chain",
+        boundary: "Public Webhook / Client ➔ Spring Security Filter Chain",
         inputs: "Raw Bank SMS / Push Notifications, Bearer Tokens",
         outputs: "Masked Ingestion Entity, Authenticated CurrentUser Context",
         controls: [
@@ -180,7 +210,7 @@
         displayName: "Gemini Intelligence & Hybrid Categorizer",
         tagline: "Gemini 3.8 Flash Tool-Calling & AI Fallback Classifier",
         status: "in-development",
-        color: 0xa855f7,
+        color: 0xD9FF3F, // Lime
         position: [-4.2, 0.6, -1.5],
         files: [
           "com.centinel.finai.service.MerchantCategorizationService.java",
@@ -206,7 +236,7 @@
         displayName: "n8n Webhook & Ingestion Pipeline",
         tagline: "Permissioned Message Capture & Transaction Parser",
         status: "operational",
-        color: 0x3b82f6,
+        color: 0x8DDAFF, // Sky
         position: [4.2, 0.6, -1.5],
         files: [
           "com.centinel.finai.controller.IngestionController.java",
@@ -232,7 +262,7 @@
         displayName: "Supabase PostgreSQL Ledger",
         tagline: "Relational Ledger, Families & Purchase Request State",
         status: "operational",
-        color: 0x10b981,
+        color: 0xFFD64A, // Sun yellow
         position: [0, 0.6, -4.5],
         files: [
           "com.centinel.finai.entity.Transaction.java",
@@ -259,7 +289,7 @@
         displayName: "ParentGuard Next.js Frontend",
         tagline: "Neo-Brutalist Dashboard & Role-Aware Family Hub",
         status: "operational",
-        color: 0xf59e0b,
+        color: 0xFF8F7C, // Coral
         position: [0, 0.6, 3.8],
         files: [
           "frontend/src/app/dashboard/page.tsx",
@@ -286,16 +316,26 @@
     let scene, camera, renderer, controls, raycaster, mouse;
     const clickableObjects = [];
 
+    // Neo-Brutalist Black Outline Helper
+    function addBlackEdges(mesh) {
+      const edges = new THREE.EdgesGeometry(mesh.geometry);
+      const line = new THREE.LineSegments(
+        edges,
+        new THREE.LineBasicMaterial({ color: 0x151515, linewidth: 3 })
+      );
+      mesh.add(line);
+      return mesh;
+    }
+
     function init() {
       const container = document.getElementById('canvas-container');
 
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x060913);
-      scene.fog = new THREE.FogExp2(0x060913, 0.04);
+      scene.background = new THREE.Color(0xFFFDF7); // Paper warm off-white
 
       const aspect = window.innerWidth / window.innerHeight;
       camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
-      camera.position.set(11, 13, 11);
+      camera.position.set(12, 14, 12);
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -306,24 +346,29 @@
       controls = new THREE.OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.dampingFactor = 0.05;
-      controls.maxPolarAngle = Math.PI / 2.1;
+      controls.maxPolarAngle = Math.PI / 2.15;
       controls.target.set(0, 0, -0.5);
 
       raycaster = new THREE.Raycaster();
       mouse = new THREE.Vector2();
 
-      const ambientLight = new THREE.AmbientLight(0x223355, 1.3);
+      // Flat Studio Lighting suitable for Neo-Brutalism
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
       scene.add(ambientLight);
 
-      const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
-      mainLight.position.set(12, 22, 10);
-      mainLight.castShadow = true;
-      scene.add(mainLight);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(15, 25, 12);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      scene.add(dirLight);
 
-      const gridHelper = new THREE.GridHelper(28, 28, 0x00ffcc, 0x16223f);
+      // Neo-Brutalist Ink Grid Floor
+      const gridHelper = new THREE.GridHelper(28, 28, 0x151515, 0xd0cbc0);
       gridHelper.position.y = 0;
       scene.add(gridHelper);
 
+      // Build Tactile Modular Pods
       Object.values(STATIONS_DATA).forEach(data => {
         buildStationPod(data);
       });
@@ -339,64 +384,56 @@
       group.position.set(...data.position);
       group.userData = { stationId: data.id };
 
-      // Base Platform
-      const baseGeo = new THREE.CylinderGeometry(1.4, 1.6, 0.3, 6);
+      // 1. Base Pedestal (Solid white slab with bold black edges)
+      const baseGeo = new THREE.BoxGeometry(2.4, 0.35, 2.4);
       const baseMat = new THREE.MeshStandardMaterial({
-        color: 0x0d1527,
-        metalness: 0.8,
-        roughness: 0.3
+        color: 0xFFFFFF,
+        roughness: 0.9,
+        metalness: 0.1
       });
-      const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+      const baseMesh = addBlackEdges(new THREE.Mesh(baseGeo, baseMat));
       baseMesh.receiveShadow = true;
       group.add(baseMesh);
 
-      // Central Pillar
-      const pillarGeo = new THREE.BoxGeometry(0.85, 1.2, 0.85);
+      // 2. Central Structural Block (Offset block)
+      const pillarGeo = new THREE.BoxGeometry(1.4, 1.3, 1.4);
       const pillarMat = new THREE.MeshStandardMaterial({
-        color: 0x111e38,
-        metalness: 0.5,
-        roughness: 0.2
+        color: 0x151515, // Solid ink column
+        roughness: 0.8
       });
-      const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-      pillar.position.y = 0.75;
+      const pillar = addBlackEdges(new THREE.Mesh(pillarGeo, pillarMat));
+      pillar.position.y = 0.82;
       pillar.castShadow = true;
       group.add(pillar);
 
-      // Floating Holographic Core Gem
-      const orbGeo = new THREE.OctahedronGeometry(0.48);
+      // 3. Flat Color Cap (Neo-brutalist accent block on top)
+      const capGeo = new THREE.BoxGeometry(1.6, 0.25, 1.6);
+      const capMat = new THREE.MeshStandardMaterial({
+        color: data.color,
+        roughness: 0.3
+      });
+      const cap = addBlackEdges(new THREE.Mesh(capGeo, capMat));
+      cap.position.y = 1.55;
+      group.add(cap);
+
+      // 4. Floating Geometric Identifier (Rotates on top)
+      const orbGeo = new THREE.OctahedronGeometry(0.5);
       const orbMat = new THREE.MeshStandardMaterial({
         color: data.color,
-        emissive: data.color,
-        emissiveIntensity: 0.75,
-        roughness: 0.1,
-        metalness: 0.9,
-        wireframe: data.status === 'planned-milestone'
+        roughness: 0.2,
+        metalness: 0.1
       });
-      const orb = new THREE.Mesh(orbGeo, orbMat);
-      orb.position.y = 1.85;
+      const orb = addBlackEdges(new THREE.Mesh(orbGeo, orbMat));
+      orb.position.y = 2.4;
       orb.userData = { isFloatingOrb: true };
       group.add(orb);
-
-      // Pulsing Data Ring
-      const ringGeo = new THREE.TorusGeometry(1.15, 0.03, 8, 32);
-      const ringMat = new THREE.MeshBasicMaterial({ color: data.color });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = Math.PI / 2;
-      ring.position.y = 0.4;
-      ring.userData = { isDataRing: true };
-      group.add(ring);
-
-      // Glow Point Light
-      const light = new THREE.PointLight(data.color, 1.2, 4);
-      light.position.y = 1.85;
-      group.add(light);
 
       scene.add(group);
       clickableObjects.push(group);
     }
 
     function onPointerDown(event) {
-      if (event.clientY < 70 && event.clientX > window.innerWidth - 300) return;
+      if (event.clientY < 75 && event.clientX > window.innerWidth - 350) return;
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -433,18 +470,22 @@
 
       badge.innerText = data.status.replace('-', ' ').toUpperCase();
       if (data.status === 'operational') {
-        badge.className = "px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+        badge.className = "px-2 py-0.5 text-[10px] font-black tracking-widest uppercase border-2 border-[#151515] bg-[#8EF0C0] text-[#151515]";
       } else if (data.status === 'in-development') {
-        badge.className = "px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-purple-500/20 text-purple-400 border border-purple-500/30";
+        badge.className = "px-2 py-0.5 text-[10px] font-black tracking-widest uppercase border-2 border-[#151515] bg-[#D9FF3F] text-[#151515]";
       } else {
-        badge.className = "px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30";
+        badge.className = "px-2 py-0.5 text-[10px] font-black tracking-widest uppercase border-2 border-[#151515] bg-[#8DDAFF] text-[#151515]";
       }
 
       // Files
       const filesContainer = document.getElementById('drawer-files');
       filesContainer.innerHTML = '';
       data.files.forEach(f => {
-        filesContainer.innerHTML += `<div class="p-1.5 rounded bg-slate-900/90 border border-slate-800 text-cyan-300">📁 ${f}</div>`;
+        filesContainer.innerHTML += `
+          <div class="p-2 bg-[#FFFDF7] border-2 border-[#151515] shadow-[2px_2px_0px_#151515] font-bold text-[#151515]">
+            📄 ${f}
+          </div>
+        `;
       });
 
       // Metrics
@@ -452,9 +493,9 @@
       metricsContainer.innerHTML = '';
       Object.entries(data.metrics).forEach(([k, v]) => {
         metricsContainer.innerHTML += `
-          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-            <span class="text-slate-400 text-xs">${k}</span>
-            <span class="font-mono text-cyan-300 font-semibold text-xs">${v}</span>
+          <div class="flex items-center justify-between p-2.5 bg-white border-2 border-[#151515] shadow-[2px_2px_0px_#151515]">
+            <span class="text-[#555] font-bold text-xs uppercase">${k}</span>
+            <span class="font-mono text-[#151515] font-black text-xs">${v}</span>
           </div>
         `;
       });
@@ -470,12 +511,12 @@
       data.controls.forEach(ctrl => {
         const isOp = ctrl.status === 'operational';
         controlsContainer.innerHTML += `
-          <div class="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800">
+          <div class="p-3 bg-white border-2 border-[#151515] shadow-[3px_3px_0px_#151515]">
             <div class="flex items-center justify-between">
-              <span class="font-bold text-slate-200 text-xs">${ctrl.name}</span>
-              <span class="text-[9px] px-1.5 py-0.5 rounded font-mono ${isOp ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-400'}">${ctrl.status}</span>
+              <span class="font-black text-[#151515] text-xs uppercase">${ctrl.name}</span>
+              <span class="text-[9px] px-1.5 py-0.5 font-black uppercase border border-[#151515] ${isOp ? 'bg-[#8EF0C0]' : 'bg-[#FFD64A]'}">${ctrl.status}</span>
             </div>
-            <p class="text-[11px] text-slate-400 mt-1">${ctrl.desc}</p>
+            <p class="text-[12px] text-[#444] mt-1.5 leading-snug">${ctrl.desc}</p>
           </div>
         `;
       });
@@ -501,13 +542,9 @@
       clickableObjects.forEach((group, index) => {
         group.children.forEach(child => {
           if (child.userData && child.userData.isFloatingOrb) {
-            child.rotation.y = elapsedTime * 0.8;
-            child.rotation.x = Math.sin(elapsedTime + index) * 0.3;
-            child.position.y = 1.85 + Math.sin(elapsedTime * 2.0 + index) * 0.12;
-          }
-          if (child.userData && child.userData.isDataRing) {
-            const scale = 1 + Math.sin(elapsedTime * 3.0 + index) * 0.06;
-            child.scale.set(scale, scale, scale);
+            child.rotation.y = elapsedTime * 0.7;
+            child.rotation.x = Math.sin(elapsedTime * 0.5 + index) * 0.2;
+            child.position.y = 2.4 + Math.sin(elapsedTime * 1.5 + index) * 0.08;
           }
         });
       });

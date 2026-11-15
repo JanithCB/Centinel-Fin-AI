@@ -17,12 +17,14 @@ export default function Header() {
             PHASE 1 FOUNDATION
           </span>
         </div>
-        <nav className="flex items-center gap-4 lg:gap-6">
+        <nav className="flex items-center gap-3 lg:gap-4">
           <Link
-            href="/"
-            className="font-label-md text-label-md uppercase tracking-wider px-3 py-2 transition-colors bg-primary-container text-ink border-[2px] border-ink shadow-[4px_4px_0_#151515]"
+            href="/sentinel_dev_log_3d.html"
+            target="_blank"
+            className="font-label-md text-label-md uppercase tracking-wider px-3 py-2 bg-mint border-[2px] border-ink text-ink shadow-[3px_3px_0_#151515] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#151515] transition-all flex items-center gap-1.5"
           >
-            Platform
+            <span className="w-2 h-2 rounded-full bg-ink animate-pulse"></span>
+            <span>Architecture 3D</span>
           </Link>
           <Link
             href="/auth/sign-in"

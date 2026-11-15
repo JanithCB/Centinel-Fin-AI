@@ -36,7 +36,7 @@ export default function Home() {
               ParentGuard helps families set clear purchase permissions. No hidden decisions. No payment processing in this app.
             </p>
             {/* CTAs */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-4 w-full sm:w-auto">
               <Link
                 href="/auth/sign-up"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary-container border-[3px] border-ink text-ink font-label-md text-label-md uppercase tracking-wider shadow-[6px_6px_0_#151515] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[8px_8px_0_#151515] active:translate-x-1 active:translate-y-1 active:shadow-[2px_2px_0_#151515] transition-all"
@@ -48,7 +48,15 @@ export default function Home() {
                 href="/auth/sign-in"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-surface border-[3px] border-ink text-ink font-label-md text-label-md uppercase tracking-wider shadow-[4px_4px_0_#151515] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0_#151515] active:translate-x-1 active:translate-y-1 active:shadow-[1px_1px_0_#151515] transition-all"
               >
-                <span>[ I ALREADY HAVE AN ACCOUNT ]</span>
+                <span>[ SIGN IN ]</span>
+              </Link>
+              <Link
+                href="/sentinel_dev_log_3d.html"
+                target="_blank"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-mint border-[3px] border-ink text-ink font-label-md text-label-md uppercase tracking-wider shadow-[5px_5px_0_#151515] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[7px_7px_0_#151515] active:translate-x-1 active:translate-y-1 active:shadow-[1px_1px_0_#151515] transition-all"
+              >
+                <span className="material-symbols-outlined text-[18px]">view_in_ar</span>
+                <span>[ ARCHITECTURE VIEW (3D) ]</span>
               </Link>
             </div>
             {/* Live Trust Indicators */}
