@@ -9,7 +9,7 @@ body:
 
     \    \"itemName\": \"Xbox Game Pass 1-Month\",\r
 
-    \    \"amount\": 29.99,\r
+    \    \"amount\": 129.99,\r
 
     \    \"currency\": \"USD\",\r
 
@@ -154,6 +154,32 @@ scripts:
 
       \    console.log(\"Captured requestId:\", res.id);\r
 
-      });"
+      });\r
+
+      \r
+
+      \r
+
+      //Dynamic workflow Branching \r
+
+      const data = pm.response.json();\r
+
+      \r
+
+      if (data.amount > 100.00) {\r
+
+      \    console.log(\"⚠️ High value transaction ($\" + data.amount + \")! Escalating to Senior Parent.\");\r
+
+      \    pm.execution.setNextRequest(\"SEC-01: Child Cannot Approve Request\");\r
+
+      \r
+
+      } else {\r
+
+      \    console.log(\"ℹ️ Standard transaction ($\" + data.amount + \"). Routing to Parent Approval.\");\r
+
+      \    pm.execution.setNextRequest(\"05. Parent Approves Purchase Request\");\r
+
+      }"
     language: text/javascript
 order: 4000

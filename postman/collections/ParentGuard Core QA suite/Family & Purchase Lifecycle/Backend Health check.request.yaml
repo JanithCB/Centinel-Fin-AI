@@ -27,6 +27,36 @@ scripts:
 
       \    pm.expect(pm.response.responseTime).to.be.below(500);\r
 
+      });\r
+
+      \r
+
+      \r
+
+      // ============================================================================\r
+
+      // ⚡ Performance & Defensive Header Audit\r
+
+      // ============================================================================\r
+
+      pm.test(\"Performance SLA: Response completed under 300ms\", function () {\r
+
+      \    pm.expect(pm.response.responseTime).to.be.below(300);\r
+
+      });\r
+
+      pm.test(\"Payload Optimization: Body size is compact (< 2KB)\", function () {\r
+
+      \    pm.expect(pm.response.responseSize).to.be.below(2048);\r
+
+      });\r
+
+      pm.test(\"Defensive Header: X-Content-Type-Options is nosniff\", function () {\r
+
+      \    pm.response.to.have.header(\"x-content-type-options\");\r
+
+      \    pm.expect(pm.response.headers.get(\"x-content-type-options\")).to.eql(\"nosniff\");\r
+
       });"
     language: text/javascript
 order: 1000

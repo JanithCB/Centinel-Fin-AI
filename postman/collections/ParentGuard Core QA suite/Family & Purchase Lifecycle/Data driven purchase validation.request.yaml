@@ -1,0 +1,61 @@
+$kind: http-request
+url: "{{baseURL}}/api/v1/purchase-requests"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"siteDomain\": \"{{siteDomain}}\",\r
+
+    \  \"itemName\": \"{{itemName}}\",\r
+
+    \  \"amount\": {{amount}},\r
+
+    \  \"currency\": \"{{currency}}\",\r
+
+    \  \"category\": \"{{category}}\",\r
+
+    \  \"note\": \"Automated DDT iteration: {{testCase}}\"\r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: "{{childToken}}"
+scripts:
+  - type: afterResponse
+    code: "const testCase = pm.iterationData.get(\"testCase\");\r
+
+      const expectedStatus = pm.iterationData.get(\"expectedStatus\");\r
+
+      const expectedOutcome = pm.iterationData.get(\"expectedOutcome\");\r
+
+      pm.test(`[${testCase}] Server returns expected status ${expectedStatus}`, function () {\r
+
+      \    pm.response.to.have.status(expectedStatus);\r
+
+      });\r
+
+      if (expectedStatus === 201) {\r
+
+      \    pm.test(`[${testCase}] Purchase status matches expected state: ${expectedOutcome}`, function () {\r
+
+      \        const data = pm.response.json();\r
+
+      \        pm.expect(data.status).to.eql(expectedOutcome);\r
+
+      \    });\r
+
+      } else if (expectedStatus === 400) {\r
+
+      \    pm.test(`[${testCase}] Invalid payload rejected by backend Bean Validation`, function () {\r
+
+      \        const error = pm.response.json();\r
+
+      \        pm.expect(error).to.have.property(\"validationErrors\");\r
+
+      \    });\r
+
+      }"
+    language: text/javascript
+order: 6000

@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Centinel Fin AI - Interactive Architecture & Dev Log</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #060913;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    .glass-panel {
+      background: rgba(10, 15, 30, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+<body class="text-slate-100 select-none">
+
+  <!-- 3D Canvas -->
+  <div id="canvas-container"></div>
+
+  <!-- HUD: Header Bar -->
+  <header class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-8 py-5 pointer-events-none">
+    <div class="pointer-events-auto flex items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-wider text-white flex items-center gap-2">
+          CENTINEL FIN AI
+          <span class="text-xs px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800">GEMINI 3.8 FLASH</span>
+        </h1>
+        <p class="text-xs text-slate-400">ParentGuard & Personal Expense Intelligence Architecture</p>
+      </div>
+    </div>
+
+    <!-- Quick Station Switcher -->
+    <div class="pointer-events-auto hidden lg:flex items-center gap-2 glass-panel px-3 py-1.5 rounded-xl">
+      <span class="text-xs text-slate-400 font-semibold px-2">CLICK POD OR JUMP:</span>
+      <button onclick="focusStation('security')" class="px-2.5 py-1 text-xs rounded-lg bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 transition">🛡️ Security</button>
+      <button onclick="focusStation('ai_engine')" class="px-2.5 py-1 text-xs rounded-lg bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition">🧠 Gemini AI</button>
+      <button onclick="focusStation('ingestion_pipeline')" class="px-2.5 py-1 text-xs rounded-lg bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition">⚡ n8n Webhook</button>
+      <button onclick="focusStation('ledger_db')" class="px-2.5 py-1 text-xs rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition">💾 PostgreSQL</button>
+      <button onclick="focusStation('parentguard_ui')" class="px-2.5 py-1 text-xs rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition">🖥️ Next.js UI</button>
+    </div>
+  </header>
+
+  <!-- Instructions Overlay (Bottom Left) -->
+  <div class="absolute bottom-6 left-6 z-20 glass-panel px-4 py-3 rounded-xl max-w-sm text-xs text-slate-300 pointer-events-none">
+    <div class="font-bold text-slate-200 mb-1 flex items-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      Centinel 3D Architecture Engine
+    </div>
+    <p>• Left-click + drag to orbit the isometric scene.</p>
+    <p>• Click any station pod to inspect its live code files, security controls & data flows.</p>
+  </div>
+
+  <!-- Slide-Over Architecture Drawer (Right) -->
+  <aside id="drawer" class="fixed top-0 right-0 h-full w-full max-w-md glass-panel z-30 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col shadow-2xl border-l border-slate-700/50">
+    <!-- Drawer Header -->
+    <div class="p-6 border-b border-slate-800 flex items-start justify-between">
+      <div>
+        <div class="flex items-center gap-2">
+          <span id="drawer-badge" class="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">OPERATIONAL</span>
+          <span id="drawer-id" class="text-xs font-mono text-slate-500">STATION_ID</span>
+        </div>
+        <h2 id="drawer-title" class="text-xl font-bold text-white mt-1">Station Name</h2>
+        <p id="drawer-tagline" class="text-xs text-slate-400 mt-0.5">Tagline description</p>
+      </div>
+      <button onclick="closeDrawer()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/60 transition">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Drawer Content -->
+    <div class="p-6 overflow-y-auto space-y-6 flex-1 text-sm">
+      <!-- Implementation Files -->
+      <div>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-2 flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+          Active Repository Classes / Files
+        </h3>
+        <div id="drawer-files" class="space-y-1 font-mono text-[11px] text-slate-300"></div>
+      </div>
+
+      <!-- Live Metrics Card -->
+      <div>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Telemetric & Architecture Indicators
+        </h3>
+        <div id="drawer-metrics" class="grid grid-cols-1 gap-2"></div>
+      </div>
+
+      <!-- Trust Boundary & Data Flows -->
+      <div>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-3 flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+          Trust Boundary & Data Flows
+        </h3>
+        <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-800 space-y-2 text-xs">
+          <div>
+            <span class="text-slate-400 font-semibold">Boundary Zone:</span>
+            <p id="drawer-boundary" class="text-indigo-300 font-mono mt-0.5">External ➔ Internal</p>
+          </div>
+          <div class="pt-2 border-t border-slate-800">
+            <span class="text-slate-400 font-semibold">Ingress Data:</span>
+            <p id="drawer-inputs" class="text-slate-200 mt-0.5"></p>
+          </div>
+          <div class="pt-2 border-t border-slate-800">
+            <span class="text-slate-400 font-semibold">Egress Outputs:</span>
+            <p id="drawer-outputs" class="text-slate-200 mt-0.5"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Security Controls List -->
+      <div>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-3 flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          Security Controls & Milestones
+        </h3>
+        <div id="drawer-controls" class="space-y-2.5"></div>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+    const STATIONS_DATA = {
+      security: {
+        id: "security",
+        displayName: "Security & Privacy Perimeter",
+        tagline: "Spring Security, Supabase JWT, API Key Interceptor & PII Masking",
+        status: "operational",
+        color: 0x00ffcc,
+        position: [0, 0.6, 0],
+        files: [
+          "com.centinel.finai.common.SecurityConfig.java",
+          "com.centinel.finai.config.IngestionApiKeyInterceptor.java",
+          "com.centinel.finai.service.SensitiveDataMaskingService.java",
+          "com.centinel.finai.util.MaskingUtils.java"
+        ],
+        metrics: {
+          "Auth Standard": "Supabase JWT Bearer (RS256)",
+          "API Ingestion Gate": "X-API-KEY Webhook Interceptor",
+          "Privacy Masking": "PAN & Account Number Regex Masking",
+          "Role Security": "PARENT vs CHILD Role-Aware Authorization"
+        },
+        boundary: "Public Network / Webhook ➔ Spring Security Filter Chain",
+        inputs: "Raw Bank SMS / Push Notifications, Bearer Tokens",
+        outputs: "Masked Ingestion Entity, Authenticated CurrentUser Context",
+        controls: [
+          { name: "Sensitive Data Masking Service", status: "operational", desc: "Masks PAN credit card numbers and account identifiers before writing to database or calling AI." },
+          { name: "Ingestion API Key Interceptor", status: "operational", desc: "Protects /api/ingestion/webhook against unauthorized traffic." },
+          { name: "ParentGuard Role-Based Access", status: "operational", desc: "Enforces strict access boundaries: children cannot approve purchase requests." }
+        ]
+      },
+      ai_engine: {
+        id: "ai_engine",
+        displayName: "Gemini Intelligence & Hybrid Categorizer",
+        tagline: "Gemini 3.8 Flash Tool-Calling & AI Fallback Classifier",
+        status: "in-development",
+        color: 0xa855f7,
+        position: [-4.2, 0.6, -1.5],
+        files: [
+          "com.centinel.finai.service.MerchantCategorizationService.java",
+          "Spring AI / Google Gemini 3.8 Flash Client"
+        ],
+        metrics: {
+          "Active Model": "Google Gemini 3.8 Flash",
+          "Architecture": "Hybrid (Rule Regex First ➔ AI Fallback)",
+          "Ledger Interface": "Safe Spring AI Tool Calling over PostgreSQL",
+          "Privacy Guarantee": "AI processes only masked tokens, zero raw PAN"
+        },
+        boundary: "Spring Boot Service Layer ➔ Google Gemini Cloud API",
+        inputs: "Unrecognized Masked Transaction Text, Natural Language Questions",
+        outputs: "Standardized Category Code, Conversational Spending Summaries",
+        controls: [
+          { name: "Rule-Based Categorizer (Tier 1)", status: "operational", desc: "Instant O(1) HashMap matching for known merchants (Keells, Uber, PickMe, Netflix)." },
+          { name: "Gemini AI Fallback (Tier 2)", status: "in-development", desc: "Processes unfamiliar merchant tokens into structured JSON categories." },
+          { name: "Safe Ledger Query Tools", status: "planned-milestone", desc: "Allows Gemini to query spending aggregates without SQL injection risks." }
+        ]
+      },
+      ingestion_pipeline: {
+        id: "ingestion_pipeline",
+        displayName: "n8n Webhook & Ingestion Pipeline",
+        tagline: "Permissioned Message Capture & Transaction Parser",
+        status: "operational",
+        color: 0x3b82f6,
+        position: [4.2, 0.6, -1.5],
+        files: [
+          "com.centinel.finai.controller.IngestionController.java",
+          "com.centinel.finai.service.TransactionMessageParserService.java",
+          "feed_mock_data.ps1 (Harness)"
+        ],
+        metrics: {
+          "Endpoint": "POST /api/ingestion/webhook",
+          "Parser Engine": "Pattern-Matching Regex Parser",
+          "Financial Precision": "BigDecimal (Two-decimal currency precision)",
+          "Message Storage": "IngestedMessage Table stores raw payload"
+        },
+        boundary: "External n8n Automation Engine ➔ IngestionController",
+        inputs: "Permissioned Ingestion Webhooks, Bank Notification Push Feeds",
+        outputs: "Parsed Transaction Entity, IngestedMessage Audit Record",
+        controls: [
+          { name: "Transaction Message Parser Service", status: "operational", desc: "Extracts amount, currency, merchant, and timestamp from unstructured bank alerts." },
+          { name: "feed_mock_data.ps1 Simulation Harness", status: "operational", desc: "Powers local regression testing against various bank SMS templates." }
+        ]
+      },
+      ledger_db: {
+        id: "ledger_db",
+        displayName: "Supabase PostgreSQL Ledger",
+        tagline: "Relational Ledger, Families & Purchase Request State",
+        status: "operational",
+        color: 0x10b981,
+        position: [0, 0.6, -4.5],
+        files: [
+          "com.centinel.finai.entity.Transaction.java",
+          "com.centinel.finai.family.Family.java",
+          "com.centinel.finai.purchase.PurchaseRequest.java",
+          "src/main/resources/db/migration/V1__schema.sql"
+        ],
+        metrics: {
+          "Engine": "PostgreSQL 15+ (Hosted on Supabase)",
+          "Data Modeling": "BigDecimal Currency, UUID Foreign Keys",
+          "Migration Tool": "Flyway Versioned Migrations",
+          "ACID Safety": "Strict Read-Committed / Serializable Isolation"
+        },
+        boundary: "Spring Boot Backend ➔ Supabase Managed Cloud DB",
+        inputs: "Spring Data JPA CRUD, Purchase Approval Transactions",
+        outputs: "ACID Committed Records, Weekly Spending Summaries",
+        controls: [
+          { name: "Relational Foreign Key Integrity", status: "operational", desc: "Maintains relational links between users, families, and purchase requests." },
+          { name: "Purchase Approval State Machine", status: "operational", desc: "Enforces immutable transition rules: PENDING ➔ APPROVED / REJECTED." }
+        ]
+      },
+      parentguard_ui: {
+        id: "parentguard_ui",
+        displayName: "ParentGuard Next.js Frontend",
+        tagline: "Neo-Brutalist Dashboard & Role-Aware Family Hub",
+        status: "operational",
+        color: 0xf59e0b,
+        position: [0, 0.6, 3.8],
+        files: [
+          "frontend/src/app/dashboard/page.tsx",
+          "frontend/src/app/auth/sign-in/page.tsx",
+          "frontend/src/middleware.ts",
+          "frontend_design.md"
+        ],
+        metrics: {
+          "Framework": "Next.js 15 (App Router, React 19)",
+          "Design System": "Neo-Brutalism (Hard-offset shadows, #151515)",
+          "Auth Gateway": "Supabase SSR + Middleware Session Verification",
+          "Testing": "Vitest + Playwright E2E"
+        },
+        boundary: "Browser DOM ➔ Next.js Server Components / Spring Boot API",
+        inputs: "User Form Submissions, Supabase Session Cookies",
+        outputs: "Role-Aware Dashboards, Purchase Request Triage Triggers",
+        controls: [
+          { name: "Next.js Middleware Session Protection", status: "operational", desc: "Redirects unauthenticated visitors to /auth/sign-in." },
+          { name: "Role-Aware View Toggling", status: "operational", desc: "Restricts family management and approvals to verified parents." }
+        ]
+      }
+    };
+
+    let scene, camera, renderer, controls, raycaster, mouse;
+    const clickableObjects = [];
+
+    function init() {
+      const container = document.getElementById('canvas-container');
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x060913);
+      scene.fog = new THREE.FogExp2(0x060913, 0.04);
+
+      const aspect = window.innerWidth / window.innerHeight;
+      camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
+      camera.position.set(11, 13, 11);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2.1;
+      controls.target.set(0, 0, -0.5);
+
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
+      const ambientLight = new THREE.AmbientLight(0x223355, 1.3);
+      scene.add(ambientLight);
+
+      const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
+      mainLight.position.set(12, 22, 10);
+      mainLight.castShadow = true;
+      scene.add(mainLight);
+
+      const gridHelper = new THREE.GridHelper(28, 28, 0x00ffcc, 0x16223f);
+      gridHelper.position.y = 0;
+      scene.add(gridHelper);
+
+      Object.values(STATIONS_DATA).forEach(data => {
+        buildStationPod(data);
+      });
+
+      window.addEventListener('resize', onWindowResize);
+      window.addEventListener('pointerdown', onPointerDown);
+
+      animate();
+    }
+
+    function buildStationPod(data) {
+      const group = new THREE.Group();
+      group.position.set(...data.position);
+      group.userData = { stationId: data.id };
+
+      // Base Platform
+      const baseGeo = new THREE.CylinderGeometry(1.4, 1.6, 0.3, 6);
+      const baseMat = new THREE.MeshStandardMaterial({
+        color: 0x0d1527,
+        metalness: 0.8,
+        roughness: 0.3
+      });
+      const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+      baseMesh.receiveShadow = true;
+      group.add(baseMesh);
+
+      // Central Pillar
+      const pillarGeo = new THREE.BoxGeometry(0.85, 1.2, 0.85);
+      const pillarMat = new THREE.MeshStandardMaterial({
+        color: 0x111e38,
+        metalness: 0.5,
+        roughness: 0.2
+      });
+      const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+      pillar.position.y = 0.75;
+      pillar.castShadow = true;
+      group.add(pillar);
+
+      // Floating Holographic Core Gem
+      const orbGeo = new THREE.OctahedronGeometry(0.48);
+      const orbMat = new THREE.MeshStandardMaterial({
+        color: data.color,
+        emissive: data.color,
+        emissiveIntensity: 0.75,
+        roughness: 0.1,
+        metalness: 0.9,
+        wireframe: data.status === 'planned-milestone'
+      });
+      const orb = new THREE.Mesh(orbGeo, orbMat);
+      orb.position.y = 1.85;
+      orb.userData = { isFloatingOrb: true };
+      group.add(orb);
+
+      // Pulsing Data Ring
+      const ringGeo = new THREE.TorusGeometry(1.15, 0.03, 8, 32);
+      const ringMat = new THREE.MeshBasicMaterial({ color: data.color });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 0.4;
+      ring.userData = { isDataRing: true };
+      group.add(ring);
+
+      // Glow Point Light
+      const light = new THREE.PointLight(data.color, 1.2, 4);
+      light.position.y = 1.85;
+      group.add(light);
+
+      scene.add(group);
+      clickableObjects.push(group);
+    }
+
+    function onPointerDown(event) {
+      if (event.clientY < 70 && event.clientX > window.innerWidth - 300) return;
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(clickableObjects, true);
+
+      if (intersects.length > 0) {
+        let rootGroup = intersects[0].object;
+        while (rootGroup.parent && !rootGroup.userData.stationId) {
+          rootGroup = rootGroup.parent;
+        }
+        if (rootGroup.userData && rootGroup.userData.stationId) {
+          focusStation(rootGroup.userData.stationId);
+        }
+      }
+    }
+
+    function focusStation(stationId) {
+      const data = STATIONS_DATA[stationId];
+      if (!data) return;
+
+      const targetPos = new THREE.Vector3(...data.position);
+      controls.target.copy(targetPos);
+      openDrawer(data);
+    }
+
+    function openDrawer(data) {
+      const drawer = document.getElementById('drawer');
+      const badge = document.getElementById('drawer-badge');
+
+      document.getElementById('drawer-id').innerText = data.id.toUpperCase();
+      document.getElementById('drawer-title').innerText = data.displayName;
+      document.getElementById('drawer-tagline').innerText = data.tagline;
+
+      badge.innerText = data.status.replace('-', ' ').toUpperCase();
+      if (data.status === 'operational') {
+        badge.className = "px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+      } else if (data.status === 'in-development') {
+        badge.className = "px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-purple-500/20 text-purple-400 border border-purple-500/30";
+      } else {
+        badge.className = "px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30";
+      }
+
+      // Files
+      const filesContainer = document.getElementById('drawer-files');
+      filesContainer.innerHTML = '';
+      data.files.forEach(f => {
+        filesContainer.innerHTML += `<div class="p-1.5 rounded bg-slate-900/90 border border-slate-800 text-cyan-300">📁 ${f}</div>`;
+      });
+
+      // Metrics
+      const metricsContainer = document.getElementById('drawer-metrics');
+      metricsContainer.innerHTML = '';
+      Object.entries(data.metrics).forEach(([k, v]) => {
+        metricsContainer.innerHTML += `
+          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+            <span class="text-slate-400 text-xs">${k}</span>
+            <span class="font-mono text-cyan-300 font-semibold text-xs">${v}</span>
+          </div>
+        `;
+      });
+
+      // Data flows
+      document.getElementById('drawer-boundary').innerText = data.boundary;
+      document.getElementById('drawer-inputs').innerText = data.inputs;
+      document.getElementById('drawer-outputs').innerText = data.outputs;
+
+      // Controls
+      const controlsContainer = document.getElementById('drawer-controls');
+      controlsContainer.innerHTML = '';
+      data.controls.forEach(ctrl => {
+        const isOp = ctrl.status === 'operational';
+        controlsContainer.innerHTML += `
+          <div class="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-200 text-xs">${ctrl.name}</span>
+              <span class="text-[9px] px-1.5 py-0.5 rounded font-mono ${isOp ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-400'}">${ctrl.status}</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1">${ctrl.desc}</p>
+          </div>
+        `;
+      });
+
+      drawer.classList.remove('translate-x-full');
+    }
+
+    function closeDrawer() {
+      document.getElementById('drawer').classList.add('translate-x-full');
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const elapsedTime = clock.getElapsedTime();
+
+      clickableObjects.forEach((group, index) => {
+        group.children.forEach(child => {
+          if (child.userData && child.userData.isFloatingOrb) {
+            child.rotation.y = elapsedTime * 0.8;
+            child.rotation.x = Math.sin(elapsedTime + index) * 0.3;
+            child.position.y = 1.85 + Math.sin(elapsedTime * 2.0 + index) * 0.12;
+          }
+          if (child.userData && child.userData.isDataRing) {
+            const scale = 1 + Math.sin(elapsedTime * 3.0 + index) * 0.06;
+            child.scale.set(scale, scale, scale);
+          }
+        });
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>

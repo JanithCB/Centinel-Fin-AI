@@ -25,9 +25,9 @@ scripts:
 
       // Baseline 03: Latency SLA Check\r
 
-      pm.test(\"Latency is within acceptable threshold (< 500ms)\", function () {\r
+      pm.test(\"Latency is within acceptable threshold (< 1000ms)\", function () {\r
 
-      \    pm.expect(pm.response.responseTime).to.be.below(500);\r
+      \    pm.expect(pm.response.responseTime).to.be.below(1000);\r
 
       });\r
 

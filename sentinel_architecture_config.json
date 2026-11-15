@@ -1,0 +1,209 @@
+{
+  "system": {
+    "name": "Centinel Fin AI",
+    "codename": "ParentGuard & Personal Expense Intelligence",
+    "version": "1.0.0-beta",
+    "repositoryPath": "D:\\Centinel Fin AI",
+    "primaryModel": "Gemini 3.8 Flash",
+    "backendFramework": "Java Spring Boot (Maven)",
+    "databaseEngine": "Supabase PostgreSQL (Spring Data JPA)",
+    "frontendFramework": "Next.js (React / TypeScript / Tailwind Neo-Brutalism)",
+    "lastVerified": "2026-11-15T20:50:00Z"
+  },
+  "stations": {
+    "security": {
+      "id": "security",
+      "displayName": "Security & Privacy Perimeter",
+      "tagline": "Spring Security, Supabase JWT, API Key Interceptor & PII Masking",
+      "status": "operational",
+      "coordinates3D": { "x": 0, "y": 0.6, "z": 0 },
+      "accentColor": "#00ffcc",
+      "implementationFiles": [
+        "com.centinel.finai.common.SecurityConfig",
+        "com.centinel.finai.config.IngestionApiKeyInterceptor",
+        "com.centinel.finai.service.SensitiveDataMaskingService",
+        "com.centinel.finai.util.MaskingUtils"
+      ],
+      "metrics": {
+        "Auth Standard": "Supabase JWT Bearer (RS256)",
+        "API Ingestion Gate": "X-API-KEY Webhook Interceptor",
+        "Privacy Protection": "Regex-driven PII & PAN Card Masking",
+        "Role Boundaries": "PARENT, CHILD, ADMIN (Role-Aware Shell)"
+      },
+      "controls": [
+        {
+          "name": "Sensitive Data Masking Service",
+          "status": "operational",
+          "desc": "Masks credit card numbers (PAN), bank account digits, and personal identifiers before passing to database or AI."
+        },
+        {
+          "name": "Ingestion API Key Interceptor",
+          "status": "operational",
+          "desc": "Validates cryptographically hashed headers on incoming n8n webhook posts."
+        },
+        {
+          "name": "Role-Aware ParentGuard Authorization",
+          "status": "operational",
+          "desc": "Prevents children from performing parent-only purchase approvals or family-member modifications."
+        }
+      ],
+      "dataFlow": {
+        "inputs": ["Raw Bank SMS / Push Notifications", "Client Auth Bearer Headers"],
+        "outputs": ["Masked Ingestion Entity", "Authenticated CurrentUser Context"],
+        "boundary": "Public Network / Webhook ➔ Spring Security Filter Chain"
+      }
+    },
+    "ai_engine": {
+      "id": "ai_engine",
+      "displayName": "Gemini Intelligence & Hybrid Categorizer",
+      "tagline": "Gemini 3.8 Flash Tool-Calling & AI Fallback Classifier",
+      "status": "in-development",
+      "coordinates3D": { "x": -4, "y": 0.6, "z": -2 },
+      "accentColor": "#a855f7",
+      "implementationFiles": [
+        "com.centinel.finai.service.MerchantCategorizationService",
+        "Spring AI / Google Gemini 3.8 Flash API Client"
+      ],
+      "metrics": {
+        "Core AI Model": "Gemini 3.8 Flash",
+        "Categorization Strategy": "Hybrid (Rule Regex First ➔ AI Fallback)",
+        "Query Interface": "Natural Language Tool Calling over Ledger",
+        "Latency Ceiling": "Target < 400ms for conversational analysis"
+      },
+      "controls": [
+        {
+          "name": "Hybrid Categorizer Tier 1 (Rule-Based)",
+          "status": "operational",
+          "desc": "O(1) HashMap & Regex matching for known merchants (Keells, Uber, PickMe, Netflix, Spotify)."
+        },
+        {
+          "name": "Hybrid Categorizer Tier 2 (Gemini Fallback)",
+          "status": "in-development",
+          "desc": "Structured JSON output extraction from unknown merchant formats using masked transaction tokens."
+        },
+        {
+          "name": "Safe Ledger Query Tools",
+          "status": "planned-milestone",
+          "desc": "Strictly typed Spring AI function-calling allowing Gemini to query transactions without raw SQL injection risk."
+        }
+      ],
+      "dataFlow": {
+        "inputs": ["Unrecognized Masked Transaction Text", "Natural Language User Questions"],
+        "outputs": ["Standardized Category Code", "Conversational Spending Summaries"],
+        "boundary": "Spring Boot Service Layer ➔ Google Gemini Cloud API"
+      }
+    },
+    "ingestion_pipeline": {
+      "id": "ingestion_pipeline",
+      "displayName": "n8n Webhook & Ingestion Pipeline",
+      "tagline": "Permissioned Message Capture & Transaction Parser",
+      "status": "operational",
+      "coordinates3D": { "x": 4, "y": 0.6, "z": -2 },
+      "accentColor": "#3b82f6",
+      "implementationFiles": [
+        "com.centinel.finai.controller.IngestionController",
+        "com.centinel.finai.service.TransactionMessageParserService",
+        "com.centinel.finai.repository.IngestedMessageRepository",
+        "n8n / feed_mock_data.ps1"
+      ],
+      "metrics": {
+        "Protocol": "HTTP POST /api/ingestion/webhook",
+        "Parser Engine": "Pattern-matching Regex Extraction",
+        "Precision": "BigDecimal (Two-decimal currency precision)",
+        "Raw Audit": "IngestedMessage table stores raw message hash"
+      },
+      "controls": [
+        {
+          "name": "Transaction Message Parser",
+          "status": "operational",
+          "desc": "Extracts amount, currency, merchant, and timestamp from unstructured bank notifications."
+        },
+        {
+          "name": "feed_mock_data.ps1 Simulation Harness",
+          "status": "operational",
+          "desc": "Developer test harness feeding standardized SMS payloads for end-to-end integration testing."
+        }
+      ],
+      "dataFlow": {
+        "inputs": ["Permissioned Ingestion Webhooks (n8n)", "Automated Bank Notification Forwarders"],
+        "outputs": ["Parsed Transaction Entity", "Audit Ingestion Log Record"],
+        "boundary": "External n8n Automation Engine ➔ IngestionController"
+      }
+    },
+    "ledger_db": {
+      "id": "ledger_db",
+      "displayName": "Supabase PostgreSQL Ledger",
+      "tagline": "Multi-Tenant Relational Store & Purchase Request State",
+      "status": "operational",
+      "coordinates3D": { "x": 0, "y": 0.6, "z": -4.5 },
+      "accentColor": "#10b981",
+      "implementationFiles": [
+        "com.centinel.finai.entity.Transaction",
+        "com.centinel.finai.family.Family",
+        "com.centinel.finai.family.FamilyMember",
+        "com.centinel.finai.purchase.PurchaseRequest",
+        "src/main/resources/db/migration/V1__schema.sql"
+      ],
+      "metrics": {
+        "Engine": "PostgreSQL 15+ (Hosted on Supabase)",
+        "Data Types": "BigDecimal for Currency, UUID for Keys, TIMESTAMPTZ",
+        "Migration Tooling": "Flyway DB Migrations",
+        "ACID Guarantees": "Strict Read-Committed / Serializable Isolation"
+      },
+      "controls": [
+        {
+          "name": "Relational Foreign Key Integrity",
+          "status": "operational",
+          "desc": "Enforces relational links between users, families, transactions, and purchase requests."
+        },
+        {
+          "name": "Purchase Approval State Machine",
+          "status": "operational",
+          "desc": "Enforces immutable transition rules: PENDING ➔ APPROVED / REJECTED."
+        }
+      ],
+      "dataFlow": {
+        "inputs": ["Spring Data JPA CRUD Operations", "Database Migrations"],
+        "outputs": ["ACID Committed Records", "Ledger Summary Aggregations"],
+        "boundary": "Spring Boot Backend ➔ Supabase Managed Cloud DB"
+      }
+    },
+    "parentguard_ui": {
+      "id": "parentguard_ui",
+      "displayName": "ParentGuard Next.js Frontend",
+      "tagline": "Neo-Brutalist Dashboard & Role-Aware Family Hub",
+      "status": "operational",
+      "coordinates3D": { "x": 0, "y": 0.6, "z": 3.5 },
+      "accentColor": "#f59e0b",
+      "implementationFiles": [
+        "frontend/src/app/dashboard/page.tsx",
+        "frontend/src/app/auth/sign-in/page.tsx",
+        "frontend/src/middleware.ts",
+        "frontend_design.md"
+      ],
+      "metrics": {
+        "Framework": "Next.js 15 (App Router, React 19)",
+        "Design System": "Neo-Brutalism (Hard-offset shadows, --ink #151515)",
+        "Auth Gateway": "Supabase Client SSR + Middleware Session Verification",
+        "Testing Suite": "Vitest + Playwright E2E"
+      },
+      "controls": [
+        {
+          "name": "Client Middleware Route Protection",
+          "status": "operational",
+          "desc": "Redirects unauthenticated traffic from /dashboard to /auth/sign-in."
+        },
+        {
+          "name": "Role-Aware View Toggling",
+          "status": "operational",
+          "desc": "Renders family management and approval controls exclusively for verified PARENT roles."
+        }
+      ],
+      "dataFlow": {
+        "inputs": ["User Form Submissions", "Supabase Session Cookies"],
+        "outputs": ["Rendered Neo-Brutalist Views", "REST API Calls to Spring Boot"],
+        "boundary": "Browser DOM ➔ Next.js Server Components / Spring Boot API"
+      }
+    }
+  }
+}
