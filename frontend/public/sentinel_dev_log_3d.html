@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Centinel Fin AI — Interactive 3D System Architecture (CW1 & CW2)</title>
+  <title>Centinel Fin AI — 3D System & Security Architecture (NB6005CEM CW1 & CW2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Inter:wght@500;600;700;800&family=Space+Grotesk:wght@700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -19,13 +22,20 @@
       --sun: #FFD64A;
       --mint: #8EF0C0;
       --muted: #E9E6DD;
+      --danger: #E5484D;
     }
     body {
       margin: 0;
       overflow: hidden;
       background-color: var(--paper);
       color: var(--ink);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    }
+    .font-display {
+      font-family: 'Space Grotesk', 'Arial Black', sans-serif;
+    }
+    .font-mono-code {
+      font-family: 'IBM Plex Mono', monospace;
     }
     #canvas-container {
       width: 100vw;
@@ -36,22 +46,25 @@
       z-index: 1;
     }
     .neo-box {
-      background: #FFFFFF;
+      background: var(--surface);
       border: 3px solid var(--ink);
       box-shadow: 4px 4px 0px var(--ink);
     }
     .neo-box-lg {
-      background: #FFFFFF;
+      background: var(--surface);
       border: 3px solid var(--ink);
       box-shadow: 6px 6px 0px var(--ink);
     }
     .neo-btn {
       border: 2px solid var(--ink);
       box-shadow: 3px 3px 0px var(--ink);
-      transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.1s ease;
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      letter-spacing: 0.04em;
     }
     .neo-btn:hover {
-      transform: translate(-1px, -1px);
+      transform: translate(-1.5px, -1.5px);
       box-shadow: 5px 5px 0px var(--ink);
     }
     .neo-btn:active {
@@ -61,174 +74,207 @@
     .tab-btn.active {
       background-color: var(--lime);
       color: var(--ink);
-      border-bottom: 3px solid var(--ink);
     }
   </style>
 </head>
 <body class="select-none">
 
-  <!-- 3D Canvas -->
+  <!-- 3D WebGL Viewport -->
   <div id="canvas-container"></div>
 
-  <!-- TOP HUD: Header & Quick Nav -->
-  <header class="absolute top-0 left-0 right-0 z-20 flex flex-wrap items-center justify-between gap-3 px-6 py-4 pointer-events-none">
-    
-    <!-- Branding Card -->
-    <div class="pointer-events-auto flex items-center gap-3 neo-box px-4 py-2 bg-white">
-      <div class="w-9 h-9 bg-[#D9FF3F] border-2 border-[#151515] flex items-center justify-center shadow-[2px_2px_0px_#151515]">
-        <svg class="w-5 h-5 text-[#151515]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-        </svg>
-      </div>
-      <div>
-        <h1 class="text-xs md:text-sm font-black tracking-wider uppercase text-[#151515] flex items-center gap-2">
-          CENTINEL FIN AI
-          <span class="text-[10px] px-2 py-0.5 bg-[#8EF0C0] border border-[#151515] font-bold">CW1 SPATIAL ARCHITECTURE</span>
-        </h1>
-        <p class="text-[11px] font-mono text-[#555]">NB6005CEM SECURITY • INTERACTIVE 3D BLUEPRINT</p>
-      </div>
-    </div>
-
-    <!-- Station Selector & Mode Controls -->
-    <div class="pointer-events-auto flex items-center gap-2 neo-box px-3 py-2 bg-[#FFFDF7]">
-      <span class="text-[11px] text-[#151515] font-black uppercase tracking-wider pr-1 hidden lg:inline">PILLARS:</span>
-      <button onclick="focusStation('parentguard_client')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#FF8F7C] text-[#151515]">🖥️ Client & Ext</button>
-      <button onclick="focusStation('ingestion_pipeline')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#8DDAFF] text-[#151515]">⚡ Webhook</button>
-      <button onclick="focusStation('security_core')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#8EF0C0] text-[#151515]">🛡️ Spring Boot Core</button>
-      <button onclick="focusStation('ai_engine')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#D9FF3F] text-[#151515]">🧠 Gemini AI</button>
-      <button onclick="focusStation('ledger_db')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#FFD64A] text-[#151515]">💾 PostgreSQL Vault</button>
+  <!-- TOP HUD: Brand + Station Controls + Live Flow Simulator -->
+  <header class="absolute top-0 left-0 right-0 z-20 flex flex-col gap-2.5 px-5 py-4 pointer-events-none">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       
-      <div class="h-6 w-[2px] bg-[#151515] mx-1"></div>
-      <button id="toggle-overlay-btn" onclick="toggleSecurityOverlay()" class="px-2.5 py-1 text-[11px] font-black uppercase rounded neo-btn bg-[#B9A7FF] text-[#151515]">
-        🛡️ Security Badges: ON
-      </button>
-      <button onclick="resetCamera()" class="px-2.5 py-1 text-[11px] font-black uppercase rounded neo-btn bg-white text-[#151515]">
-        🔭 Overview [ESC]
-      </button>
-    </div>
-  </header>
-
-  <!-- Instructions Helper (Bottom Left) -->
-  <div class="absolute bottom-6 left-6 z-20 neo-box px-4 py-3 rounded max-w-xs text-xs bg-white pointer-events-none hidden md:block">
-    <div class="font-black text-[#151515] mb-1 flex items-center gap-1.5 uppercase tracking-wider">
-      <span class="w-2.5 h-2.5 bg-[#D9FF3F] border border-[#151515] animate-ping"></span>
-      3D Navigation Controls
-    </div>
-    <p class="text-[#333] leading-snug">• <strong>Click any 3D pillar</strong> to fly camera into that station.</p>
-    <p class="text-[#333] leading-snug mt-1">• <strong>Left-drag</strong>: Orbit | <strong>Right-drag</strong>: Pan | <strong>Scroll</strong>: Zoom</p>
-    <p class="text-[#333] leading-snug mt-1">• Press <strong>[ESC]</strong> or click Overview to zoom back out.</p>
-  </div>
-
-  <!-- IN-WORLD FLOATING BOTTOM INSPECTION CARD (Zero intrusive sidebar!) -->
-  <div id="inspection-card" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92vw] max-w-4xl z-30 transition-all duration-300 transform translate-y-[140%] opacity-0 pointer-events-auto">
-    <div class="neo-box-lg bg-white overflow-hidden">
-      
-      <!-- Card Top Bar -->
-      <div class="p-4 border-b-[3px] border-[#151515] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <span id="card-badge" class="px-2.5 py-0.5 text-[11px] font-black tracking-widest uppercase border-2 border-[#151515] bg-[#8EF0C0] text-[#151515]">
-            OPERATIONAL
-          </span>
-          <span id="card-id" class="text-xs font-mono font-bold text-[#666]">STATION_ID</span>
-          <h2 id="card-title" class="text-base md:text-lg font-black text-[#151515] uppercase tracking-tight">
-            Station Name
-          </h2>
-        </div>
-
-        <!-- Tabs -->
-        <div class="flex items-center gap-1 border-2 border-[#151515] p-0.5 bg-white">
-          <button id="tab-btn-sec" onclick="switchCardTab('security')" class="tab-btn active px-3 py-1 text-xs font-black uppercase">
-            🛡️ CW1 Security Analysis
-          </button>
-          <button id="tab-btn-ctrl" onclick="switchCardTab('controls')" class="tab-btn px-3 py-1 text-xs font-black uppercase">
-            ⚡ Controls & Flow
-          </button>
-          <button id="tab-btn-code" onclick="switchCardTab('code')" class="tab-btn px-3 py-1 text-xs font-black uppercase">
-            📁 Repository Code
-          </button>
-        </div>
-
-        <!-- Close / Zoom Out Button -->
-        <button onclick="resetCamera()" class="neo-btn px-3 py-1 bg-[#FF8F7C] text-xs font-black uppercase text-[#151515] flex items-center gap-1">
-          <span>ESC</span>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+      <!-- Brand Identity Block -->
+      <div class="pointer-events-auto flex items-center gap-3 neo-box px-4 py-2.5 bg-white">
+        <div class="w-9 h-9 bg-[#D9FF3F] border-[2.5px] border-[#151515] flex items-center justify-center shadow-[2px_2px_0px_#151515]">
+          <svg class="w-5 h-5 text-[#151515]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 3l8 4.5v5c0 5.25-3.4 9.74-8 11-4.6-1.26-8-5.75-8-11v-5L12 3z" />
           </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-display text-sm md:text-base font-extrabold tracking-tight uppercase text-[#151515]">
+              CENTINEL FIN AI // PARENTGUARD
+            </span>
+            <span class="font-mono-code text-[10px] px-2 py-0.5 bg-[#8EF0C0] border-2 border-[#151515] font-bold uppercase">
+              CW1 &amp; CW2 3D SPEC
+            </span>
+          </div>
+          <p class="font-mono-code text-[10px] text-[#444] uppercase tracking-wider mt-0.5">
+            NB6005CEM SECURITY ARCHITECTURE • PROCEDURAL THREE.JS ENGINE
+          </p>
+        </div>
+      </div>
+
+      <!-- Station Jump Bar -->
+      <div class="pointer-events-auto flex flex-wrap items-center gap-1.5 neo-box px-3 py-2 bg-[#FFFDF7]">
+        <span class="font-mono-code text-[10px] text-[#151515] font-bold uppercase tracking-wider mr-1 hidden xl:inline">NODES:</span>
+        <button onclick="focusStation('parentguard_client')" class="px-2.5 py-1 text-[11px] uppercase neo-btn bg-[#B9A7FF] text-[#151515]">[01] CLIENT &amp; EXT</button>
+        <button onclick="focusStation('ingestion_pipeline')" class="px-2.5 py-1 text-[11px] uppercase neo-btn bg-[#8DDAFF] text-[#151515]">[02] N8N WEBHOOK</button>
+        <button onclick="focusStation('security_core')" class="px-2.5 py-1 text-[11px] uppercase neo-btn bg-[#8EF0C0] text-[#151515]">[03] SPRING BOOT CORE</button>
+        <button onclick="focusStation('ai_engine')" class="px-2.5 py-1 text-[11px] uppercase neo-btn bg-[#D9FF3F] text-[#151515]">[04] GEMINI AI &amp; MASK</button>
+        <button onclick="focusStation('ledger_db')" class="px-2.5 py-1 text-[11px] uppercase neo-btn bg-[#FFD64A] text-[#151515]">[05] POSTGRES VAULT</button>
+        <div class="h-5 w-[2px] bg-[#151515] mx-1"></div>
+        <button id="toggle-overlay-btn" onclick="toggleSecurityOverlay()" class="px-2.5 py-1 text-[11px] uppercase neo-btn bg-white text-[#151515]">
+          CW1 LABELS: ON
+        </button>
+        <button onclick="resetCamera()" class="px-2.5 py-1 text-[11px] uppercase neo-btn bg-[#151515] text-white">
+          OVERVIEW [ESC]
+        </button>
+      </div>
+    </div>
+
+    <!-- Second Row: Interactive Security Flow Simulator -->
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="pointer-events-auto flex flex-wrap items-center gap-1.5 neo-box px-3 py-1.5 bg-white">
+        <span class="font-mono-code text-[10px] font-bold uppercase tracking-wider text-[#151515] mr-1">SIMULATE PACKET FLOW:</span>
+        <button id="sim-btn-all" onclick="setSimulationMode('all')" class="px-2.5 py-1 text-[10px] uppercase neo-btn bg-[#D9FF3F] text-[#151515]">
+          ALL TRAFFIC
+        </button>
+        <button id="sim-btn-approval" onclick="setSimulationMode('approval')" class="px-2.5 py-1 text-[10px] uppercase neo-btn bg-white text-[#151515]">
+          FLOW A: CHILD CHECKOUT -&gt; PARENT RSA APPROVAL
+        </button>
+        <button id="sim-btn-webhook" onclick="setSimulationMode('webhook')" class="px-2.5 py-1 text-[10px] uppercase neo-btn bg-white text-[#151515]">
+          FLOW B: BANK WEBHOOK -&gt; PII MASK -&gt; GEMINI AI
+        </button>
+        <button id="sim-btn-attack" onclick="setSimulationMode('attack')" class="px-2.5 py-1 text-[10px] uppercase neo-btn bg-[#FF8F7C] text-[#151515]">
+          FLOW C: SQLi / XSS INTRUSION BLOCKED AT FW-1
         </button>
       </div>
 
-      <!-- Tab Content Area -->
-      <div class="p-5 max-h-[38vh] overflow-y-auto text-xs bg-white">
+      <!-- Live Telemetry Status Pill -->
+      <div id="sim-status-banner" class="pointer-events-auto neo-box px-3.5 py-1.5 bg-[#FFFDF7] font-mono-code text-[11px] font-bold text-[#151515]">
+        STATUS: ACTIVE MULTI-TIER TELEMETRY // TLS 1.3 + AES-256-GCM + RSA-2048
+      </div>
+    </div>
+  </header>
+
+  <!-- Legend & Controls Box (Bottom Left) -->
+  <div class="absolute bottom-5 left-5 z-20 neo-box p-3.5 max-w-xs text-xs bg-white pointer-events-none hidden lg:block">
+    <div class="font-display font-extrabold text-[#151515] mb-2 flex items-center gap-2 uppercase tracking-wider text-[11px] border-b-2 border-[#151515] pb-1.5">
+      <span class="w-2.5 h-2.5 bg-[#D9FF3F] border-2 border-[#151515] inline-block"></span>
+      CW1 Architecture Legend
+    </div>
+    <div class="grid grid-cols-2 gap-1.5 font-mono-code text-[10px] mb-2">
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#B9A7FF] border border-[#151515] inline-block"></span> PARENT ROLE</div>
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#8DDAFF] border border-[#151515] inline-block"></span> CHILD / WEBHOOK</div>
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#8EF0C0] border border-[#151515] inline-block"></span> SPRING SECURITY</div>
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#D9FF3F] border border-[#151515] inline-block"></span> GEMINI 3.8 AI</div>
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#FFD64A] border border-[#151515] inline-block"></span> POSTGRES VAULT</div>
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-[#FF8F7C] border border-[#151515] inline-block"></span> FIREWALL / VULN</div>
+    </div>
+    <p class="text-[#333] text-[11px] leading-snug">• Click any 3D structure to fly camera in.</p>
+    <p class="text-[#333] text-[11px] leading-snug">• Drag to Orbit | Right-Click to Pan | Scroll to Zoom.</p>
+  </div>
+
+  <!-- FLOATING BOTTOM TACTICAL CARD (Appears on Station Select — No Sidebar) -->
+  <div id="inspection-card" class="fixed bottom-5 left-1/2 -translate-x-1/2 w-[94vw] max-w-4xl z-30 transition-all duration-300 transform translate-y-[150%] opacity-0 pointer-events-auto">
+    <div class="neo-box-lg bg-white overflow-hidden">
+      
+      <!-- Card Header -->
+      <div class="px-4 py-3 border-b-[3px] border-[#151515] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <span id="card-badge" class="font-mono-code px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase border-2 border-[#151515] bg-[#8EF0C0] text-[#151515]">
+            OPERATIONAL
+          </span>
+          <span id="card-id" class="font-mono-code text-xs font-bold text-[#555]">[STATION_ID]</span>
+          <h2 id="card-title" class="font-display text-base md:text-lg font-extrabold text-[#151515] uppercase tracking-tight">
+            Station Title
+          </h2>
+        </div>
+
+        <!-- View Mode Tabs -->
+        <div class="flex items-center gap-1 border-2 border-[#151515] p-0.5 bg-white">
+          <button id="tab-btn-sec" onclick="switchCardTab('security')" class="tab-btn active px-3 py-1 text-[11px] font-extrabold uppercase">
+            CW1 SECURITY MATRIX (1B &amp; 1C)
+          </button>
+          <button id="tab-btn-ctrl" onclick="switchCardTab('controls')" class="tab-btn px-3 py-1 text-[11px] font-extrabold uppercase">
+            CONTROLS &amp; DATA FLOW
+          </button>
+          <button id="tab-btn-code" onclick="switchCardTab('code')" class="tab-btn px-3 py-1 text-[11px] font-extrabold uppercase">
+            IMPLEMENTATION FILES
+          </button>
+        </div>
+
+        <!-- Close Button -->
+        <button onclick="resetCamera()" class="neo-btn px-3 py-1 bg-[#FF8F7C] text-[11px] font-extrabold uppercase text-[#151515]">
+          CLOSE [ESC]
+        </button>
+      </div>
+
+      <!-- Card Body -->
+      <div class="p-4 max-h-[34vh] overflow-y-auto text-xs bg-white">
         
-        <!-- TAB 1: CW1 SECURITY EVALUATION -->
-        <div id="tab-content-security" class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div class="neo-box p-3 bg-[#FFFDF7]">
-              <span class="text-[10px] font-black uppercase tracking-wider text-[#FF8F7C] block mb-1">Access Control Point (Task 1.b)</span>
+        <!-- TAB 1: CW1 SECURITY -->
+        <div id="tab-content-security" class="space-y-3">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            <div class="p-2.5 border-2 border-[#151515] bg-[#FFFDF7] shadow-[2px_2px_0px_#151515]">
+              <span class="font-mono-code text-[10px] font-extrabold text-[#151515] uppercase tracking-wider px-2 py-0.5 bg-[#B9A7FF] border-2 border-[#151515] inline-block mb-1">ACCESS CONTROL POINT (TASK 1.B)</span>
               <p id="card-acp" class="font-bold text-[#151515] text-[11px]"></p>
             </div>
-            <div class="neo-box p-3 bg-[#FFFDF7]">
-              <span class="text-[10px] font-black uppercase tracking-wider text-[#B9A7FF] block mb-1">Firewall Point (Task 1.b)</span>
+            <div class="p-2.5 border-2 border-[#151515] bg-[#FFFDF7] shadow-[2px_2px_0px_#151515]">
+              <span class="font-mono-code text-[10px] font-extrabold text-[#151515] uppercase tracking-wider px-2 py-0.5 bg-[#FFD64A] border-2 border-[#151515] inline-block mb-1">FIREWALL POINT (TASK 1.B)</span>
               <p id="card-fw" class="font-bold text-[#151515] text-[11px]"></p>
             </div>
-            <div class="neo-box p-3 bg-[#FFFDF7]">
-              <span class="text-[10px] font-black uppercase tracking-wider text-[#8EF0C0] block mb-1">Encryption Point & Level (Task 1.b)</span>
+            <div class="p-2.5 border-2 border-[#151515] bg-[#FFFDF7] shadow-[2px_2px_0px_#151515]">
+              <span class="font-mono-code text-[10px] font-extrabold text-[#151515] uppercase tracking-wider px-2 py-0.5 bg-[#8EF0C0] border-2 border-[#151515] inline-block mb-1">ENCRYPTION POINT &amp; LEVEL (TASK 1.B)</span>
               <p id="card-enc" class="font-bold text-[#151515] text-[11px]"></p>
             </div>
-            <div class="neo-box p-3 bg-[#FFFDF7]">
-              <span class="text-[10px] font-black uppercase tracking-wider text-[#E5484D] block mb-1">Potential Vulnerability Mitigated (Task 1.b)</span>
+            <div class="p-2.5 border-2 border-[#151515] bg-[#FFFDF7] shadow-[2px_2px_0px_#151515]">
+              <span class="font-mono-code text-[10px] font-extrabold text-[#151515] uppercase tracking-wider px-2 py-0.5 bg-[#FF8F7C] border-2 border-[#151515] inline-block mb-1">VULNERABILITY MITIGATED (TASK 1.B)</span>
               <p id="card-vuln" class="font-bold text-[#151515] text-[11px]"></p>
             </div>
           </div>
 
-          <!-- 3 Defense Levels (Task 1.c) -->
-          <div class="neo-box p-3.5 bg-white border-2 border-[#151515]">
-            <h4 class="font-black text-[#151515] text-xs uppercase mb-2 flex items-center gap-1.5">
+          <div class="p-3 border-2 border-[#151515] bg-white shadow-[3px_3px_0px_#151515]">
+            <div class="font-display font-extrabold text-[#151515] text-[11px] uppercase mb-2 flex items-center gap-2">
               <span class="w-2.5 h-2.5 bg-[#D9FF3F] border border-[#151515]"></span>
-              Coursework 1 — Three-Level Defense Specification (Task 1.c)
-            </h4>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px]">
+              THREE-LAYER DEFENSE SPECIFICATION (TASK 1.C)
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
               <div class="p-2 border border-[#151515] bg-[#FFFDF7]">
-                <strong class="text-[#151515] block uppercase text-[10px]">1. Algorithm Level:</strong>
+                <strong class="font-mono-code text-[#151515] block uppercase text-[10px] mb-0.5">[1] ALGORITHM LEVEL (40%):</strong>
                 <span id="card-algo" class="text-[#333]"></span>
               </div>
               <div class="p-2 border border-[#151515] bg-[#FFFDF7]">
-                <strong class="text-[#151515] block uppercase text-[10px]">2. Protocol Level:</strong>
+                <strong class="font-mono-code text-[#151515] block uppercase text-[10px] mb-0.5">[2] PROTOCOL LEVEL (30%):</strong>
                 <span id="card-proto" class="text-[#333]"></span>
               </div>
               <div class="p-2 border border-[#151515] bg-[#FFFDF7]">
-                <strong class="text-[#151515] block uppercase text-[10px]">3. System Level:</strong>
+                <strong class="font-mono-code text-[#151515] block uppercase text-[10px] mb-0.5">[3] SYSTEM LEVEL (30%):</strong>
                 <span id="card-sys" class="text-[#333]"></span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- TAB 2: CONTROLS & DATA FLOW -->
-        <div id="tab-content-controls" class="hidden space-y-3">
-          <div class="neo-box p-3 bg-[#FFFDF7] text-[11px]">
+        <!-- TAB 2: CONTROLS & FLOW -->
+        <div id="tab-content-controls" class="hidden space-y-2.5">
+          <div class="p-2.5 border-2 border-[#151515] bg-[#FFFDF7] text-[11px] shadow-[2px_2px_0px_#151515]">
             <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#151515]">
-              <span class="font-black uppercase text-[10px]">Network Boundary:</span>
-              <span id="card-boundary" class="font-mono font-bold text-[#151515]"></span>
+              <span class="font-mono-code font-bold uppercase text-[10px]">TRUST BOUNDARY:</span>
+              <span id="card-boundary" class="font-mono-code font-bold text-[#151515]"></span>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
               <div>
-                <strong class="text-[#555] uppercase text-[10px] block">Ingress Payload:</strong>
-                <p id="card-inputs" class="text-[#151515]"></p>
+                <strong class="font-mono-code text-[#555] uppercase text-[10px] block">INGRESS INPUTS:</strong>
+                <p id="card-inputs" class="text-[#151515] font-medium"></p>
               </div>
               <div>
-                <strong class="text-[#555] uppercase text-[10px] block">Egress Output:</strong>
-                <p id="card-outputs" class="text-[#151515]"></p>
+                <strong class="font-mono-code text-[#555] uppercase text-[10px] block">EGRESS OUTPUTS:</strong>
+                <p id="card-outputs" class="text-[#151515] font-medium"></p>
               </div>
             </div>
           </div>
           <div id="card-controls-list" class="grid grid-cols-1 md:grid-cols-3 gap-2"></div>
         </div>
 
-        <!-- TAB 3: CODE FILES -->
-        <div id="tab-content-code" class="hidden space-y-2">
-          <div id="card-files-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 font-mono text-[11px]"></div>
-          <div id="card-metrics-list" class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2"></div>
+        <!-- TAB 3: CODEBASE FILES -->
+        <div id="tab-content-code" class="hidden space-y-2.5">
+          <div id="card-files-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 font-mono-code text-[11px]"></div>
+          <div id="card-metrics-list" class="grid grid-cols-2 md:grid-cols-4 gap-2"></div>
         </div>
 
       </div>
@@ -236,25 +282,28 @@
   </div>
 
   <script>
-    // System Architecture & CW1 Specification
+    // ============================================================================
+    // ARCHITECTURAL STATION DATA (CW1 + CW2 MAPPED, ZERO EMOJIS)
+    // ============================================================================
     const STATIONS_DATA = {
       parentguard_client: {
         id: "parentguard_client",
-        displayName: "Client Tier: Next.js & Chrome Extension",
-        tagline: "Parent Portal, Child Extension & Checkout Detection",
+        code: "NODE 01",
+        displayName: "Client Tier: Parent Portal & Child Chrome Extension",
+        tagline: "Next.js 15 Parent Dashboard + Manifest V3 Child Checkout Lock",
         status: "operational",
-        color: 0xFF8F7C, // Coral
-        position: [0, 0.6, 5.0],
-        cameraLookAt: [0, 0.6, 5.0],
-        cameraPosition: [0, 4.0, 9.5],
+        color: 0xB9A7FF,
+        position: [0, 0, 6.2],
+        cameraLookAt: [0, 1.2, 6.2],
+        cameraPosition: [0, 5.2, 12.2],
         cw1: {
-          acp: "ACP-1: Supabase Session Gate & Role Cookie Verification",
-          fw: "FW-1: Browser Content Security Policy (CSP) & Strict SameSite Origin",
-          enc: "ENC-1: HTTPS / TLS 1.3 ECDHE Encrypted Transport (WebCrypto RSA Verification)",
-          vuln: "VULN-1: Cross-Site Scripting (XSS), Clickjacking & Approval Bypass",
-          algo: "WebCrypto API (RSA-2048 public key verification on approval token)",
-          proto: "TLS 1.3, Strict CSP, HSTS, X-Frame-Options: DENY, SameSite=Strict cookies",
-          sys: "Browser Sandboxing, Chrome Extension Manifest V3 isolated service worker"
+          acp: "ACP-1: Supabase OAuth2 Session Gate & Role-Aware Guard (ROLE_PARENT vs ROLE_CHILD)",
+          fw: "FW-1: Edge Reverse Proxy + Strict Browser Content-Security-Policy (CSP)",
+          enc: "ENC-1: HTTPS / TLS 1.3 In-Transit + WebCrypto RSA-2048 Token Verification",
+          vuln: "VULN-1: Cross-Site Scripting (XSS), Clickjacking & Child Checkout Bypass",
+          algo: "WebCrypto API (crypto.subtle.verify RSA-2048 signature on parent approval token)",
+          proto: "TLS 1.3 (ECDHE), HSTS, CSP, X-Frame-Options: DENY, SameSite=Strict Cookies",
+          sys: "Browser DOM Sandbox + Isolated Chrome Extension Manifest V3 Service Worker"
         },
         files: [
           "frontend/src/app/dashboard/page.tsx",
@@ -263,76 +312,78 @@
           "chrome-extension/content.js"
         ],
         metrics: {
-          "Parent Portal": "Next.js 15 (Neo-Brutalism)",
+          "Parent Portal": "Next.js 15 (Neo-Brutalist)",
           "Child Agent": "Manifest V3 Extension",
-          "Auth Gateway": "Supabase JWT Bearer",
-          "DOM Lock": "Pay Button Overlay"
+          "Auth Token": "Supabase RS256/ES256 JWT",
+          "Checkout Lock": "WebCrypto RSA Unlock"
         },
-        boundary: "Public Browser DOM / Untrusted Client ➔ Edge Reverse Proxy",
-        inputs: "Child Checkout Events, Parent Approval Clicks, Supabase Bearer JWTs",
-        outputs: "Signed Purchase Requests (POST /api/v1/purchase-requests)",
+        boundary: "Untrusted Client Browser DOM -> Edge Network Switch -> Firewall FW-1",
+        inputs: "Child E-Commerce Checkout Attempt, Parent Approval Decision, Bearer JWT",
+        outputs: "Signed Purchase Request (POST /api/v1/purchase-requests)",
         controls: [
-          { name: "Next.js Middleware Gate", status: "operational", desc: "Intercepts unauthorized routes and redirects unauthenticated traffic." },
-          { name: "Role-Aware View Toggling", status: "operational", desc: "Restricts family management and approvals to verified parents." },
-          { name: "ParentGuard Checkout Interceptor", status: "in-development", desc: "DOM Mutation Observer detecting pay buttons and demanding RSA approval." }
+          { name: "Next.js Middleware Gate", status: "operational", desc: "Intercepts unauthenticated traffic and enforces session validity before rendering." },
+          { name: "Role-Aware Parent vs Child UI", status: "operational", desc: "Renders approval controls strictly for verified ROLE_PARENT accounts." },
+          { name: "Checkout DOM Lock Overlay", status: "in-development", desc: "Blocks e-commerce Pay button until RSA-2048 signed parent token is verified." }
         ]
       },
       ingestion_pipeline: {
         id: "ingestion_pipeline",
-        displayName: "Ingestion Gateway: n8n Bank Webhook",
-        tagline: "Permissioned Message Capture, Parser & Tamper Verification",
+        code: "NODE 02",
+        displayName: "Ingestion Gateway: n8n Bank Webhook & Parser",
+        tagline: "Automated Bank Notification Capture, Regex Parser & Dedup Hash",
         status: "operational",
-        color: 0x8DDAFF, // Sky
-        position: [5.2, 0.6, 0.5],
-        cameraLookAt: [5.2, 0.6, 0.5],
-        cameraPosition: [9.0, 3.5, 4.0],
+        color: 0x8DDAFF,
+        position: [6.4, 0, 1.2],
+        cameraLookAt: [6.4, 1.2, 1.2],
+        cameraPosition: [11.5, 4.8, 5.2],
         cw1: {
-          acp: "ACP-2: Ingestion API Key & Webhook Shared Secret Authentication",
-          fw: "FW-1: Ingress Rate-Limiting & Reverse Proxy Webhook IP Whitelisting",
-          enc: "ENC-2: TLS 1.3 in transit + HMAC-SHA256 Webhook Payload Signatures",
-          vuln: "VULN-2: Webhook Replay Attacks, Malicious Payload Spoofing & Timing Attacks",
-          algo: "HMAC-SHA256 signature verification with MessageDigest.isEqual()",
-          proto: "HTTP POST over TLS 1.3 with X-API-KEY and X-Signature headers",
-          sys: "Spring Interceptor rate-limiting bursts and rejecting unauthenticated webhooks"
+          acp: "ACP-2: IngestionApiKeyInterceptor (X-API-KEY & HMAC Header Gate)",
+          fw: "FW-1: Edge Webhook Rate-Limiter & IP Whitelisting Filter",
+          enc: "ENC-2: TLS 1.3 Channel + SHA-256 Deduplication + HMAC-SHA256 Signature",
+          vuln: "VULN-2: Webhook Replay Attacks, Spoofed Bank SMS & Timing Side-Channels",
+          algo: "SHA-256 Message Fingerprinting + Constant-Time HMAC-SHA256 Verification",
+          proto: "HTTPS POST /api/ingestion/webhook with X-API-KEY & X-HMAC-Signature",
+          sys: "Burst Rate-Limiting Filter & Dead-Letter Reject Queue for Invalid Payloads"
         },
         files: [
           "com.centinel.finai.controller.IngestionController.java",
           "com.centinel.finai.config.IngestionApiKeyInterceptor.java",
           "com.centinel.finai.service.TransactionMessageParserService.java",
-          "feed_mock_data.ps1 (Test Harness)"
+          "feed_mock_data.ps1"
         ],
         metrics: {
-          "Endpoint": "POST /api/ingestion/webhook",
-          "Auth Interceptor": "X-API-KEY Header Check",
-          "Precision": "BigDecimal (Two Decimals)",
-          "Audit Trail": "SHA-256 Message Hash"
+          "Webhook Endpoint": "POST /api/ingestion/webhook",
+          "Integrity Check": "HMAC-SHA256 + SHA-256",
+          "Currency Math": "Java BigDecimal (Exact)",
+          "Lab Proof": "security_labs/lab06_hashing.py"
         },
-        boundary: "External n8n / Bank SMS Forwarder ➔ IngestionController",
-        inputs: "Raw Bank SMS / Push Notifications, Webhook Auth Headers",
-        outputs: "Clean Masked IngestedMessage Entity for Processing",
+        boundary: "External n8n Automation Engine -> Firewall FW-1 -> IngestionController",
+        inputs: "Raw Bank SMS / Notification JSON, X-API-KEY, X-HMAC-Signature",
+        outputs: "Validated & Deduplicated IngestedMessage Entity",
         controls: [
-          { name: "Ingestion API Key Interceptor", status: "operational", desc: "Validates cryptographic headers on incoming n8n webhook posts." },
-          { name: "Transaction Message Parser", status: "operational", desc: "Extracts currency, merchant, and amounts from SMS/Push notifications." },
-          { name: "SHA-256 Deduplication Hash", status: "operational", desc: "Prevents replay attacks by checking SHA-256 hashes of incoming raw messages." }
+          { name: "Constant-Time Key & HMAC Check", status: "operational", desc: "Uses MessageDigest.isEqual() to defeat byte-by-byte timing attacks." },
+          { name: "SHA-256 Replay Prevention", status: "operational", desc: "Computes 256-bit digest of raw message to block duplicate bank alerts." },
+          { name: "BigDecimal Regex Parser", status: "operational", desc: "Extracts merchant, currency, and exact amount from unstructured text." }
         ]
       },
       security_core: {
         id: "security_core",
-        displayName: "Core Security Perimeter: Spring Boot 3",
-        tagline: "Resource Server, RBAC, Intrusion Detection & Approval Signatures",
+        code: "NODE 03",
+        displayName: "Core Security Fortress: Spring Boot 3 Resource Server",
+        tagline: "OAuth2 JWKS Validator, RBAC, AES-256-GCM, RSA-2048 & IDS Filter",
         status: "operational",
-        color: 0x8EF0C0, // Mint
-        position: [0, 0.6, -0.2],
-        cameraLookAt: [0, 0.6, -0.2],
-        cameraPosition: [0, 4.2, 4.2],
+        color: 0x8EF0C0,
+        position: [0, 0, 0],
+        cameraLookAt: [0, 1.5, 0],
+        cameraPosition: [4.8, 5.2, 5.2],
         cw1: {
-          acp: "ACP-3: Spring Security Filter Chain & PreAuthorize('hasRole(\"PARENT\")')",
-          fw: "FW-1 & FW-2: Host Stateful Packet Filtering & Application IDS Filter",
-          enc: "ENC-3: AES-256-GCM (Database at-rest) + RSA-2048 (SHA256withRSA Signatures)",
-          vuln: "VULN-3: Privilege Escalation, SQL Injection, Approval Forgery & State Tampering",
-          algo: "AES-256-GCM (Cipher AES/GCM/NoPadding, 12-byte IV) + RSA-2048 (SHA256withRSA)",
-          proto: "OAuth 2.0 Resource Server (Supabase JWKS validation) + Strict CORS",
-          sys: "IntrusionDetectionFilter blocking SQLi/XSS, Spring Actuator health monitoring"
+          acp: "ACP-3: Spring Security Filter Chain + Authoritative DB Role Resolution (AC-82)",
+          fw: "FW-1 & FW-2: Host Firewall + Application IntrusionDetectionFilter (SQLi/XSS)",
+          enc: "ENC-3: AES-256-GCM (Field Encryption) + RSA-2048 (SHA256withRSA Signatures)",
+          vuln: "VULN-3: Privilege Escalation, SQL Injection, Forged Approvals & Brute-Force",
+          algo: "AES-256-GCM (96-bit SecureRandom IV, 128-bit Auth Tag) + RSA-2048 (SHA256withRSA)",
+          proto: "OAuth 2.0 Bearer JWT (JWKS Public Key Verification) + Signed Export Protocol",
+          sys: "IntrusionDetectionFilter (Blocks SQLi/XSS & floods with HTTP 403/429)"
         },
         files: [
           "com.centinel.finai.common.SecurityConfig.java",
@@ -341,175 +392,275 @@
           "com.centinel.finai.security.IntrusionDetectionFilter.java"
         ],
         metrics: {
-          "Auth Standard": "Supabase JWT Bearer (RS256)",
-          "At-Rest Encryption": "AES-256-GCM (128-bit Tag)",
-          "Approval Signature": "RSA-2048 (SHA256withRSA)",
-          "IDS Filter": "SQLi/XSS Auto-Block (403/429)"
+          "Symmetric Crypto": "AES-256-GCM (At-Rest)",
+          "Asymmetric Crypto": "RSA-2048 (Signatures)",
+          "Unit Test Suite": "129+ JUnit 5 Tests Pass",
+          "Lab Proofs": "Labs 01-05 & Labs 07-10"
         },
-        boundary: "Edge Gateway ➔ Spring Security Filter Chain ➔ Service Layer",
-        inputs: "Bearer JWTs, Purchase Requests, Ingested Transactions",
-        outputs: "Signed Approval Tokens, Verified Ledger Entries, Audited Events",
+        boundary: "Edge Firewall FW-1 -> Spring Security Filter Chain -> Internal Domain Services",
+        inputs: "Authenticated REST Requests, Purchase Approvals, Ingested Bank Alerts",
+        outputs: "RSA-Signed Approval Tokens, AES-Encrypted Entities, Security Audit Logs",
         controls: [
-          { name: "Stateless OAuth2 JWT Validation", status: "operational", desc: "Validates Supabase cryptographically signed public keys via JWKS." },
-          { name: "ParentGuard Role Enforcement", status: "operational", desc: "Ensures children cannot approve purchase requests or modify family rosters." },
-          { name: "AES-256-GCM Encryption at Rest", status: "operational", desc: "Encrypts sensitive raw transaction notes and account numbers before DB storage." },
-          { name: "RSA-2048 Digital Signatures", status: "operational", desc: "Digitally signs approved purchase tokens so browser extension can verify parent authorization." }
+          { name: "OAuth2 JWKS & RBAC Gate", status: "operational", desc: "Verifies JWT signature and enforces ROLE_PARENT on approval endpoints." },
+          { name: "AES-256-GCM Field Encryption", status: "in-development", desc: "Encrypts sensitive payload fields with unique 12-byte IV + 128-bit GCM tag." },
+          { name: "RSA-2048 Approval Signer", status: "in-development", desc: "Signs parent approval decisions with backend private key for browser verification." }
         ]
       },
       ai_engine: {
         id: "ai_engine",
-        displayName: "AI Privacy & Gemini Intelligence",
-        tagline: "PII Masking Perimeter, Gemini 3.8 Flash & Spend Analytics",
+        code: "NODE 04",
+        displayName: "AI Privacy Sieve & Gemini 3.8 Flash Intelligence",
+        tagline: "Luhn PAN Masking Perimeter + Hybrid Merchant Classifier & Insights",
         status: "operational",
-        color: 0xD9FF3F, // Lime
-        position: [-5.2, 0.6, 0.5],
-        cameraLookAt: [-5.2, 0.6, 0.5],
-        cameraPosition: [-9.0, 3.5, 4.0],
+        color: 0xD9FF3F,
+        position: [-6.4, 0, 1.2],
+        cameraLookAt: [-6.4, 1.2, 1.2],
+        cameraPosition: [-11.5, 4.8, 5.2],
         cw1: {
-          acp: "ACP-4: Google Cloud IAM & Restricted API Key Environment Isolation",
-          fw: "FW-1: Outbound Egress TLS 1.3 Proxy with Whitelisting to generativelanguage.googleapis.com",
-          enc: "ENC-4: TLS 1.3 End-to-End Encryption to Google Vertex/Gemini API",
-          vuln: "VULN-4: LLM Data Exfiltration, PII / Credit Card Leakage & Hallucinated Financial Figures",
-          algo: "SensitiveDataMaskingService (Luhn PAN validation, Regex masking, Zero raw PII)",
-          proto: "HTTPS REST API with Ephemeral Bearer Headers / Google GenAI SDK",
-          sys: "Privacy Firewall: Masking executes in memory before any external network socket opens"
+          acp: "ACP-4: Isolated Google GenAI API Key & Read-Only Grounded Service Scope",
+          fw: "FW-1: Outbound Egress Filter (Whitelisted strictly to Google Gemini API)",
+          enc: "ENC-4: In-Memory Luhn PAN Redaction + TLS 1.3 Egress Encryption",
+          vuln: "VULN-4: Sensitive Card Data (PAN) Leakage to External LLM & AI Hallucinations",
+          algo: "SensitiveDataMaskingService (Luhn Checksum Algorithm + Regex PII Scrubbing)",
+          proto: "HTTPS TLS 1.3 REST Transport with Structured JSON Schema Enforcement",
+          sys: "Pre-Execution Privacy Gate: Raw PANs never leave JVM memory unmasked"
         },
         files: [
           "com.centinel.finai.service.SensitiveDataMaskingService.java",
           "com.centinel.finai.service.MerchantCategorizationService.java",
-          "com.centinel.finai.ai.GeminiCategorizationClient.java",
-          "com.centinel.finai.util.MaskingUtils.java"
+          "com.centinel.finai.util.MaskingUtils.java",
+          "com.centinel.finai.ai.GeminiCategorizationClient.java"
         ],
         metrics: {
-          "Active Model": "Google Gemini 3.8 Flash",
-          "Privacy Masking": "Luhn Regex Scrubbing",
-          "Classifier": "Hybrid: Regex ➔ Gemini AI",
-          "Safety Guarantee": "Grounded Tool Calling Only"
+          "AI Model": "Google Gemini 3.8 Flash",
+          "Privacy Filter": "Luhn PAN + Regex Masking",
+          "Tier 1 Speed": "O(1) Deterministic Map",
+          "Tier 2 Fallback": "Masked AI Categorization"
         },
-        boundary: "Spring Boot Service Layer ➔ Google Gemini Cloud API",
-        inputs: "Anonymized / Masked Bank Text, Filtered Aggregation Summaries",
-        outputs: "Standardized Category Codes, Natural Language Spending Insights",
+        boundary: "Spring Boot JVM Memory -> PII Masking Sieve -> Google Gemini Cloud API",
+        inputs: "Masked Transaction Text ('Card ****1234 at MERCHANT'), Aggregated Spend Totals",
+        outputs: "Deterministic Category Enum, Grounded Family Spend Insights",
         controls: [
-          { name: "Luhn PAN Masking Service", status: "operational", desc: "Validates and strips 16-digit credit card numbers before any text leaves the server." },
-          { name: "Tier 1 Rule-Based Categorizer", status: "operational", desc: "Instant deterministic lookup for known retail merchants without calling the cloud." },
-          { name: "Gemini 3.8 Flash AI Fallback", status: "operational", desc: "Structured JSON categorization of unknown masked bank descriptions." }
+          { name: "Luhn PAN Scrubbing Sieve", status: "operational", desc: "Detects and masks 13-19 digit Luhn-valid card numbers before AI processing." },
+          { name: "Tier 1 Rule Categorizer", status: "operational", desc: "Classifies known merchants locally in <1ms without external network calls." },
+          { name: "Gemini 3.8 Flash Fallback", status: "in-development", desc: "Classifies unknown merchants and answers natural-language spend queries safely." }
         ]
       },
       ledger_db: {
         id: "ledger_db",
-        displayName: "Data Vault: Supabase PostgreSQL Unit",
-        tagline: "Single-Unit Relational Store, Encrypted Backups & Network Isolation",
+        code: "NODE 05",
+        displayName: "Data Vault: Supabase PostgreSQL Unit & Backup Safe",
+        tagline: "Single-Unit Relational Vault (CW1 1.a) + AES-256-GCM Encrypted Backups",
         status: "operational",
-        color: 0xFFD64A, // Sun Yellow
-        position: [0, 0.6, -5.2],
-        cameraLookAt: [0, 0.6, -5.2],
-        cameraPosition: [0, 3.8, -1.0],
+        color: 0xFFD64A,
+        position: [0, 0, -6.2],
+        cameraLookAt: [0, 1.4, -6.2],
+        cameraPosition: [0, 5.2, -12.2],
         cw1: {
-          acp: "ACP-5: PostgreSQL Dedicated Role Credentials, SSL Certificate Enforced Connection",
-          fw: "FW-2: Internal Database Firewall (Blocks all external IPs, allows only Spring Boot VPC)",
-          enc: "ENC-5: AES-256-GCM Field-Level Encryption at Rest + pg_dump AES-256 Backups",
-          vuln: "VULN-5: SQL Injection (SQLi), Offline Backup Theft, Direct DB Port Scans & Unauthorized DDL",
-          algo: "AES-256-GCM encrypted database dumps + SHA-256 backup manifest checksums",
+          acp: "ACP-5: Least-Privilege DB Credentials + Family Ownership Scoping",
+          fw: "FW-2: Internal Database Firewall (Port 5432 Restricted to Spring Boot VPC)",
+          enc: "ENC-5: AES-256-GCM Encrypted Columns + RSA-Signed Encrypted Backup Archives",
+          vuln: "VULN-5: SQL Injection (SQLi), Direct Database Port Exposure & Backup Theft",
+          algo: "AES-256-GCM Column Encryption + SHA-256 & RSA-2048 Signed Backup Manifests",
           proto: "PostgreSQL Wire Protocol over TLS 1.3 (sslmode=verify-full)",
-          sys: "Network Isolation (Supabase VPC Peering, No Public 5432 Exposure), Automated Backups"
+          sys: "3-2-1 Automated Encrypted Disaster Recovery Backups (automated_encrypted_backup.py)"
         },
         files: [
           "com.centinel.finai.entity.Transaction.java",
-          "com.centinel.finai.family.Family.java",
           "com.centinel.finai.purchase.PurchaseRequest.java",
+          "src/main/resources/db/migration/V1__schema.sql",
           "security_ops/automated_encrypted_backup.py"
         ],
         metrics: {
-          "Engine": "PostgreSQL 15+ (Supabase)",
-          "Network Port": "5432 (Internal VPC Only)",
-          "At-Rest Encryption": "AES-256-GCM Sensitive Fields",
-          "Backup System": "3-2-1 Rule: Encrypted Dumps"
+          "CW1 Representation": "Single Database Unit",
+          "Engine": "Supabase PostgreSQL 15+",
+          "SQLi Defense": "JPA PreparedStatements",
+          "Disaster Recovery": "AES-256-GCM Backup Safe"
         },
-        boundary: "Spring Boot VPC Connection Pool ➔ Supabase Managed Database Vault",
-        inputs: "Parameterized JPA Queries, Migration Scripts",
-        outputs: "Encrypted Transaction Records, Audited Purchase States",
+        boundary: "Spring Boot JPA Pool -> Internal Firewall FW-2 -> PostgreSQL Single Unit Vault",
+        inputs: "Parameterized SQL Queries, AES-256-GCM Ciphertext Blobs",
+        outputs: "ACID Ledger Records, Encrypted Snapshot Archives (.enc)",
         controls: [
-          { name: "Database Isolation Firewall (FW-2)", status: "operational", desc: "Restricts PostgreSQL port 5432 strictly to the Spring Boot application server IP." },
-          { name: "PreparedStatement SQLi Immunity", status: "operational", desc: "Spring Data JPA parameterized queries prevent SQL injection completely." },
-          { name: "Automated Encrypted Backups", status: "operational", desc: "Daily automated database snapshots encrypted with AES-256-GCM and verified with SHA-256." }
+          { name: "Internal Firewall FW-2 Isolation", status: "operational", desc: "Blocks all public internet traffic from reaching PostgreSQL port 5432." },
+          { name: "Parameterized JPA Queries", status: "operational", desc: "Eliminates SQL injection by separating query structure from user parameters." },
+          { name: "AES-256-GCM Backup Safe", status: "in-development", desc: "Hashes ledger dump with SHA-256, encrypts with AES-GCM, and signs manifest." }
         ]
       }
     };
 
+    // ============================================================================
+    // THREE.JS SCENE GLOBALS
+    // ============================================================================
     let scene, camera, renderer, controls, raycaster, mouse;
-    const clickableObjects = [];
-    const floatingBadges = [];
+    const clickableGroups = [];
+    const cw1Labels = [];
+    const firewallGates = [];
+    const animatedParts = {
+      vaultWheel: null,
+      aiRings: [],
+      sieveWheel: null,
+      shieldRing: null,
+      webhookDish: null,
+      laserBars: [],
+      childLock: null,
+      switchLeds: [],
+      packets: [],
+      shockwaves: []
+    };
+
     let isTransitioning = false;
     let targetCameraPos = new THREE.Vector3();
     let targetLookAt = new THREE.Vector3();
-    let currentStation = null;
     let securityOverlayVisible = true;
-    let firewallMeshes = [];
+    let simulationMode = 'all';
 
-    const defaultCameraPos = new THREE.Vector3(13, 14, 13);
-    const defaultLookAt = new THREE.Vector3(0, 0, 0);
+    const defaultCameraPos = new THREE.Vector3(14.5, 13.5, 15.5);
+    const defaultLookAt = new THREE.Vector3(0, 0.8, 0);
 
-    function addBlackEdges(mesh) {
-      const edges = new THREE.EdgesGeometry(mesh.geometry);
+    // ============================================================================
+    // NEO-BRUTALIST GEOMETRY & TEXTURE HELPERS
+    // ============================================================================
+    function inkEdges(mesh, edgeColor = 0x151515) {
+      const edges = new THREE.EdgesGeometry(mesh.geometry, 15);
       const line = new THREE.LineSegments(
         edges,
-        new THREE.LineBasicMaterial({ color: 0x151515, linewidth: 3 })
+        new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 2 })
       );
       mesh.add(line);
       return mesh;
     }
 
+    function makeBox(w, h, d, colorHex, x = 0, y = 0, z = 0, castShadow = true) {
+      const geo = new THREE.BoxGeometry(w, h, d);
+      const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.75, metalness: 0.08 });
+      const mesh = inkEdges(new THREE.Mesh(geo, mat));
+      mesh.position.set(x, y, z);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    function makeCylinder(rTop, rBot, h, segs, colorHex, x = 0, y = 0, z = 0) {
+      const geo = new THREE.CylinderGeometry(rTop, rBot, h, segs);
+      const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.7, metalness: 0.1 });
+      const mesh = inkEdges(new THREE.Mesh(geo, mat));
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    // Creates a crisp Neo-Brutalist 3D Floating Signboard using HTML5 Canvas (Zero Emojis)
+    function createNeoSignSprite(tagText, titleText, subText, bgHex = '#FFFFFF', tagBgHex = '#D9FF3F', scaleW = 3.4, scaleH = 1.15) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 680;
+      canvas.height = 230;
+      const ctx = canvas.getContext('2d');
+
+      // Hard Offset Shadow
+      ctx.fillStyle = '#151515';
+      ctx.fillRect(14, 14, 650, 200);
+
+      // Main Card Surface
+      ctx.fillStyle = bgHex;
+      ctx.fillRect(4, 4, 650, 200);
+
+      // 6px Ink Border
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = '#151515';
+      ctx.strokeRect(4, 4, 650, 200);
+
+      // Top Tag Pill
+      ctx.fillStyle = tagBgHex;
+      ctx.fillRect(24, 22, 610, 48);
+      ctx.lineWidth = 5;
+      ctx.strokeRect(24, 22, 610, 48);
+
+      ctx.fillStyle = '#151515';
+      ctx.font = 'bold 26px "IBM Plex Mono", monospace';
+      ctx.fillText(tagText, 38, 55);
+
+      // Main Title
+      ctx.fillStyle = '#151515';
+      ctx.font = '800 32px "Space Grotesk", Arial, sans-serif';
+      ctx.fillText(titleText, 24, 118);
+
+      // Subtitle
+      ctx.fillStyle = '#333333';
+      ctx.font = '700 23px "IBM Plex Mono", monospace';
+      ctx.fillText(subText, 24, 168);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+      const sprite = new THREE.Sprite(spriteMat);
+      sprite.scale.set(scaleW, scaleH, 1);
+      sprite.renderOrder = 999;
+      return sprite;
+    }
+
+    // ============================================================================
+    // INITIALIZE SCENE
+    // ============================================================================
     function init() {
       const container = document.getElementById('canvas-container');
 
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xFFFDF7); // Neo-brutalist paper off-white
+      scene.background = new THREE.Color(0xFFFDF7);
 
-      const aspect = window.innerWidth / window.innerHeight;
-      camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
       camera.position.copy(defaultCameraPos);
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       container.appendChild(renderer.domElement);
 
       controls = new THREE.OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.dampingFactor = 0.08;
-      controls.maxPolarAngle = Math.PI / 2.15;
+      controls.maxPolarAngle = Math.PI / 2.12;
       controls.target.copy(defaultLookAt);
 
       raycaster = new THREE.Raycaster();
       mouse = new THREE.Vector2();
 
-      // Flat Studio Lighting for Neo-Brutalism
-      const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
-      scene.add(ambientLight);
-
-      const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
-      dirLight.position.set(15, 25, 12);
+      // Studio Lighting
+      scene.add(new THREE.AmbientLight(0xffffff, 1.25));
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+      dirLight.position.set(16, 28, 18);
       dirLight.castShadow = true;
       dirLight.shadow.mapSize.width = 2048;
       dirLight.shadow.mapSize.height = 2048;
+      dirLight.shadow.camera.near = 0.5;
+      dirLight.shadow.camera.far = 65;
+      const d = 16;
+      dirLight.shadow.camera.left = -d;
+      dirLight.shadow.camera.right = d;
+      dirLight.shadow.camera.top = d;
+      dirLight.shadow.camera.bottom = -d;
       scene.add(dirLight);
 
-      // Neo-Brutalist Grid Floor
-      const gridHelper = new THREE.GridHelper(30, 30, 0x151515, 0xd8d3c5);
-      gridHelper.position.y = 0;
-      scene.add(gridHelper);
+      // Architectural Base Platform & Grid
+      const boardBase = makeBox(22, 0.3, 20, 0xE9E6DD, 0, -0.16, 0, false);
+      scene.add(boardBase);
 
-      // Build Tactile Station Pods
-      Object.values(STATIONS_DATA).forEach(data => {
-        buildStationPod(data);
-      });
+      const grid = new THREE.GridHelper(22, 22, 0x151515, 0xC8C2B4);
+      grid.position.y = 0.01;
+      scene.add(grid);
 
-      // Build Connecting Data Conduits (Network Bus)
-      buildNetworkConduits();
-
-      // Build Firewall Barrier Plates (FW-1 and FW-2)
-      buildFirewallBarriers();
+      // Build Custom 3D Architectural Models
+      buildClientTierModel();       // [01] Parent Desktop + Child Laptop + Figurines + Checkout Lock
+      buildNetworkSwitchNode();     // Network Switch / Router (CW1 requirement)
+      buildWebhookGatewayModel();   // [02] n8n Satellite Receiver & Hash Funnel
+      buildSpringBootCoreModel();   // [03] Spring Boot 3 Server Rack Fortress + Rotating Shield
+      buildGeminiAiAndMaskModel();  // [04] PII Scrubbing Sieve + Gemini 3.8 Neural Gyroscope
+      buildPostgresVaultModel();    // [05] Cylindrical Bank Vault DB Unit + 3-2-1 Backup Safe
+      buildFirewallArches();        // FW-1 (Edge Gate) & FW-2 (DB Gate) with scanning lasers
+      buildConduitHighways();       // Raised Neo-Brutalist Data Tracks
+      initAnimatedPackets();        // Live Animated Traffic Cubes & Attack Interception
 
       window.addEventListener('resize', onWindowResize);
       window.addEventListener('pointerdown', onPointerDown);
@@ -520,139 +671,533 @@
       animate();
     }
 
-    function buildStationPod(data) {
+    // ============================================================================
+    // 1. CLIENT TIER: PARENT WORKSTATION + CHILD LAPTOP + AVATARS + LOCK
+    // ============================================================================
+    function buildClientTierModel() {
+      const data = STATIONS_DATA.parentguard_client;
+      const group = new THREE.Group();
+      group.position.set(...data.position);
+      group.userData = { stationId: data.id };
+
+      // Platform Base
+      group.add(makeBox(4.8, 0.35, 3.0, 0xFFFFFF, 0, 0.175, 0));
+      group.add(makeBox(4.6, 0.1, 2.8, 0x151515, 0, 0.38, 0));
+
+      // --- LEFT SIDE: PARENT WORKSTATION (ROLE_PARENT - VIOLET #B9A7FF) ---
+      // Monitor Stand & Screen
+      group.add(makeBox(0.5, 0.4, 0.3, 0x151515, -1.2, 0.6, -0.2));
+      group.add(makeBox(1.5, 1.05, 0.16, 0xB9A7FF, -1.2, 1.25, -0.2));
+      group.add(makeBox(1.3, 0.82, 0.06, 0xFFFFFF, -1.2, 1.25, -0.1));
+      // Approve Button UI Block on Parent Screen
+      group.add(makeBox(0.55, 0.24, 0.06, 0x8EF0C0, -1.45, 1.15, -0.05));
+      group.add(makeBox(0.45, 0.24, 0.06, 0xFF8F7C, -0.85, 1.15, -0.05));
+      // Keyboard
+      group.add(makeBox(1.1, 0.08, 0.4, 0x151515, -1.2, 0.46, 0.45));
+
+      // Stylized Parent Figurine (Geometric Avatar)
+      group.add(makeBox(0.46, 0.75, 0.36, 0xB9A7FF, -2.1, 0.8, 0.3)); // Torso
+      group.add(makeBox(0.38, 0.38, 0.38, 0xFFFDF7, -2.1, 1.45, 0.3)); // Head
+
+      // --- RIGHT SIDE: CHILD LAPTOP + CHECKOUT PADLOCK (ROLE_CHILD - SKY #8DDAFF) ---
+      // Laptop Base & Angled Screen
+      group.add(makeBox(1.25, 0.1, 0.85, 0x8DDAFF, 1.15, 0.48, 0.25));
+      const laptopScreen = makeBox(1.25, 0.85, 0.12, 0x8DDAFF, 1.15, 0.92, -0.18);
+      laptopScreen.rotation.x = -0.15;
+      group.add(laptopScreen);
+      const innerScreen = makeBox(1.05, 0.65, 0.06, 0x151515, 1.15, 0.92, -0.11);
+      innerScreen.rotation.x = -0.15;
+      group.add(innerScreen);
+
+      // Stylized Child Figurine
+      group.add(makeBox(0.4, 0.58, 0.32, 0x8DDAFF, 2.05, 0.72, 0.3)); // Torso
+      group.add(makeBox(0.32, 0.32, 0.32, 0xFFFDF7, 2.05, 1.24, 0.3)); // Head
+
+      // Floating 3D Padlock above Child Laptop (ParentGuard Checkout Lock)
+      const lockGroup = new THREE.Group();
+      lockGroup.position.set(1.15, 1.95, 0);
+      const lockBody = makeBox(0.58, 0.48, 0.22, 0xFF8F7C, 0, 0, 0);
+      lockGroup.add(lockBody);
+      const shackleGeo = new THREE.TorusGeometry(0.16, 0.045, 8, 16, Math.PI);
+      const shackleMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.4 });
+      const shackle = new THREE.Mesh(shackleGeo, shackleMat);
+      shackle.position.y = 0.24;
+      lockGroup.add(shackle);
+      group.add(lockGroup);
+      animatedParts.childLock = lockGroup;
+
+      // 3D Floating Label
+      const label = createNeoSignSprite(
+        "ACP-1 & ENC-1 // CLIENT & EXTENSION",
+        "[01] PARENT PORTAL & CHILD EXT",
+        "Next.js 15 + Manifest V3 RSA Lock | VULN-1: XSS/Bypass",
+        "#FFFFFF", "#B9A7FF"
+      );
+      label.position.set(0, 3.1, 0);
+      group.add(label);
+      cw1Labels.push(label);
+
+      scene.add(group);
+      clickableGroups.push(group);
+    }
+
+    // ============================================================================
+    // NETWORK SWITCH / ROUTER NODE (Satisfies CW1 1.a Network Topology Rule)
+    // ============================================================================
+    function buildNetworkSwitchNode() {
+      const switchGroup = new THREE.Group();
+      switchGroup.position.set(2.4, 0, 3.6);
+
+      // Router Chassis
+      switchGroup.add(makeBox(1.7, 0.38, 1.1, 0xFFFFFF, 0, 0.19, 0));
+      switchGroup.add(makeBox(1.5, 0.26, 0.9, 0x151515, 0, 0.42, 0));
+
+      // Dual Antennas
+      switchGroup.add(makeCylinder(0.04, 0.04, 0.85, 8, 0x151515, -0.55, 0.85, -0.25));
+      switchGroup.add(makeCylinder(0.04, 0.04, 0.85, 8, 0x151515, 0.55, 0.85, -0.25));
+
+      // Blinking Port LEDs
+      for (let i = -2; i <= 2; i++) {
+        const led = makeBox(0.14, 0.1, 0.06, i % 2 === 0 ? 0xD9FF3F : 0x8EF0C0, i * 0.24, 0.42, 0.46);
+        switchGroup.add(led);
+        animatedParts.switchLeds.push(led);
+      }
+
+      const switchLabel = createNeoSignSprite(
+        "CW1 TASK 1.A // NETWORK TOPOLOGY",
+        "EDGE ROUTER & L3 SWITCH",
+        "TLS 1.3 Packet Routing & VLAN Segmentation",
+        "#FFFDF7", "#E9E6DD", 2.7, 0.9
+      );
+      switchLabel.position.set(0, 1.85, 0);
+      switchGroup.add(switchLabel);
+      cw1Labels.push(switchLabel);
+
+      scene.add(switchGroup);
+    }
+
+    // ============================================================================
+    // 2. INGESTION GATEWAY: N8N WEBHOOK SATELLITE & SHA-256 HASH FUNNEL
+    // ============================================================================
+    function buildWebhookGatewayModel() {
+      const data = STATIONS_DATA.ingestion_pipeline;
       const group = new THREE.Group();
       group.position.set(...data.position);
       group.userData = { stationId: data.id };
 
       // Base Pedestal
-      const baseGeo = new THREE.BoxGeometry(2.6, 0.35, 2.6);
-      const baseMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.9 });
-      const baseMesh = addBlackEdges(new THREE.Mesh(baseGeo, baseMat));
-      baseMesh.receiveShadow = true;
-      group.add(baseMesh);
+      group.add(makeBox(3.4, 0.35, 3.0, 0xFFFFFF, 0, 0.175, 0));
 
-      // Main Column
-      const pillarGeo = new THREE.BoxGeometry(1.6, 1.4, 1.6);
-      const pillarMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.8 });
-      const pillar = addBlackEdges(new THREE.Mesh(pillarGeo, pillarMat));
-      pillar.position.y = 0.87;
-      pillar.castShadow = true;
-      group.add(pillar);
+      // Webhook Receiver Tower
+      group.add(makeBox(1.1, 1.4, 1.1, 0x8DDAFF, -0.65, 0.95, 0));
+      // Rotating Radar / Dish on top
+      const dishGroup = new THREE.Group();
+      dishGroup.position.set(-0.65, 1.85, 0);
+      const dish = makeCylinder(0.6, 0.15, 0.35, 12, 0xD9FF3F, 0, 0, 0);
+      dish.rotation.z = 0.45;
+      dishGroup.add(dish);
+      group.add(dishGroup);
+      animatedParts.webhookDish = dishGroup;
 
-      // Accent Top Cap
-      const capGeo = new THREE.BoxGeometry(1.8, 0.25, 1.8);
-      const capMat = new THREE.MeshStandardMaterial({ color: data.color, roughness: 0.3 });
-      const cap = addBlackEdges(new THREE.Mesh(capGeo, capMat));
-      cap.position.y = 1.65;
-      group.add(cap);
+      // SHA-256 & HMAC Verification Funnel
+      group.add(makeCylinder(0.65, 0.3, 0.9, 10, 0x151515, 0.75, 1.35, 0));
+      group.add(makeBox(1.1, 0.65, 1.1, 0x8EF0C0, 0.75, 0.65, 0));
 
-      // Floating Geometric Identifier
-      const orbGeo = new THREE.OctahedronGeometry(0.5);
-      const orbMat = new THREE.MeshStandardMaterial({ color: data.color, roughness: 0.2, metalness: 0.1 });
-      const orb = addBlackEdges(new THREE.Mesh(orbGeo, orbMat));
-      orb.position.y = 2.5;
-      orb.userData = { isFloatingOrb: true };
-      group.add(orb);
+      const label = createNeoSignSprite(
+        "ACP-2 & ENC-2 // WEBHOOK GATEWAY",
+        "[02] N8N BANK INGESTION",
+        "HMAC-SHA256 + SHA-256 Dedup | VULN-2: Replay/Spoof",
+        "#FFFFFF", "#8DDAFF"
+      );
+      label.position.set(0, 3.0, 0);
+      group.add(label);
+      cw1Labels.push(label);
 
-      // Security Point Indicator (Pulsing Shield Badge)
-      const badgeGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.08, 16);
-      const badgeMat = new THREE.MeshBasicMaterial({ color: 0x151515 });
-      const badge = addBlackEdges(new THREE.Mesh(badgeGeo, badgeMat));
-      badge.position.y = 3.3;
-      badge.userData = { isBadge: true };
-      group.add(badge);
-
-      floatingBadges.push(badge);
       scene.add(group);
-      clickableObjects.push(group);
+      clickableGroups.push(group);
     }
 
-    function buildNetworkConduits() {
-      // Connect Core to Client, Ingestion, AI, and DB
-      const corePos = new THREE.Vector3(0, 0.1, -0.2);
-      const clientPos = new THREE.Vector3(0, 0.1, 5.0);
-      const ingestPos = new THREE.Vector3(5.2, 0.1, 0.5);
-      const aiPos = new THREE.Vector3(-5.2, 0.1, 0.5);
-      const dbPos = new THREE.Vector3(0, 0.1, -5.2);
+    // ============================================================================
+    // 3. CORE SECURITY FORTRESS: SPRING BOOT 3 SERVER RACK + SHIELD RING
+    // ============================================================================
+    function buildSpringBootCoreModel() {
+      const data = STATIONS_DATA.security_core;
+      const group = new THREE.Group();
+      group.position.set(...data.position);
+      group.userData = { stationId: data.id };
 
-      const paths = [
-        [corePos, clientPos, 0xFF8F7C],
-        [corePos, ingestPos, 0x8DDAFF],
-        [corePos, aiPos, 0xD9FF3F],
-        [corePos, dbPos, 0xFFD64A]
+      // Octagonal / Layered Fortress Pedestal
+      group.add(makeBox(3.8, 0.4, 3.8, 0xFFFFFF, 0, 0.2, 0));
+      group.add(makeBox(3.2, 0.25, 3.2, 0x8EF0C0, 0, 0.52, 0));
+
+      // Central 4-Blade Server Rack Tower
+      group.add(makeBox(1.9, 2.2, 1.9, 0x151515, 0, 1.75, 0));
+
+      // 4 Distinct Security Module Blades on the Server Tower
+      const bladeColors = [0x8EF0C0, 0xD9FF3F, 0xB9A7FF, 0xFFD64A];
+      for (let i = 0; i < 4; i++) {
+        const yPos = 0.95 + i * 0.48;
+        group.add(makeBox(2.06, 0.28, 2.06, bladeColors[i], 0, yPos, 0));
+      }
+
+      // Rotating Hexagonal Access Control Shield Ring (ACP-3)
+      const ringGeo = new THREE.TorusGeometry(1.75, 0.09, 8, 6);
+      const ringMat = new THREE.MeshStandardMaterial({ color: 0xD9FF3F, roughness: 0.3 });
+      const shieldRing = inkEdges(new THREE.Mesh(ringGeo, ringMat));
+      shieldRing.rotation.x = Math.PI / 2;
+      shieldRing.position.y = 1.65;
+      group.add(shieldRing);
+      animatedParts.shieldRing = shieldRing;
+
+      // Top Cryptographic Key Crown
+      group.add(makeCylinder(0, 0.65, 0.8, 4, 0x8EF0C0, 0, 3.3, 0));
+
+      const label = createNeoSignSprite(
+        "ACP-3 & ENC-3 // CORE SECURITY PERIMETER",
+        "[03] SPRING BOOT 3 FORTRESS",
+        "JWT RBAC + AES-256-GCM + RSA-2048 | VULN-3: PrivEsc",
+        "#FFFFFF", "#8EF0C0", 3.7, 1.2
+      );
+      label.position.set(0, 4.4, 0);
+      group.add(label);
+      cw1Labels.push(label);
+
+      scene.add(group);
+      clickableGroups.push(group);
+    }
+
+    // ============================================================================
+    // 4. AI PRIVACY SIEVE & GEMINI 3.8 FLASH NEURAL GYROSCOPE
+    // ============================================================================
+    function buildGeminiAiAndMaskModel() {
+      const data = STATIONS_DATA.ai_engine;
+      const group = new THREE.Group();
+      group.position.set(...data.position);
+      group.userData = { stationId: data.id };
+
+      // Base Platform
+      group.add(makeBox(3.8, 0.35, 3.0, 0xFFFFFF, 0, 0.175, 0));
+
+      // --- RIGHT SUB-UNIT: PII MASKING SIEVE (SensitiveDataMaskingService) ---
+      group.add(makeBox(1.1, 1.3, 1.3, 0xFFFFFF, 0.95, 0.95, 0));
+      const sieveWheel = makeCylinder(0.55, 0.55, 0.25, 8, 0xFF8F7C, 0.95, 1.1, 0);
+      sieveWheel.rotation.z = Math.PI / 2;
+      group.add(sieveWheel);
+      animatedParts.sieveWheel = sieveWheel;
+
+      // --- LEFT SUB-UNIT: GEMINI 3.8 FLASH NEURAL GYROSCOPE ---
+      group.add(makeCylinder(0.8, 0.95, 0.4, 8, 0x151515, -0.75, 0.55, 0));
+
+      // Core Neural Sphere
+      const coreGeo = new THREE.OctahedronGeometry(0.52, 1);
+      const coreMat = new THREE.MeshStandardMaterial({ color: 0xD9FF3F, roughness: 0.2 });
+      const aiCore = inkEdges(new THREE.Mesh(coreGeo, coreMat));
+      aiCore.position.set(-0.75, 1.75, 0);
+      group.add(aiCore);
+
+      // Dual Orbiting Gyroscope Rings
+      const r1Geo = new THREE.TorusGeometry(0.95, 0.06, 8, 24);
+      const r1Mat = new THREE.MeshStandardMaterial({ color: 0x151515 });
+      const ring1 = new THREE.Mesh(r1Geo, r1Mat);
+      ring1.position.set(-0.75, 1.75, 0);
+      group.add(ring1);
+
+      const r2Geo = new THREE.TorusGeometry(1.18, 0.06, 8, 24);
+      const r2Mat = new THREE.MeshStandardMaterial({ color: 0xB9A7FF });
+      const ring2 = inkEdges(new THREE.Mesh(r2Geo, r2Mat));
+      ring2.position.set(-0.75, 1.75, 0);
+      group.add(ring2);
+
+      animatedParts.aiRings.push(ring1, ring2, aiCore);
+
+      const label = createNeoSignSprite(
+        "ACP-4 & ENC-4 // AI PRIVACY PERIMETER",
+        "[04] LUHN MASK & GEMINI 3.8",
+        "PII Scrubbing Before LLM Call | VULN-4: PAN Leak",
+        "#FFFFFF", "#D9FF3F"
+      );
+      label.position.set(0, 3.35, 0);
+      group.add(label);
+      cw1Labels.push(label);
+
+      scene.add(group);
+      clickableGroups.push(group);
+    }
+
+    // ============================================================================
+    // 5. DATA VAULT: SUPABASE POSTGRESQL SINGLE UNIT + 3-2-1 BACKUP SAFE
+    // ============================================================================
+    function buildPostgresVaultModel() {
+      const data = STATIONS_DATA.ledger_db;
+      const group = new THREE.Group();
+      group.position.set(...data.position);
+      group.userData = { stationId: data.id };
+
+      // Base Slab
+      group.add(makeBox(4.4, 0.35, 3.2, 0xFFFFFF, 0, 0.175, 0));
+
+      // --- MAIN DATABASE SINGLE UNIT (Stacked Cylindrical DB Silo + Vault Door) ---
+      for (let i = 0; i < 3; i++) {
+        group.add(makeCylinder(1.25, 1.25, 0.55, 16, 0xFFD64A, -0.55, 0.68 + i * 0.68, 0));
+        group.add(makeCylinder(1.1, 1.1, 0.16, 16, 0x151515, -0.55, 1.0 + i * 0.68, 0));
+      }
+
+      // Armored Vault Door Wheel on Front of DB Unit
+      const wheelGroup = new THREE.Group();
+      wheelGroup.position.set(-0.55, 1.35, 1.3);
+      const wheelRim = new THREE.Mesh(
+        new THREE.TorusGeometry(0.45, 0.08, 8, 16),
+        new THREE.MeshStandardMaterial({ color: 0x151515 })
+      );
+      wheelGroup.add(wheelRim);
+      const spoke1 = makeBox(0.85, 0.09, 0.09, 0x8EF0C0, 0, 0, 0);
+      const spoke2 = makeBox(0.09, 0.85, 0.09, 0x8EF0C0, 0, 0, 0);
+      wheelGroup.add(spoke1, spoke2);
+      group.add(wheelGroup);
+      animatedParts.vaultWheel = wheelGroup;
+
+      // --- 3-2-1 ENCRYPTED DISASTER RECOVERY BACKUP SAFE ---
+      group.add(makeBox(1.25, 1.35, 1.25, 0x151515, 1.35, 1.02, 0));
+      group.add(makeBox(1.0, 1.1, 0.12, 0x8EF0C0, 1.35, 1.02, 0.62));
+      // Conduit linking Main DB Unit to Encrypted Backup Safe
+      group.add(makeBox(0.8, 0.2, 0.2, 0xFFD64A, 0.45, 1.0, 0));
+
+      const label = createNeoSignSprite(
+        "ACP-5 & ENC-5 // SINGLE DATABASE UNIT",
+        "[05] POSTGRESQL VAULT & BACKUP",
+        "AES-256-GCM At-Rest + Signed Backup | VULN-5: SQLi",
+        "#FFFFFF", "#FFD64A", 3.6, 1.2
+      );
+      label.position.set(0, 3.45, 0);
+      group.add(label);
+      cw1Labels.push(label);
+
+      scene.add(group);
+      clickableGroups.push(group);
+    }
+
+    // ============================================================================
+    // FIREWALL GATES: FW-1 (EDGE PERIMETER) & FW-2 (DB ISOLATION)
+    // ============================================================================
+    function buildFirewallArches() {
+      // Helper to construct an Armored Firewall Gate with Animated Laser Bars
+      function createFirewallArch(zPos, tag, title, sub, accentHex, tagBg) {
+        const fwGroup = new THREE.Group();
+        fwGroup.position.set(0, 0, zPos);
+
+        // Left & Right Armored Pillars
+        fwGroup.add(makeBox(0.65, 2.2, 0.65, 0x151515, -3.4, 1.1, 0));
+        fwGroup.add(makeBox(0.65, 2.2, 0.65, 0x151515, 3.4, 1.1, 0));
+        fwGroup.add(makeBox(0.8, 0.3, 0.8, accentHex, -3.4, 2.3, 0));
+        fwGroup.add(makeBox(0.8, 0.3, 0.8, accentHex, 3.4, 2.3, 0));
+
+        // Top Crossbeam
+        fwGroup.add(makeBox(7.5, 0.35, 0.55, 0xFFFFFF, 0, 2.05, 0));
+
+        // Translucent Forcefield Wall
+        const wallGeo = new THREE.BoxGeometry(6.2, 1.8, 0.08);
+        const wallMat = new THREE.MeshStandardMaterial({
+          color: accentHex,
+          transparent: true,
+          opacity: 0.32,
+          roughness: 0.2
+        });
+        const wall = inkEdges(new THREE.Mesh(wallGeo, wallMat));
+        wall.position.set(0, 1.0, 0);
+        fwGroup.add(wall);
+
+        // Animated Horizontal Laser Scan Bar
+        const laserBar = makeBox(6.2, 0.1, 0.14, accentHex, 0, 1.0, 0, false);
+        fwGroup.add(laserBar);
+        animatedParts.laserBars.push({ mesh: laserBar, phase: zPos });
+
+        // Floating Firewall Signboard
+        const fwLabel = createNeoSignSprite(tag, title, sub, "#FFFDF7", tagBg, 3.2, 1.0);
+        fwLabel.position.set(0, 3.05, 0);
+        fwGroup.add(fwLabel);
+        cw1Labels.push(fwLabel);
+
+        scene.add(fwGroup);
+        firewallGates.push(fwGroup);
+      }
+
+      // FW-1: Between Client/Router and Spring Boot Core
+      createFirewallArch(
+        3.1,
+        "CW1 TASK 1.B // FIREWALL POINT FW-1",
+        "FW-1: EDGE & IDS FIREWALL",
+        "Default-Deny Ingress | Blocks SQLi, XSS & Rate Floods",
+        0xFF8F7C, "#FF8F7C"
+      );
+
+      // FW-2: Between Spring Boot Core and PostgreSQL Database Unit
+      createFirewallArch(
+        -3.1,
+        "CW1 TASK 1.B // FIREWALL POINT FW-2",
+        "FW-2: INTERNAL DB FIREWALL",
+        "Blocks Public Internet | Allows Only Spring Boot VPC:5432",
+        0xB9A7FF, "#B9A7FF"
+      );
+    }
+
+    // ============================================================================
+    // RAISED NEO-BRUTALIST DATA CONDUIT TRACKS
+    // ============================================================================
+    function buildConduitHighways() {
+      const conduits = [
+        // Client -> Core (North-South Highway)
+        { w: 0.55, d: 6.2, x: 0, z: 3.1, color: 0xB9A7FF },
+        // Core -> DB Vault (North-South Highway)
+        { w: 0.55, d: 6.2, x: 0, z: -3.1, color: 0xFFD64A },
+        // Webhook -> Core (East-West Highway)
+        { w: 6.4, d: 0.55, x: 3.2, z: 0.6, color: 0x8DDAFF },
+        // Core -> Gemini AI (East-West Highway)
+        { w: 6.4, d: 0.55, x: -3.2, z: 0.6, color: 0xD9FF3F }
       ];
 
-      paths.forEach(([p1, p2, col]) => {
-        const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
-        const lineMat = new THREE.LineBasicMaterial({ color: 0x151515, linewidth: 4 });
-        scene.add(new THREE.Line(lineGeo, lineMat));
-
-        // Animated Pulse Plane on Conduit
-        const midPoint = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
-        const dist = p1.distanceTo(p2);
-        const trackGeo = new THREE.BoxGeometry(0.3, 0.04, dist);
-        const trackMat = new THREE.MeshBasicMaterial({ color: col });
-        const track = new THREE.Mesh(trackGeo, trackMat);
-        track.position.copy(midPoint);
-        track.lookAt(p2);
-        scene.add(track);
+      conduits.forEach(c => {
+        scene.add(makeBox(c.w, 0.08, c.d, 0x151515, c.x, 0.04, c.z, false));
+        scene.add(makeBox(c.w * 0.7, 0.05, c.d * 0.7, c.color, c.x, 0.09, c.z, false));
       });
     }
 
-    function buildFirewallBarriers() {
-      // FW-1 (Perimeter Firewall between Client and Spring Boot)
-      const fw1Geo = new THREE.BoxGeometry(6.0, 1.2, 0.15);
-      const fw1Mat = new THREE.MeshStandardMaterial({
-        color: 0xB9A7FF,
-        transparent: true,
-        opacity: 0.85,
-        roughness: 0.2
-      });
-      const fw1 = addBlackEdges(new THREE.Mesh(fw1Geo, fw1Mat));
-      fw1.position.set(0, 0.6, 2.5);
-      fw1.userData = { isFirewall: true, label: "FW-1: Edge Perimeter Firewall" };
-      scene.add(fw1);
-      firewallMeshes.push(fw1);
+    // ============================================================================
+    // LIVE ANIMATED DATA PACKETS & ATTACK INTERCEPTION
+    // ============================================================================
+    function initAnimatedPackets() {
+      const packetDefs = [
+        // Flow A: Child Checkout -> Core -> Parent -> Core (RSA Sign) -> Child Unlock
+        {
+          mode: 'approval',
+          color: 0x8DDAFF,
+          path: [
+            new THREE.Vector3(1.15, 0.45, 6.2),
+            new THREE.Vector3(0, 0.45, 3.1),
+            new THREE.Vector3(0, 0.45, 0),
+            new THREE.Vector3(-1.2, 0.45, 6.2)
+          ],
+          speed: 0.35
+        },
+        {
+          mode: 'approval',
+          color: 0x8EF0C0,
+          path: [
+            new THREE.Vector3(0, 0.45, 0),
+            new THREE.Vector3(0, 0.45, 3.1),
+            new THREE.Vector3(1.15, 0.45, 6.2)
+          ],
+          speed: 0.42
+        },
+        // Flow B: Bank Webhook -> Core -> PII Masking -> Gemini AI -> Core -> DB Vault
+        {
+          mode: 'webhook',
+          color: 0xD9FF3F,
+          path: [
+            new THREE.Vector3(6.4, 0.45, 1.2),
+            new THREE.Vector3(0, 0.45, 0.6),
+            new THREE.Vector3(-5.4, 0.45, 1.2),
+            new THREE.Vector3(-6.4, 0.45, 1.2),
+            new THREE.Vector3(0, 0.45, 0),
+            new THREE.Vector3(0, 0.45, -6.2)
+          ],
+          speed: 0.28
+        },
+        // Flow C: Malicious SQLi / XSS Packet intercepted at Firewall FW-1
+        {
+          mode: 'attack',
+          color: 0xE5484D,
+          isAttack: true,
+          path: [
+            new THREE.Vector3(0, 0.55, 8.2),
+            new THREE.Vector3(0, 0.55, 3.25) // Stops and shatters right at FW-1!
+          ],
+          speed: 0.55
+        }
+      ];
 
-      // FW-2 (Database Isolation Firewall between Spring Boot and DB)
-      const fw2Geo = new THREE.BoxGeometry(5.0, 1.2, 0.15);
-      const fw2Mat = new THREE.MeshStandardMaterial({
-        color: 0xFF8F7C,
-        transparent: true,
-        opacity: 0.85,
-        roughness: 0.2
+      packetDefs.forEach((def, idx) => {
+        const mesh = makeBox(0.36, 0.36, 0.36, def.color, 0, 0.45, 0, false);
+        scene.add(mesh);
+        animatedParts.packets.push({
+          mesh,
+          mode: def.mode,
+          isAttack: !!def.isAttack,
+          path: def.path,
+          speed: def.speed,
+          progress: idx * 0.25
+        });
       });
-      const fw2 = addBlackEdges(new THREE.Mesh(fw2Geo, fw2Mat));
-      fw2.position.set(0, 0.6, -2.8);
-      fw2.userData = { isFirewall: true, label: "FW-2: Internal Database Firewall" };
-      scene.add(fw2);
-      firewallMeshes.push(fw2);
+    }
+
+    function spawnBlockedShockwave(pos) {
+      const ringGeo = new THREE.RingGeometry(0.15, 0.32, 16);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xE5484D,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.95
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.copy(pos);
+      scene.add(ring);
+      animatedParts.shockwaves.push({ mesh: ring, scale: 1.0, opacity: 0.95 });
+    }
+
+    // ============================================================================
+    // SIMULATION & UI CONTROLS
+    // ============================================================================
+    function setSimulationMode(mode) {
+      simulationMode = mode;
+      const btns = {
+        all: document.getElementById('sim-btn-all'),
+        approval: document.getElementById('sim-btn-approval'),
+        webhook: document.getElementById('sim-btn-webhook'),
+        attack: document.getElementById('sim-btn-attack')
+      };
+      Object.entries(btns).forEach(([k, btn]) => {
+        if (k === mode) {
+          btn.className = "px-2.5 py-1 text-[10px] uppercase neo-btn bg-[#D9FF3F] text-[#151515]";
+        } else {
+          btn.className = k === 'attack'
+            ? "px-2.5 py-1 text-[10px] uppercase neo-btn bg-[#FF8F7C] text-[#151515]"
+            : "px-2.5 py-1 text-[10px] uppercase neo-btn bg-white text-[#151515]";
+        }
+      });
+
+      const banner = document.getElementById('sim-status-banner');
+      if (mode === 'approval') {
+        banner.innerText = "FLOW A: CHILD CHECKOUT LOCKED -> PARENT APPROVES -> RSA-2048 SIGNATURE UNLOCKS PAY";
+      } else if (mode === 'webhook') {
+        banner.innerText = "FLOW B: N8N WEBHOOK (HMAC) -> LUHN PAN MASKING -> GEMINI 3.8 FLASH -> AES-256-GCM VAULT";
+      } else if (mode === 'attack') {
+        banner.innerText = "FLOW C: SQLi / XSS INTRUSION DETECTED -> BLOCKED AT FW-1 & IDS FILTER (HTTP 403)";
+      } else {
+        banner.innerText = "STATUS: ACTIVE MULTI-TIER TELEMETRY // TLS 1.3 + AES-256-GCM + RSA-2048";
+      }
     }
 
     function toggleSecurityOverlay() {
       securityOverlayVisible = !securityOverlayVisible;
-      firewallMeshes.forEach(mesh => mesh.visible = securityOverlayVisible);
-      floatingBadges.forEach(b => b.visible = securityOverlayVisible);
-      document.getElementById('toggle-overlay-btn').innerText = 
-        securityOverlayVisible ? "🛡️ Security Badges: ON" : "🛡️ Security Badges: OFF";
+      cw1Labels.forEach(l => l.visible = securityOverlayVisible);
+      document.getElementById('toggle-overlay-btn').innerText =
+        securityOverlayVisible ? "CW1 LABELS: ON" : "CW1 LABELS: OFF";
     }
 
     function onPointerDown(event) {
-      if (event.clientY < 75 || event.clientY > window.innerHeight - 180) return;
+      if (event.clientY < 115 || event.clientY > window.innerHeight - 190) return;
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(clickableObjects, true);
+      const intersects = raycaster.intersectObjects(clickableGroups, true);
 
       if (intersects.length > 0) {
-        let rootGroup = intersects[0].object;
-        while (rootGroup.parent && !rootGroup.userData.stationId) {
-          rootGroup = rootGroup.parent;
+        let obj = intersects[0].object;
+        while (obj.parent && !obj.userData.stationId) {
+          obj = obj.parent;
         }
-        if (rootGroup.userData && rootGroup.userData.stationId) {
-          focusStation(rootGroup.userData.stationId);
+        if (obj.userData && obj.userData.stationId) {
+          focusStation(obj.userData.stationId);
         }
       }
     }
@@ -661,9 +1206,6 @@
       const data = STATIONS_DATA[stationId];
       if (!data) return;
 
-      currentStation = data;
-
-      // Set smooth camera flight target
       targetCameraPos.set(...data.cameraPosition);
       targetLookAt.set(...data.cameraLookAt);
       isTransitioning = true;
@@ -675,7 +1217,6 @@
       targetCameraPos.copy(defaultCameraPos);
       targetLookAt.copy(defaultLookAt);
       isTransitioning = true;
-      currentStation = null;
       hideInspectionCard();
     }
 
@@ -683,15 +1224,14 @@
       const card = document.getElementById('inspection-card');
       const badge = document.getElementById('card-badge');
 
-      document.getElementById('card-id').innerText = data.id.toUpperCase();
+      document.getElementById('card-id').innerText = `[${data.code}]`;
       document.getElementById('card-title').innerText = data.displayName;
 
       badge.innerText = data.status.replace('-', ' ').toUpperCase();
       badge.className = data.status === 'operational'
-        ? "px-2.5 py-0.5 text-[11px] font-black tracking-widest uppercase border-2 border-[#151515] bg-[#8EF0C0] text-[#151515]"
-        : "px-2.5 py-0.5 text-[11px] font-black tracking-widest uppercase border-2 border-[#151515] bg-[#D9FF3F] text-[#151515]";
+        ? "font-mono-code px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase border-2 border-[#151515] bg-[#8EF0C0] text-[#151515]"
+        : "font-mono-code px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase border-2 border-[#151515] bg-[#D9FF3F] text-[#151515]";
 
-      // CW1 Security Fields
       document.getElementById('card-acp').innerText = data.cw1.acp;
       document.getElementById('card-fw').innerText = data.cw1.fw;
       document.getElementById('card-enc').innerText = data.cw1.enc;
@@ -700,7 +1240,6 @@
       document.getElementById('card-proto').innerText = data.cw1.proto;
       document.getElementById('card-sys').innerText = data.cw1.sys;
 
-      // Controls Tab
       document.getElementById('card-boundary').innerText = data.boundary;
       document.getElementById('card-inputs').innerText = data.inputs;
       document.getElementById('card-outputs').innerText = data.outputs;
@@ -711,22 +1250,21 @@
         const isOp = ctrl.status === 'operational';
         controlsList.innerHTML += `
           <div class="p-2.5 bg-white border-2 border-[#151515] shadow-[2px_2px_0px_#151515]">
-            <div class="flex items-center justify-between">
-              <span class="font-black text-[#151515] text-[11px] uppercase">${ctrl.name}</span>
-              <span class="text-[9px] px-1 py-0.2 font-black uppercase border border-[#151515] ${isOp ? 'bg-[#8EF0C0]' : 'bg-[#FFD64A]'}">${ctrl.status}</span>
+            <div class="flex items-center justify-between gap-1">
+              <span class="font-display font-extrabold text-[#151515] text-[11px] uppercase">${ctrl.name}</span>
+              <span class="font-mono-code text-[9px] px-1.5 py-0.5 font-bold uppercase border border-[#151515] ${isOp ? 'bg-[#8EF0C0]' : 'bg-[#FFD64A]'}">${ctrl.status}</span>
             </div>
-            <p class="text-[11px] text-[#444] mt-1 leading-snug">${ctrl.desc}</p>
+            <p class="text-[11px] text-[#333] mt-1 leading-snug">${ctrl.desc}</p>
           </div>
         `;
       });
 
-      // Files & Metrics Tab
       const filesList = document.getElementById('card-files-list');
       filesList.innerHTML = '';
       data.files.forEach(f => {
         filesList.innerHTML += `
           <div class="p-2 bg-[#FFFDF7] border-2 border-[#151515] shadow-[2px_2px_0px_#151515] font-bold text-[#151515]">
-            📄 ${f}
+            [FILE] ${f}
           </div>
         `;
       });
@@ -735,22 +1273,21 @@
       metricsList.innerHTML = '';
       Object.entries(data.metrics).forEach(([k, v]) => {
         metricsList.innerHTML += `
-          <div class="p-2 bg-white border border-[#151515]">
-            <span class="text-[#666] font-bold text-[10px] uppercase block">${k}</span>
-            <span class="font-mono text-[#151515] font-black text-xs">${v}</span>
+          <div class="p-2 bg-white border-2 border-[#151515]">
+            <span class="font-mono-code text-[#555] font-bold text-[10px] uppercase block">${k}</span>
+            <span class="font-mono-code text-[#151515] font-bold text-xs">${v}</span>
           </div>
         `;
       });
 
-      // Show card smoothly
-      card.classList.remove('translate-y-[140%]', 'opacity-0');
+      card.classList.remove('translate-y-[150%]', 'opacity-0');
       card.classList.add('translate-y-0', 'opacity-100');
     }
 
     function hideInspectionCard() {
       const card = document.getElementById('inspection-card');
       card.classList.remove('translate-y-0', 'opacity-100');
-      card.classList.add('translate-y-[140%]', 'opacity-0');
+      card.classList.add('translate-y-[150%]', 'opacity-0');
     }
 
     function switchCardTab(tab) {
@@ -777,37 +1314,98 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
+    // ============================================================================
+    // MAIN RENDER & PROCEDURAL ANIMATION LOOP
+    // ============================================================================
     const clock = new THREE.Clock();
     function animate() {
       requestAnimationFrame(animate);
-      const elapsedTime = clock.getElapsedTime();
+      const dt = clock.getDelta();
+      const elapsed = clock.getElapsedTime();
 
-      // Smooth Camera & Target Glide
+      // Smooth Camera Flight
       if (isTransitioning) {
         camera.position.lerp(targetCameraPos, 0.08);
         controls.target.lerp(targetLookAt, 0.08);
-
-        if (camera.position.distanceTo(targetCameraPos) < 0.05 &&
-            controls.target.distanceTo(targetLookAt) < 0.05) {
+        if (camera.position.distanceTo(targetCameraPos) < 0.06 &&
+            controls.target.distanceTo(targetLookAt) < 0.06) {
           camera.position.copy(targetCameraPos);
           controls.target.copy(targetLookAt);
           isTransitioning = false;
         }
       }
 
-      // Animate Floating Geometric Identifiers & Badges
-      clickableObjects.forEach((group, index) => {
-        group.children.forEach(child => {
-          if (child.userData && child.userData.isFloatingOrb) {
-            child.rotation.y = elapsedTime * 0.8;
-            child.rotation.x = Math.sin(elapsedTime * 0.5 + index) * 0.25;
-            child.position.y = 2.5 + Math.sin(elapsedTime * 1.5 + index) * 0.1;
-          }
-          if (child.userData && child.userData.isBadge) {
-            child.rotation.y = elapsedTime * 0.4;
-          }
-        });
+      // 1. Rotate Spring Boot Access Control Shield Ring
+      if (animatedParts.shieldRing) {
+        animatedParts.shieldRing.rotation.z = elapsed * 0.7;
+      }
+
+      // 2. Rotate Gemini AI Neural Gyroscope Rings & PII Sieve Wheel
+      if (animatedParts.aiRings.length === 3) {
+        animatedParts.aiRings[0].rotation.x = elapsed * 1.1;
+        animatedParts.aiRings[0].rotation.y = elapsed * 0.7;
+        animatedParts.aiRings[1].rotation.y = -elapsed * 0.9;
+        animatedParts.aiRings[1].rotation.z = elapsed * 0.6;
+        animatedParts.aiRings[2].rotation.y = elapsed * 1.4;
+      }
+      if (animatedParts.sieveWheel) {
+        animatedParts.sieveWheel.rotation.x = elapsed * 1.8;
+      }
+
+      // 3. Rotate PostgreSQL Bank Vault Locking Wheel
+      if (animatedParts.vaultWheel) {
+        animatedParts.vaultWheel.rotation.z = Math.sin(elapsed * 0.9) * 1.2;
+      }
+
+      // 4. Oscillate Webhook Receiver Dish & Child Checkout Padlock
+      if (animatedParts.webhookDish) {
+        animatedParts.webhookDish.rotation.y = Math.sin(elapsed * 1.1) * 0.75;
+      }
+      if (animatedParts.childLock) {
+        animatedParts.childLock.position.y = 1.95 + Math.sin(elapsed * 2.4) * 0.12;
+        animatedParts.childLock.rotation.y = Math.sin(elapsed * 1.2) * 0.35;
+      }
+
+      // 5. Scan Firewall Laser Bars Up and Down
+      animatedParts.laserBars.forEach(item => {
+        item.mesh.position.y = 1.0 + Math.sin(elapsed * 2.6 + item.phase) * 0.72;
       });
+
+      // 6. Animate Live Network Traffic Packets along Conduits
+      animatedParts.packets.forEach(pkt => {
+        const active = (simulationMode === 'all' || simulationMode === pkt.mode);
+        pkt.mesh.visible = active;
+        if (!active) return;
+
+        pkt.progress += dt * pkt.speed;
+        if (pkt.progress >= 1.0) {
+          if (pkt.isAttack) {
+            spawnBlockedShockwave(pkt.path[pkt.path.length - 1]);
+          }
+          pkt.progress = 0;
+        }
+
+        const totalSegs = pkt.path.length - 1;
+        const scaled = pkt.progress * totalSegs;
+        const segIdx = Math.min(Math.floor(scaled), totalSegs - 1);
+        const segT = scaled - segIdx;
+
+        pkt.mesh.position.lerpVectors(pkt.path[segIdx], pkt.path[segIdx + 1], segT);
+        pkt.mesh.rotation.y = elapsed * 2.5;
+      });
+
+      // 7. Expand & Fade Firewall Block Shockwaves
+      for (let i = animatedParts.shockwaves.length - 1; i >= 0; i--) {
+        const sw = animatedParts.shockwaves[i];
+        sw.scale += dt * 4.5;
+        sw.opacity -= dt * 1.4;
+        sw.mesh.scale.set(sw.scale, sw.scale, 1);
+        sw.mesh.material.opacity = Math.max(0, sw.opacity);
+        if (sw.opacity <= 0) {
+          scene.remove(sw.mesh);
+          animatedParts.shockwaves.splice(i, 1);
+        }
+      }
 
       controls.update();
       renderer.render(scene, camera);
