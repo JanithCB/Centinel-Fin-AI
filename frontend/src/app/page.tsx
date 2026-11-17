@@ -51,7 +51,7 @@ export default function Home() {
                 <span>[ SIGN IN ]</span>
               </Link>
               <Link
-                href="/sentinel_dev_log_3d.html"
+                href="/centinel_dev_log_3d.html"
                 target="_blank"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-mint border-[3px] border-ink text-ink font-label-md text-label-md uppercase tracking-wider shadow-[5px_5px_0_#151515] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[7px_7px_0_#151515] active:translate-x-1 active:translate-y-1 active:shadow-[1px_1px_0_#151515] transition-all"
               >

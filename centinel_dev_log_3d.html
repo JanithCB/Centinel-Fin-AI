@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Centinel Fin AI — Interactive 3D System Architecture (CW1 & CW2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    :root {
+      --ink: #151515;
+      --paper: #FFFDF7;
+      --surface: #FFFFFF;
+      --lime: #D9FF3F;
+      --violet: #B9A7FF;
+      --coral: #FF8F7C;
+      --sky: #8DDAFF;
+      --sun: #FFD64A;
+      --mint: #8EF0C0;
+      --muted: #E9E6DD;
+    }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: var(--paper);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    .neo-box {
+      background: #FFFFFF;
+      border: 3px solid var(--ink);
+      box-shadow: 4px 4px 0px var(--ink);
+    }
+    .neo-box-lg {
+      background: #FFFFFF;
+      border: 3px solid var(--ink);
+      box-shadow: 6px 6px 0px var(--ink);
+    }
+    .neo-btn {
+      border: 2px solid var(--ink);
+      box-shadow: 3px 3px 0px var(--ink);
+      transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .neo-btn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0px var(--ink);
+    }
+    .neo-btn:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px var(--ink);
+    }
+    .tab-btn.active {
+      background-color: var(--lime);
+      color: var(--ink);
+      border-bottom: 3px solid var(--ink);
+    }
+  </style>
+</head>
+<body class="select-none">
+
+  <!-- 3D Canvas -->
+  <div id="canvas-container"></div>
+
+  <!-- TOP HUD: Header & Quick Nav -->
+  <header class="absolute top-0 left-0 right-0 z-20 flex flex-wrap items-center justify-between gap-3 px-6 py-4 pointer-events-none">
+    
+    <!-- Branding Card -->
+    <div class="pointer-events-auto flex items-center gap-3 neo-box px-4 py-2 bg-white">
+      <div class="w-9 h-9 bg-[#D9FF3F] border-2 border-[#151515] flex items-center justify-center shadow-[2px_2px_0px_#151515]">
+        <svg class="w-5 h-5 text-[#151515]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-xs md:text-sm font-black tracking-wider uppercase text-[#151515] flex items-center gap-2">
+          CENTINEL FIN AI
+          <span class="text-[10px] px-2 py-0.5 bg-[#8EF0C0] border border-[#151515] font-bold">CW1 SPATIAL ARCHITECTURE</span>
+        </h1>
+        <p class="text-[11px] font-mono text-[#555]">NB6005CEM SECURITY • INTERACTIVE 3D BLUEPRINT</p>
+      </div>
+    </div>
+
+    <!-- Station Selector & Mode Controls -->
+    <div class="pointer-events-auto flex items-center gap-2 neo-box px-3 py-2 bg-[#FFFDF7]">
+      <span class="text-[11px] text-[#151515] font-black uppercase tracking-wider pr-1 hidden lg:inline">PILLARS:</span>
+      <button onclick="focusStation('parentguard_client')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#FF8F7C] text-[#151515]">🖥️ Client & Ext</button>
+      <button onclick="focusStation('ingestion_pipeline')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#8DDAFF] text-[#151515]">⚡ Webhook</button>
+      <button onclick="focusStation('security_core')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#8EF0C0] text-[#151515]">🛡️ Spring Boot Core</button>
+      <button onclick="focusStation('ai_engine')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#D9FF3F] text-[#151515]">🧠 Gemini AI</button>
+      <button onclick="focusStation('ledger_db')" class="px-2.5 py-1 text-[11px] font-bold uppercase rounded neo-btn bg-[#FFD64A] text-[#151515]">💾 PostgreSQL Vault</button>
+      
+      <div class="h-6 w-[2px] bg-[#151515] mx-1"></div>
+      <button id="toggle-overlay-btn" onclick="toggleSecurityOverlay()" class="px-2.5 py-1 text-[11px] font-black uppercase rounded neo-btn bg-[#B9A7FF] text-[#151515]">
+        🛡️ Security Badges: ON
+      </button>
+      <button onclick="resetCamera()" class="px-2.5 py-1 text-[11px] font-black uppercase rounded neo-btn bg-white text-[#151515]">
+        🔭 Overview [ESC]
+      </button>
+    </div>
+  </header>
+
+  <!-- Instructions Helper (Bottom Left) -->
+  <div class="absolute bottom-6 left-6 z-20 neo-box px-4 py-3 rounded max-w-xs text-xs bg-white pointer-events-none hidden md:block">
+    <div class="font-black text-[#151515] mb-1 flex items-center gap-1.5 uppercase tracking-wider">
+      <span class="w-2.5 h-2.5 bg-[#D9FF3F] border border-[#151515] animate-ping"></span>
+      3D Navigation Controls
+    </div>
+    <p class="text-[#333] leading-snug">• <strong>Click any 3D pillar</strong> to fly camera into that station.</p>
+    <p class="text-[#333] leading-snug mt-1">• <strong>Left-drag</strong>: Orbit | <strong>Right-drag</strong>: Pan | <strong>Scroll</strong>: Zoom</p>
+    <p class="text-[#333] leading-snug mt-1">• Press <strong>[ESC]</strong> or click Overview to zoom back out.</p>
+  </div>
+
+  <!-- IN-WORLD FLOATING BOTTOM INSPECTION CARD (Zero intrusive sidebar!) -->
+  <div id="inspection-card" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92vw] max-w-4xl z-30 transition-all duration-300 transform translate-y-[140%] opacity-0 pointer-events-auto">
+    <div class="neo-box-lg bg-white overflow-hidden">
+      
+      <!-- Card Top Bar -->
+      <div class="p-4 border-b-[3px] border-[#151515] bg-[#FFFDF7] flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <span id="card-badge" class="px-2.5 py-0.5 text-[11px] font-black tracking-widest uppercase border-2 border-[#151515] bg-[#8EF0C0] text-[#151515]">
+            OPERATIONAL
+          </span>
+          <span id="card-id" class="text-xs font-mono font-bold text-[#666]">STATION_ID</span>
+          <h2 id="card-title" class="text-base md:text-lg font-black text-[#151515] uppercase tracking-tight">
+            Station Name
+          </h2>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex items-center gap-1 border-2 border-[#151515] p-0.5 bg-white">
+          <button id="tab-btn-sec" onclick="switchCardTab('security')" class="tab-btn active px-3 py-1 text-xs font-black uppercase">
+            🛡️ CW1 Security Analysis
+          </button>
+          <button id="tab-btn-ctrl" onclick="switchCardTab('controls')" class="tab-btn px-3 py-1 text-xs font-black uppercase">
+            ⚡ Controls & Flow
+          </button>
+          <button id="tab-btn-code" onclick="switchCardTab('code')" class="tab-btn px-3 py-1 text-xs font-black uppercase">
+            📁 Repository Code
+          </button>
+        </div>
+
+        <!-- Close / Zoom Out Button -->
+        <button onclick="resetCamera()" class="neo-btn px-3 py-1 bg-[#FF8F7C] text-xs font-black uppercase text-[#151515] flex items-center gap-1">
+          <span>ESC</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Tab Content Area -->
+      <div class="p-5 max-h-[38vh] overflow-y-auto text-xs bg-white">
+        
+        <!-- TAB 1: CW1 SECURITY EVALUATION -->
+        <div id="tab-content-security" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="neo-box p-3 bg-[#FFFDF7]">
+              <span class="text-[10px] font-black uppercase tracking-wider text-[#FF8F7C] block mb-1">Access Control Point (Task 1.b)</span>
+              <p id="card-acp" class="font-bold text-[#151515] text-[11px]"></p>
+            </div>
+            <div class="neo-box p-3 bg-[#FFFDF7]">
+              <span class="text-[10px] font-black uppercase tracking-wider text-[#B9A7FF] block mb-1">Firewall Point (Task 1.b)</span>
+              <p id="card-fw" class="font-bold text-[#151515] text-[11px]"></p>
+            </div>
+            <div class="neo-box p-3 bg-[#FFFDF7]">
+              <span class="text-[10px] font-black uppercase tracking-wider text-[#8EF0C0] block mb-1">Encryption Point & Level (Task 1.b)</span>
+              <p id="card-enc" class="font-bold text-[#151515] text-[11px]"></p>
+            </div>
+            <div class="neo-box p-3 bg-[#FFFDF7]">
+              <span class="text-[10px] font-black uppercase tracking-wider text-[#E5484D] block mb-1">Potential Vulnerability Mitigated (Task 1.b)</span>
+              <p id="card-vuln" class="font-bold text-[#151515] text-[11px]"></p>
+            </div>
+          </div>
+
+          <!-- 3 Defense Levels (Task 1.c) -->
+          <div class="neo-box p-3.5 bg-white border-2 border-[#151515]">
+            <h4 class="font-black text-[#151515] text-xs uppercase mb-2 flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 bg-[#D9FF3F] border border-[#151515]"></span>
+              Coursework 1 — Three-Level Defense Specification (Task 1.c)
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px]">
+              <div class="p-2 border border-[#151515] bg-[#FFFDF7]">
+                <strong class="text-[#151515] block uppercase text-[10px]">1. Algorithm Level:</strong>
+                <span id="card-algo" class="text-[#333]"></span>
+              </div>
+              <div class="p-2 border border-[#151515] bg-[#FFFDF7]">
+                <strong class="text-[#151515] block uppercase text-[10px]">2. Protocol Level:</strong>
+                <span id="card-proto" class="text-[#333]"></span>
+              </div>
+              <div class="p-2 border border-[#151515] bg-[#FFFDF7]">
+                <strong class="text-[#151515] block uppercase text-[10px]">3. System Level:</strong>
+                <span id="card-sys" class="text-[#333]"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: CONTROLS & DATA FLOW -->
+        <div id="tab-content-controls" class="hidden space-y-3">
+          <div class="neo-box p-3 bg-[#FFFDF7] text-[11px]">
+            <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#151515]">
+              <span class="font-black uppercase text-[10px]">Network Boundary:</span>
+              <span id="card-boundary" class="font-mono font-bold text-[#151515]"></span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div>
+                <strong class="text-[#555] uppercase text-[10px] block">Ingress Payload:</strong>
+                <p id="card-inputs" class="text-[#151515]"></p>
+              </div>
+              <div>
+                <strong class="text-[#555] uppercase text-[10px] block">Egress Output:</strong>
+                <p id="card-outputs" class="text-[#151515]"></p>
+              </div>
+            </div>
+          </div>
+          <div id="card-controls-list" class="grid grid-cols-1 md:grid-cols-3 gap-2"></div>
+        </div>
+
+        <!-- TAB 3: CODE FILES -->
+        <div id="tab-content-code" class="hidden space-y-2">
+          <div id="card-files-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 font-mono text-[11px]"></div>
+          <div id="card-metrics-list" class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // System Architecture & CW1 Specification
+    const STATIONS_DATA = {
+      parentguard_client: {
+        id: "parentguard_client",
+        displayName: "Client Tier: Next.js & Chrome Extension",
+        tagline: "Parent Portal, Child Extension & Checkout Detection",
+        status: "operational",
+        color: 0xFF8F7C, // Coral
+        position: [0, 0.6, 5.0],
+        cameraLookAt: [0, 0.6, 5.0],
+        cameraPosition: [0, 4.0, 9.5],
+        cw1: {
+          acp: "ACP-1: Supabase Session Gate & Role Cookie Verification",
+          fw: "FW-1: Browser Content Security Policy (CSP) & Strict SameSite Origin",
+          enc: "ENC-1: HTTPS / TLS 1.3 ECDHE Encrypted Transport (WebCrypto RSA Verification)",
+          vuln: "VULN-1: Cross-Site Scripting (XSS), Clickjacking & Approval Bypass",
+          algo: "WebCrypto API (RSA-2048 public key verification on approval token)",
+          proto: "TLS 1.3, Strict CSP, HSTS, X-Frame-Options: DENY, SameSite=Strict cookies",
+          sys: "Browser Sandboxing, Chrome Extension Manifest V3 isolated service worker"
+        },
+        files: [
+          "frontend/src/app/dashboard/page.tsx",
+          "frontend/src/middleware.ts",
+          "chrome-extension/manifest.json",
+          "chrome-extension/content.js"
+        ],
+        metrics: {
+          "Parent Portal": "Next.js 15 (Neo-Brutalism)",
+          "Child Agent": "Manifest V3 Extension",
+          "Auth Gateway": "Supabase JWT Bearer",
+          "DOM Lock": "Pay Button Overlay"
+        },
+        boundary: "Public Browser DOM / Untrusted Client ➔ Edge Reverse Proxy",
+        inputs: "Child Checkout Events, Parent Approval Clicks, Supabase Bearer JWTs",
+        outputs: "Signed Purchase Requests (POST /api/v1/purchase-requests)",
+        controls: [
+          { name: "Next.js Middleware Gate", status: "operational", desc: "Intercepts unauthorized routes and redirects unauthenticated traffic." },
+          { name: "Role-Aware View Toggling", status: "operational", desc: "Restricts family management and approvals to verified parents." },
+          { name: "ParentGuard Checkout Interceptor", status: "in-development", desc: "DOM Mutation Observer detecting pay buttons and demanding RSA approval." }
+        ]
+      },
+      ingestion_pipeline: {
+        id: "ingestion_pipeline",
+        displayName: "Ingestion Gateway: n8n Bank Webhook",
+        tagline: "Permissioned Message Capture, Parser & Tamper Verification",
+        status: "operational",
+        color: 0x8DDAFF, // Sky
+        position: [5.2, 0.6, 0.5],
+        cameraLookAt: [5.2, 0.6, 0.5],
+        cameraPosition: [9.0, 3.5, 4.0],
+        cw1: {
+          acp: "ACP-2: Ingestion API Key & Webhook Shared Secret Authentication",
+          fw: "FW-1: Ingress Rate-Limiting & Reverse Proxy Webhook IP Whitelisting",
+          enc: "ENC-2: TLS 1.3 in transit + HMAC-SHA256 Webhook Payload Signatures",
+          vuln: "VULN-2: Webhook Replay Attacks, Malicious Payload Spoofing & Timing Attacks",
+          algo: "HMAC-SHA256 signature verification with MessageDigest.isEqual()",
+          proto: "HTTP POST over TLS 1.3 with X-API-KEY and X-Signature headers",
+          sys: "Spring Interceptor rate-limiting bursts and rejecting unauthenticated webhooks"
+        },
+        files: [
+          "com.centinel.finai.controller.IngestionController.java",
+          "com.centinel.finai.config.IngestionApiKeyInterceptor.java",
+          "com.centinel.finai.service.TransactionMessageParserService.java",
+          "feed_mock_data.ps1 (Test Harness)"
+        ],
+        metrics: {
+          "Endpoint": "POST /api/ingestion/webhook",
+          "Auth Interceptor": "X-API-KEY Header Check",
+          "Precision": "BigDecimal (Two Decimals)",
+          "Audit Trail": "SHA-256 Message Hash"
+        },
+        boundary: "External n8n / Bank SMS Forwarder ➔ IngestionController",
+        inputs: "Raw Bank SMS / Push Notifications, Webhook Auth Headers",
+        outputs: "Clean Masked IngestedMessage Entity for Processing",
+        controls: [
+          { name: "Ingestion API Key Interceptor", status: "operational", desc: "Validates cryptographic headers on incoming n8n webhook posts." },
+          { name: "Transaction Message Parser", status: "operational", desc: "Extracts currency, merchant, and amounts from SMS/Push notifications." },
+          { name: "SHA-256 Deduplication Hash", status: "operational", desc: "Prevents replay attacks by checking SHA-256 hashes of incoming raw messages." }
+        ]
+      },
+      security_core: {
+        id: "security_core",
+        displayName: "Core Security Perimeter: Spring Boot 3",
+        tagline: "Resource Server, RBAC, Intrusion Detection & Approval Signatures",
+        status: "operational",
+        color: 0x8EF0C0, // Mint
+        position: [0, 0.6, -0.2],
+        cameraLookAt: [0, 0.6, -0.2],
+        cameraPosition: [0, 4.2, 4.2],
+        cw1: {
+          acp: "ACP-3: Spring Security Filter Chain & PreAuthorize('hasRole(\"PARENT\")')",
+          fw: "FW-1 & FW-2: Host Stateful Packet Filtering & Application IDS Filter",
+          enc: "ENC-3: AES-256-GCM (Database at-rest) + RSA-2048 (SHA256withRSA Signatures)",
+          vuln: "VULN-3: Privilege Escalation, SQL Injection, Approval Forgery & State Tampering",
+          algo: "AES-256-GCM (Cipher AES/GCM/NoPadding, 12-byte IV) + RSA-2048 (SHA256withRSA)",
+          proto: "OAuth 2.0 Resource Server (Supabase JWKS validation) + Strict CORS",
+          sys: "IntrusionDetectionFilter blocking SQLi/XSS, Spring Actuator health monitoring"
+        },
+        files: [
+          "com.centinel.finai.common.SecurityConfig.java",
+          "com.centinel.finai.security.AesEncryptionService.java",
+          "com.centinel.finai.security.RsaSignatureService.java",
+          "com.centinel.finai.security.IntrusionDetectionFilter.java"
+        ],
+        metrics: {
+          "Auth Standard": "Supabase JWT Bearer (RS256)",
+          "At-Rest Encryption": "AES-256-GCM (128-bit Tag)",
+          "Approval Signature": "RSA-2048 (SHA256withRSA)",
+          "IDS Filter": "SQLi/XSS Auto-Block (403/429)"
+        },
+        boundary: "Edge Gateway ➔ Spring Security Filter Chain ➔ Service Layer",
+        inputs: "Bearer JWTs, Purchase Requests, Ingested Transactions",
+        outputs: "Signed Approval Tokens, Verified Ledger Entries, Audited Events",
+        controls: [
+          { name: "Stateless OAuth2 JWT Validation", status: "operational", desc: "Validates Supabase cryptographically signed public keys via JWKS." },
+          { name: "ParentGuard Role Enforcement", status: "operational", desc: "Ensures children cannot approve purchase requests or modify family rosters." },
+          { name: "AES-256-GCM Encryption at Rest", status: "operational", desc: "Encrypts sensitive raw transaction notes and account numbers before DB storage." },
+          { name: "RSA-2048 Digital Signatures", status: "operational", desc: "Digitally signs approved purchase tokens so browser extension can verify parent authorization." }
+        ]
+      },
+      ai_engine: {
+        id: "ai_engine",
+        displayName: "AI Privacy & Gemini Intelligence",
+        tagline: "PII Masking Perimeter, Gemini 3.8 Flash & Spend Analytics",
+        status: "operational",
+        color: 0xD9FF3F, // Lime
+        position: [-5.2, 0.6, 0.5],
+        cameraLookAt: [-5.2, 0.6, 0.5],
+        cameraPosition: [-9.0, 3.5, 4.0],
+        cw1: {
+          acp: "ACP-4: Google Cloud IAM & Restricted API Key Environment Isolation",
+          fw: "FW-1: Outbound Egress TLS 1.3 Proxy with Whitelisting to generativelanguage.googleapis.com",
+          enc: "ENC-4: TLS 1.3 End-to-End Encryption to Google Vertex/Gemini API",
+          vuln: "VULN-4: LLM Data Exfiltration, PII / Credit Card Leakage & Hallucinated Financial Figures",
+          algo: "SensitiveDataMaskingService (Luhn PAN validation, Regex masking, Zero raw PII)",
+          proto: "HTTPS REST API with Ephemeral Bearer Headers / Google GenAI SDK",
+          sys: "Privacy Firewall: Masking executes in memory before any external network socket opens"
+        },
+        files: [
+          "com.centinel.finai.service.SensitiveDataMaskingService.java",
+          "com.centinel.finai.service.MerchantCategorizationService.java",
+          "com.centinel.finai.ai.GeminiCategorizationClient.java",
+          "com.centinel.finai.util.MaskingUtils.java"
+        ],
+        metrics: {
+          "Active Model": "Google Gemini 3.8 Flash",
+          "Privacy Masking": "Luhn Regex Scrubbing",
+          "Classifier": "Hybrid: Regex ➔ Gemini AI",
+          "Safety Guarantee": "Grounded Tool Calling Only"
+        },
+        boundary: "Spring Boot Service Layer ➔ Google Gemini Cloud API",
+        inputs: "Anonymized / Masked Bank Text, Filtered Aggregation Summaries",
+        outputs: "Standardized Category Codes, Natural Language Spending Insights",
+        controls: [
+          { name: "Luhn PAN Masking Service", status: "operational", desc: "Validates and strips 16-digit credit card numbers before any text leaves the server." },
+          { name: "Tier 1 Rule-Based Categorizer", status: "operational", desc: "Instant deterministic lookup for known retail merchants without calling the cloud." },
+          { name: "Gemini 3.8 Flash AI Fallback", status: "operational", desc: "Structured JSON categorization of unknown masked bank descriptions." }
+        ]
+      },
+      ledger_db: {
+        id: "ledger_db",
+        displayName: "Data Vault: Supabase PostgreSQL Unit",
+        tagline: "Single-Unit Relational Store, Encrypted Backups & Network Isolation",
+        status: "operational",
+        color: 0xFFD64A, // Sun Yellow
+        position: [0, 0.6, -5.2],
+        cameraLookAt: [0, 0.6, -5.2],
+        cameraPosition: [0, 3.8, -1.0],
+        cw1: {
+          acp: "ACP-5: PostgreSQL Dedicated Role Credentials, SSL Certificate Enforced Connection",
+          fw: "FW-2: Internal Database Firewall (Blocks all external IPs, allows only Spring Boot VPC)",
+          enc: "ENC-5: AES-256-GCM Field-Level Encryption at Rest + pg_dump AES-256 Backups",
+          vuln: "VULN-5: SQL Injection (SQLi), Offline Backup Theft, Direct DB Port Scans & Unauthorized DDL",
+          algo: "AES-256-GCM encrypted database dumps + SHA-256 backup manifest checksums",
+          proto: "PostgreSQL Wire Protocol over TLS 1.3 (sslmode=verify-full)",
+          sys: "Network Isolation (Supabase VPC Peering, No Public 5432 Exposure), Automated Backups"
+        },
+        files: [
+          "com.centinel.finai.entity.Transaction.java",
+          "com.centinel.finai.family.Family.java",
+          "com.centinel.finai.purchase.PurchaseRequest.java",
+          "security_ops/automated_encrypted_backup.py"
+        ],
+        metrics: {
+          "Engine": "PostgreSQL 15+ (Supabase)",
+          "Network Port": "5432 (Internal VPC Only)",
+          "At-Rest Encryption": "AES-256-GCM Sensitive Fields",
+          "Backup System": "3-2-1 Rule: Encrypted Dumps"
+        },
+        boundary: "Spring Boot VPC Connection Pool ➔ Supabase Managed Database Vault",
+        inputs: "Parameterized JPA Queries, Migration Scripts",
+        outputs: "Encrypted Transaction Records, Audited Purchase States",
+        controls: [
+          { name: "Database Isolation Firewall (FW-2)", status: "operational", desc: "Restricts PostgreSQL port 5432 strictly to the Spring Boot application server IP." },
+          { name: "PreparedStatement SQLi Immunity", status: "operational", desc: "Spring Data JPA parameterized queries prevent SQL injection completely." },
+          { name: "Automated Encrypted Backups", status: "operational", desc: "Daily automated database snapshots encrypted with AES-256-GCM and verified with SHA-256." }
+        ]
+      }
+    };
+
+    let scene, camera, renderer, controls, raycaster, mouse;
+    const clickableObjects = [];
+    const floatingBadges = [];
+    let isTransitioning = false;
+    let targetCameraPos = new THREE.Vector3();
+    let targetLookAt = new THREE.Vector3();
+    let currentStation = null;
+    let securityOverlayVisible = true;
+    let firewallMeshes = [];
+
+    const defaultCameraPos = new THREE.Vector3(13, 14, 13);
+    const defaultLookAt = new THREE.Vector3(0, 0, 0);
+
+    function addBlackEdges(mesh) {
+      const edges = new THREE.EdgesGeometry(mesh.geometry);
+      const line = new THREE.LineSegments(
+        edges,
+        new THREE.LineBasicMaterial({ color: 0x151515, linewidth: 3 })
+      );
+      mesh.add(line);
+      return mesh;
+    }
+
+    function init() {
+      const container = document.getElementById('canvas-container');
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xFFFDF7); // Neo-brutalist paper off-white
+
+      const aspect = window.innerWidth / window.innerHeight;
+      camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
+      camera.position.copy(defaultCameraPos);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      controls.maxPolarAngle = Math.PI / 2.15;
+      controls.target.copy(defaultLookAt);
+
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
+      // Flat Studio Lighting for Neo-Brutalism
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+      dirLight.position.set(15, 25, 12);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      scene.add(dirLight);
+
+      // Neo-Brutalist Grid Floor
+      const gridHelper = new THREE.GridHelper(30, 30, 0x151515, 0xd8d3c5);
+      gridHelper.position.y = 0;
+      scene.add(gridHelper);
+
+      // Build Tactile Station Pods
+      Object.values(STATIONS_DATA).forEach(data => {
+        buildStationPod(data);
+      });
+
+      // Build Connecting Data Conduits (Network Bus)
+      buildNetworkConduits();
+
+      // Build Firewall Barrier Plates (FW-1 and FW-2)
+      buildFirewallBarriers();
+
+      window.addEventListener('resize', onWindowResize);
+      window.addEventListener('pointerdown', onPointerDown);
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') resetCamera();
+      });
+
+      animate();
+    }
+
+    function buildStationPod(data) {
+      const group = new THREE.Group();
+      group.position.set(...data.position);
+      group.userData = { stationId: data.id };
+
+      // Base Pedestal
+      const baseGeo = new THREE.BoxGeometry(2.6, 0.35, 2.6);
+      const baseMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.9 });
+      const baseMesh = addBlackEdges(new THREE.Mesh(baseGeo, baseMat));
+      baseMesh.receiveShadow = true;
+      group.add(baseMesh);
+
+      // Main Column
+      const pillarGeo = new THREE.BoxGeometry(1.6, 1.4, 1.6);
+      const pillarMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.8 });
+      const pillar = addBlackEdges(new THREE.Mesh(pillarGeo, pillarMat));
+      pillar.position.y = 0.87;
+      pillar.castShadow = true;
+      group.add(pillar);
+
+      // Accent Top Cap
+      const capGeo = new THREE.BoxGeometry(1.8, 0.25, 1.8);
+      const capMat = new THREE.MeshStandardMaterial({ color: data.color, roughness: 0.3 });
+      const cap = addBlackEdges(new THREE.Mesh(capGeo, capMat));
+      cap.position.y = 1.65;
+      group.add(cap);
+
+      // Floating Geometric Identifier
+      const orbGeo = new THREE.OctahedronGeometry(0.5);
+      const orbMat = new THREE.MeshStandardMaterial({ color: data.color, roughness: 0.2, metalness: 0.1 });
+      const orb = addBlackEdges(new THREE.Mesh(orbGeo, orbMat));
+      orb.position.y = 2.5;
+      orb.userData = { isFloatingOrb: true };
+      group.add(orb);
+
+      // Security Point Indicator (Pulsing Shield Badge)
+      const badgeGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.08, 16);
+      const badgeMat = new THREE.MeshBasicMaterial({ color: 0x151515 });
+      const badge = addBlackEdges(new THREE.Mesh(badgeGeo, badgeMat));
+      badge.position.y = 3.3;
+      badge.userData = { isBadge: true };
+      group.add(badge);
+
+      floatingBadges.push(badge);
+      scene.add(group);
+      clickableObjects.push(group);
+    }
+
+    function buildNetworkConduits() {
+      // Connect Core to Client, Ingestion, AI, and DB
+      const corePos = new THREE.Vector3(0, 0.1, -0.2);
+      const clientPos = new THREE.Vector3(0, 0.1, 5.0);
+      const ingestPos = new THREE.Vector3(5.2, 0.1, 0.5);
+      const aiPos = new THREE.Vector3(-5.2, 0.1, 0.5);
+      const dbPos = new THREE.Vector3(0, 0.1, -5.2);
+
+      const paths = [
+        [corePos, clientPos, 0xFF8F7C],
+        [corePos, ingestPos, 0x8DDAFF],
+        [corePos, aiPos, 0xD9FF3F],
+        [corePos, dbPos, 0xFFD64A]
+      ];
+
+      paths.forEach(([p1, p2, col]) => {
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x151515, linewidth: 4 });
+        scene.add(new THREE.Line(lineGeo, lineMat));
+
+        // Animated Pulse Plane on Conduit
+        const midPoint = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+        const dist = p1.distanceTo(p2);
+        const trackGeo = new THREE.BoxGeometry(0.3, 0.04, dist);
+        const trackMat = new THREE.MeshBasicMaterial({ color: col });
+        const track = new THREE.Mesh(trackGeo, trackMat);
+        track.position.copy(midPoint);
+        track.lookAt(p2);
+        scene.add(track);
+      });
+    }
+
+    function buildFirewallBarriers() {
+      // FW-1 (Perimeter Firewall between Client and Spring Boot)
+      const fw1Geo = new THREE.BoxGeometry(6.0, 1.2, 0.15);
+      const fw1Mat = new THREE.MeshStandardMaterial({
+        color: 0xB9A7FF,
+        transparent: true,
+        opacity: 0.85,
+        roughness: 0.2
+      });
+      const fw1 = addBlackEdges(new THREE.Mesh(fw1Geo, fw1Mat));
+      fw1.position.set(0, 0.6, 2.5);
+      fw1.userData = { isFirewall: true, label: "FW-1: Edge Perimeter Firewall" };
+      scene.add(fw1);
+      firewallMeshes.push(fw1);
+
+      // FW-2 (Database Isolation Firewall between Spring Boot and DB)
+      const fw2Geo = new THREE.BoxGeometry(5.0, 1.2, 0.15);
+      const fw2Mat = new THREE.MeshStandardMaterial({
+        color: 0xFF8F7C,
+        transparent: true,
+        opacity: 0.85,
+        roughness: 0.2
+      });
+      const fw2 = addBlackEdges(new THREE.Mesh(fw2Geo, fw2Mat));
+      fw2.position.set(0, 0.6, -2.8);
+      fw2.userData = { isFirewall: true, label: "FW-2: Internal Database Firewall" };
+      scene.add(fw2);
+      firewallMeshes.push(fw2);
+    }
+
+    function toggleSecurityOverlay() {
+      securityOverlayVisible = !securityOverlayVisible;
+      firewallMeshes.forEach(mesh => mesh.visible = securityOverlayVisible);
+      floatingBadges.forEach(b => b.visible = securityOverlayVisible);
+      document.getElementById('toggle-overlay-btn').innerText = 
+        securityOverlayVisible ? "🛡️ Security Badges: ON" : "🛡️ Security Badges: OFF";
+    }
+
+    function onPointerDown(event) {
+      if (event.clientY < 75 || event.clientY > window.innerHeight - 180) return;
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(clickableObjects, true);
+
+      if (intersects.length > 0) {
+        let rootGroup = intersects[0].object;
+        while (rootGroup.parent && !rootGroup.userData.stationId) {
+          rootGroup = rootGroup.parent;
+        }
+        if (rootGroup.userData && rootGroup.userData.stationId) {
+          focusStation(rootGroup.userData.stationId);
+        }
+      }
+    }
+
+    function focusStation(stationId) {
+      const data = STATIONS_DATA[stationId];
+      if (!data) return;
+
+      currentStation = data;
+
+      // Set smooth camera flight target
+      targetCameraPos.set(...data.cameraPosition);
+      targetLookAt.set(...data.cameraLookAt);
+      isTransitioning = true;
+
+      showInspectionCard(data);
+    }
+
+    function resetCamera() {
+      targetCameraPos.copy(defaultCameraPos);
+      targetLookAt.copy(defaultLookAt);
+      isTransitioning = true;
+      currentStation = null;
+      hideInspectionCard();
+    }
+
+    function showInspectionCard(data) {
+      const card = document.getElementById('inspection-card');
+      const badge = document.getElementById('card-badge');
+
+      document.getElementById('card-id').innerText = data.id.toUpperCase();
+      document.getElementById('card-title').innerText = data.displayName;
+
+      badge.innerText = data.status.replace('-', ' ').toUpperCase();
+      badge.className = data.status === 'operational'
+        ? "px-2.5 py-0.5 text-[11px] font-black tracking-widest uppercase border-2 border-[#151515] bg-[#8EF0C0] text-[#151515]"
+        : "px-2.5 py-0.5 text-[11px] font-black tracking-widest uppercase border-2 border-[#151515] bg-[#D9FF3F] text-[#151515]";
+
+      // CW1 Security Fields
+      document.getElementById('card-acp').innerText = data.cw1.acp;
+      document.getElementById('card-fw').innerText = data.cw1.fw;
+      document.getElementById('card-enc').innerText = data.cw1.enc;
+      document.getElementById('card-vuln').innerText = data.cw1.vuln;
+      document.getElementById('card-algo').innerText = data.cw1.algo;
+      document.getElementById('card-proto').innerText = data.cw1.proto;
+      document.getElementById('card-sys').innerText = data.cw1.sys;
+
+      // Controls Tab
+      document.getElementById('card-boundary').innerText = data.boundary;
+      document.getElementById('card-inputs').innerText = data.inputs;
+      document.getElementById('card-outputs').innerText = data.outputs;
+
+      const controlsList = document.getElementById('card-controls-list');
+      controlsList.innerHTML = '';
+      data.controls.forEach(ctrl => {
+        const isOp = ctrl.status === 'operational';
+        controlsList.innerHTML += `
+          <div class="p-2.5 bg-white border-2 border-[#151515] shadow-[2px_2px_0px_#151515]">
+            <div class="flex items-center justify-between">
+              <span class="font-black text-[#151515] text-[11px] uppercase">${ctrl.name}</span>
+              <span class="text-[9px] px-1 py-0.2 font-black uppercase border border-[#151515] ${isOp ? 'bg-[#8EF0C0]' : 'bg-[#FFD64A]'}">${ctrl.status}</span>
+            </div>
+            <p class="text-[11px] text-[#444] mt-1 leading-snug">${ctrl.desc}</p>
+          </div>
+        `;
+      });
+
+      // Files & Metrics Tab
+      const filesList = document.getElementById('card-files-list');
+      filesList.innerHTML = '';
+      data.files.forEach(f => {
+        filesList.innerHTML += `
+          <div class="p-2 bg-[#FFFDF7] border-2 border-[#151515] shadow-[2px_2px_0px_#151515] font-bold text-[#151515]">
+            📄 ${f}
+          </div>
+        `;
+      });
+
+      const metricsList = document.getElementById('card-metrics-list');
+      metricsList.innerHTML = '';
+      Object.entries(data.metrics).forEach(([k, v]) => {
+        metricsList.innerHTML += `
+          <div class="p-2 bg-white border border-[#151515]">
+            <span class="text-[#666] font-bold text-[10px] uppercase block">${k}</span>
+            <span class="font-mono text-[#151515] font-black text-xs">${v}</span>
+          </div>
+        `;
+      });
+
+      // Show card smoothly
+      card.classList.remove('translate-y-[140%]', 'opacity-0');
+      card.classList.add('translate-y-0', 'opacity-100');
+    }
+
+    function hideInspectionCard() {
+      const card = document.getElementById('inspection-card');
+      card.classList.remove('translate-y-0', 'opacity-100');
+      card.classList.add('translate-y-[140%]', 'opacity-0');
+    }
+
+    function switchCardTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('tab-content-security').classList.add('hidden');
+      document.getElementById('tab-content-controls').classList.add('hidden');
+      document.getElementById('tab-content-code').classList.add('hidden');
+
+      if (tab === 'security') {
+        document.getElementById('tab-btn-sec').classList.add('active');
+        document.getElementById('tab-content-security').classList.remove('hidden');
+      } else if (tab === 'controls') {
+        document.getElementById('tab-btn-ctrl').classList.add('active');
+        document.getElementById('tab-content-controls').classList.remove('hidden');
+      } else if (tab === 'code') {
+        document.getElementById('tab-btn-code').classList.add('active');
+        document.getElementById('tab-content-code').classList.remove('hidden');
+      }
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const elapsedTime = clock.getElapsedTime();
+
+      // Smooth Camera & Target Glide
+      if (isTransitioning) {
+        camera.position.lerp(targetCameraPos, 0.08);
+        controls.target.lerp(targetLookAt, 0.08);
+
+        if (camera.position.distanceTo(targetCameraPos) < 0.05 &&
+            controls.target.distanceTo(targetLookAt) < 0.05) {
+          camera.position.copy(targetCameraPos);
+          controls.target.copy(targetLookAt);
+          isTransitioning = false;
+        }
+      }
+
+      // Animate Floating Geometric Identifiers & Badges
+      clickableObjects.forEach((group, index) => {
+        group.children.forEach(child => {
+          if (child.userData && child.userData.isFloatingOrb) {
+            child.rotation.y = elapsedTime * 0.8;
+            child.rotation.x = Math.sin(elapsedTime * 0.5 + index) * 0.25;
+            child.position.y = 2.5 + Math.sin(elapsedTime * 1.5 + index) * 0.1;
+          }
+          if (child.userData && child.userData.isBadge) {
+            child.rotation.y = elapsedTime * 0.4;
+          }
+        });
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>

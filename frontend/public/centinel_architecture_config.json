@@ -1,0 +1,212 @@
+{
+  "system": {
+    "name": "Centinel Fin AI",
+    "codename": "ParentGuard & Personal Expense Intelligence",
+    "version": "1.0.0-beta",
+    "repositoryPath": "D:\\Centinel Fin AI",
+    "primaryModel": "Gemini 3.8 Flash",
+    "backendFramework": "Java Spring Boot 3 (Maven)",
+    "databaseEngine": "Supabase PostgreSQL 15+ (Spring Data JPA)",
+    "frontendFramework": "Next.js 15 (React 19 / TypeScript / Neo-Brutalism)",
+    "courseworkModule": "NB6005CEM Security (CW1 + CW2)",
+    "lastVerified": "2026-11-17T17:30:00Z"
+  },
+  "stations": {
+    "parentguard_client": {
+      "id": "parentguard_client",
+      "displayName": "Client Tier: Next.js & Chrome Extension",
+      "tagline": "Parent Portal, Child Extension & Checkout Detection",
+      "status": "operational",
+      "coordinates3D": { "x": 0, "y": 0.6, "z": 4.5 },
+      "accentColor": "#FF8F7C",
+      "cw1_security": {
+        "acp": "ACP-1: Supabase Session Gate & Role Cookie Verification",
+        "fw": "FW-1: Browser Content Security Policy (CSP) & Strict SameSite Origin",
+        "enc": "ENC-1: HTTPS / TLS 1.3 ECDHE Encrypted Transport (WebCrypto RSA Verification)",
+        "vuln": "VULN-1: Cross-Site Scripting (XSS), Clickjacking & Unauthorized Approval Bypass",
+        "algorithm": "WebCrypto API (RSA-2048 public key signature verification on approval token)",
+        "protocol": "TLS 1.3, Strict CSP, HSTS, X-Frame-Options: DENY, SameSite=Strict cookies",
+        "system": "Browser Sandboxing, Chrome Extension Manifest V3 isolated service worker"
+      },
+      "implementationFiles": [
+        "frontend/src/app/dashboard/page.tsx",
+        "frontend/src/middleware.ts",
+        "chrome-extension/manifest.json",
+        "chrome-extension/content.js"
+      ],
+      "metrics": {
+        "Parent Portal": "Next.js 15 App Router (Neo-Brutalism)",
+        "Child Agent": "Manifest V3 Chrome Extension (DOM Lock)",
+        "Auth Standard": "Supabase OAuth2 / JWT (RS256/ES256)",
+        "DOM Security": "Pay Button Cryptographic Overlay"
+      },
+      "controls": [
+        { "name": "Next.js Middleware Gate", "status": "operational", "desc": "Intercepts unauthorized routes and redirects unauthenticated traffic to /auth/sign-in." },
+        { "name": "Role-Aware View Toggling", "status": "operational", "desc": "Hides and restricts family configuration controls to verified ROLE_PARENT users." },
+        { "name": "ParentGuard Checkout Interceptor", "status": "in-development", "desc": "DOM Mutation Observer detecting e-commerce pay buttons and demanding cryptographic parent approval." }
+      ],
+      "dataFlow": {
+        "boundary": "Public Browser DOM / Untrusted Client ➔ Edge Reverse Proxy",
+        "inputs": "Child Checkout Events, Parent Approval Clicks, Supabase Bearer JWTs",
+        "outputs": "Signed Purchase Requests (POST /api/v1/purchase-requests)"
+      }
+    },
+    "ingestion_pipeline": {
+      "id": "ingestion_pipeline",
+      "displayName": "Ingestion Gateway: n8n Bank Webhook",
+      "tagline": "Permissioned Message Capture, Parser & Tamper Verification",
+      "status": "operational",
+      "coordinates3D": { "x": 4.5, "y": 0.6, "z": 0.5 },
+      "accentColor": "#8DDAFF",
+      "cw1_security": {
+        "acp": "ACP-2: Ingestion API Key & Webhook Shared Secret Authentication",
+        "fw": "FW-1: Ingress Rate-Limiting & Reverse Proxy Webhook IP Whitelisting",
+        "enc": "ENC-2: TLS 1.3 in transit + HMAC-SHA256 Webhook Payload Signatures",
+        "vuln": "VULN-2: Webhook Replay Attacks, Malicious Payload Spoofing & Timing Attacks",
+        "algorithm": "HMAC-SHA256 signature verification using constant-time MessageDigest.isEqual()",
+        "protocol": "HTTP POST over TLS 1.3 with X-API-KEY and X-Signature headers",
+        "system": "Spring Interceptor rate-limiting bursts and rejecting unauthenticated webhooks"
+      },
+      "implementationFiles": [
+        "com.centinel.finai.controller.IngestionController.java",
+        "com.centinel.finai.config.IngestionApiKeyInterceptor.java",
+        "com.centinel.finai.service.TransactionMessageParserService.java",
+        "feed_mock_data.ps1 (Integration Test Harness)"
+      ],
+      "metrics": {
+        "Endpoint": "POST /api/ingestion/webhook",
+        "Auth Mechanism": "X-API-KEY Webhook Interceptor",
+        "Precision": "BigDecimal (Two-decimal currency precision)",
+        "Audit Trail": "Raw message payload hashed with SHA-256 for deduplication"
+      },
+      "controls": [
+        { "name": "Ingestion API Key Interceptor", "status": "operational", "desc": "Validates cryptographic headers on incoming n8n webhook posts." },
+        { "name": "Transaction Message Parser", "status": "operational", "desc": "Extracts currency, merchant, and amounts from SMS/Push notifications." },
+        { "name": "SHA-256 Deduplication Hash", "status": "operational", "desc": "Prevents replay attacks by checking SHA-256 hashes of incoming raw messages." }
+      ],
+      "dataFlow": {
+        "boundary": "External n8n / Bank SMS Forwarder ➔ IngestionController",
+        "inputs": "Raw Bank SMS / Push Notifications, Webhook Auth Headers",
+        "outputs": "Clean Masked IngestedMessage Entity for Processing"
+      }
+    },
+    "security_core": {
+      "id": "security_core",
+      "displayName": "Core Security Perimeter: Spring Boot 3",
+      "tagline": "Resource Server, RBAC, Intrusion Detection & Approval Signatures",
+      "status": "operational",
+      "coordinates3D": { "x": 0, "y": 0.6, "z": -0.5 },
+      "accentColor": "#8EF0C0",
+      "cw1_security": {
+        "acp": "ACP-3: Spring Security Filter Chain & Method-Level PreAuthorize('hasRole(\"PARENT\")')",
+        "fw": "FW-1 & FW-2: Host Stateful Packet Filtering (UFW/Windows Firewall) & Application IDS Filter",
+        "enc": "ENC-3: AES-256-GCM (Database at-rest) + RSA-2048 (SHA256withRSA Digital Signatures)",
+        "vuln": "VULN-3: Privilege Escalation, SQL Injection, Approval Forgery & State Machine Tampering",
+        "algorithm": "AES-256-GCM (Cipher AES/GCM/NoPadding, 12-byte IV) + RSA-2048 (SHA256withRSA)",
+        "protocol": "OAuth 2.0 Resource Server (Supabase JWKS validation) + Strict CORS",
+        "system": "IntrusionDetectionFilter blocking SQLi/XSS, Spring Actuator health monitoring"
+      },
+      "implementationFiles": [
+        "com.centinel.finai.common.SecurityConfig.java",
+        "com.centinel.finai.security.AesEncryptionService.java",
+        "com.centinel.finai.security.RsaSignatureService.java",
+        "com.centinel.finai.security.IntrusionDetectionFilter.java"
+      ],
+      "metrics": {
+        "Auth Standard": "Supabase JWT Bearer (RS256 / ES256)",
+        "Data Encryption": "AES-256-GCM (128-bit Authentication Tag)",
+        "Digital Signature": "RSA-2048 (SHA256withRSA Parent Approval Tokens)",
+        "IDS Gate": "Regex SQLi/XSS Detection Filter (HTTP 403/429)"
+      },
+      "controls": [
+        { "name": "Stateless OAuth2 JWT Validation", "status": "operational", "desc": "Validates Supabase cryptographically signed public keys via JWKS." },
+        { "name": "ParentGuard Role Enforcement", "status": "operational", "desc": "Ensures children cannot approve purchase requests or modify family rosters." },
+        { "name": "AES-256-GCM Encryption at Rest", "status": "operational", "desc": "Encrypts sensitive raw transaction notes and account numbers before DB storage." },
+        { "name": "RSA-2048 Digital Signatures", "status": "operational", "desc": "Digitally signs approved purchase tokens so browser extension can verify parent authorization." }
+      ],
+      "dataFlow": {
+        "boundary": "Edge Gateway ➔ Spring Security Filter Chain ➔ Service Layer",
+        "inputs": "Bearer JWTs, Purchase Requests, Ingested Transactions",
+        "outputs": "Signed Approval Tokens, Verified Ledger Entries, Audited Events"
+      }
+    },
+    "ai_engine": {
+      "id": "ai_engine",
+      "displayName": "AI Privacy & Gemini Intelligence",
+      "tagline": "PII Masking Perimeter, Gemini 3.8 Flash & Spend Analytics",
+      "status": "operational",
+      "coordinates3D": { "x": -4.5, "y": 0.6, "z": 0.5 },
+      "accentColor": "#D9FF3F",
+      "cw1_security": {
+        "acp": "ACP-4: Google Cloud IAM & Restricted API Key Environment Isolation",
+        "fw": "FW-1: Outbound Egress TLS 1.3 Proxy with Strict Whitelisting to generativelanguage.googleapis.com",
+        "enc": "ENC-4: TLS 1.3 End-to-End Encryption to Google Vertex/Gemini API",
+        "vuln": "VULN-4: LLM Data Exfiltration, PII / Credit Card Leakage & Hallucinated Financial Figures",
+        "algorithm": "SensitiveDataMaskingService (Luhn PAN validation, Regex masking, Zero raw PII to LLM)",
+        "protocol": "HTTPS REST API with Ephemeral Bearer Headers / Google GenAI SDK",
+        "system": "Privacy Firewall: Masking executes in memory before any external network socket opens"
+      },
+      "implementationFiles": [
+        "com.centinel.finai.service.SensitiveDataMaskingService.java",
+        "com.centinel.finai.service.MerchantCategorizationService.java",
+        "com.centinel.finai.ai.GeminiCategorizationClient.java",
+        "com.centinel.finai.util.MaskingUtils.java"
+      ],
+      "metrics": {
+        "Active Model": "Google Gemini 3.8 Flash",
+        "Privacy Protection": "Regex + Luhn PAN Scrubbing (Zero Raw Cards to Cloud)",
+        "Classification Strategy": "Hybrid: O(1) Rule Matching ➔ Gemini AI Fallback",
+        "Safety Architecture": "Read-Only Grounded Tool Calling (No Direct DB Execution)"
+      },
+      "controls": [
+        { "name": "Luhn PAN Masking Service", "status": "operational", "desc": "Validates and strips 16-digit credit card numbers before any text leaves the server." },
+        { "name": "Tier 1 Rule-Based Categorizer", "status": "operational", "desc": "Instant deterministic lookup for known retail merchants without calling the cloud." },
+        { "name": "Gemini 3.8 Flash AI Fallback", "status": "operational", "desc": "Structured JSON categorization of unknown masked bank descriptions." }
+      ],
+      "dataFlow": {
+        "boundary": "Spring Boot Service Layer ➔ Google Gemini Cloud API",
+        "inputs": "Anonymized / Masked Bank Text, Filtered Aggregation Summaries",
+        "outputs": "Standardized Category Codes, Natural Language Spending Insights"
+      }
+    },
+    "ledger_db": {
+      "id": "ledger_db",
+      "displayName": "Data Vault: Supabase PostgreSQL Unit",
+      "tagline": "Single-Unit Relational Store, Encrypted Backups & Network Isolation",
+      "status": "operational",
+      "coordinates3D": { "x": 0, "y": 0.6, "z": -4.5 },
+      "accentColor": "#FFD64A",
+      "cw1_security": {
+        "acp": "ACP-5: PostgreSQL Dedicated Role Credentials, SSL Certificate Enforced Connection",
+        "fw": "FW-2: Internal Database Firewall (Blocks all external IPs, allows only Spring Boot VPC)",
+        "enc": "ENC-5: AES-256-GCM Field-Level Encryption at Rest + pg_dump AES-256 Backups",
+        "vuln": "VULN-5: SQL Injection (SQLi), Offline Backup Theft, Direct DB Port Scans & Unauthorized DDL",
+        "algorithm": "AES-256-GCM encrypted database dumps + SHA-256 backup manifest checksums",
+        "protocol": "PostgreSQL Wire Protocol over TLS 1.3 (sslmode=verify-full)",
+        "system": "Network Isolation (Supabase VPC Peering, No Public 5432 Exposure), Automated Backups"
+      },
+      "implementationFiles": [
+        "com.centinel.finai.entity.Transaction.java",
+        "com.centinel.finai.family.Family.java",
+        "com.centinel.finai.purchase.PurchaseRequest.java",
+        "security_ops/automated_encrypted_backup.py"
+      ],
+      "metrics": {
+        "Engine": "PostgreSQL 15+ (Hosted on Supabase)",
+        "Network Exposure": "Zero Public Ports (Internal VPC Access Only)",
+        "At-Rest Protection": "AES-256-GCM Sensitive Field Encryption",
+        "Backup Strategy": "3-2-1 Rule: Encrypted Dumps with SHA-256 Hash Signatures"
+      },
+      "controls": [
+        { "name": "Database Isolation Firewall (FW-2)", "status": "operational", "desc": "Restricts PostgreSQL port 5432 strictly to the Spring Boot application server IP." },
+        { "name": "PreparedStatement SQLi Immunity", "status": "operational", "desc": "Spring Data JPA parameterized queries prevent SQL injection completely." },
+        { "name": "Automated Encrypted Backups", "status": "operational", "desc": "Daily automated database snapshots encrypted with AES-256-GCM and verified with SHA-256." }
+      ],
+      "dataFlow": {
+        "boundary": "Spring Boot VPC Connection Pool ➔ Supabase Managed Database Vault",
+        "inputs": "Parameterized JPA Queries, Migration Scripts",
+        "outputs": "Encrypted Transaction Records, Audited Purchase States"
+      }
+    }
+  }
+}
