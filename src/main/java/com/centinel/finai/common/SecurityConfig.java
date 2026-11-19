@@ -60,6 +60,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/ingestion/**").permitAll()
+                .requestMatchers("/api/v1/security/**").permitAll()
                 .requestMatchers("/health", "/api/health", "/tasks/**").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/purchase-requests").hasAuthority("ROLE_CHILD")
