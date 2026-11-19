@@ -19,6 +19,8 @@ public class PurchaseRequestResponseDTO {
     private String category;
     private String note;
     private PurchaseRequestStatus status;
+    private String idempotencyHash;
+    private String rsaSignature;
     private LocalDateTime createdAt;
     private LocalDateTime decidedAt;
 
@@ -116,6 +118,22 @@ public class PurchaseRequestResponseDTO {
 
     public void setStatus(PurchaseRequestStatus status) {
         this.status = status;
+    }
+
+    public String getIdempotencyHash() {
+        return idempotencyHash;
+    }
+
+    public void setIdempotencyHash(String idempotencyHash) {
+        this.idempotencyHash = idempotencyHash;
+    }
+
+    public String getRsaSignature() {
+        return rsaSignature;
+    }
+
+    public void setRsaSignature(String rsaSignature) {
+        this.rsaSignature = rsaSignature;
     }
 
     public LocalDateTime getCreatedAt() {

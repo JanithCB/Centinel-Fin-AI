@@ -157,6 +157,8 @@ public class PurchaseRequestService {
         dto.setCategory(req.getCategory());
         dto.setNote(req.getNote());
         dto.setStatus(req.getStatus());
+        dto.setIdempotencyHash(req.getIdempotencyHash());
+        dto.setRsaSignature(req.getRsaSignature());
         dto.setCreatedAt(req.getCreatedAt());
         dto.setDecidedAt(req.getDecidedAt());
         return dto;

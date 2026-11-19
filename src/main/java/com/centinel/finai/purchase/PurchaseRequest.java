@@ -44,6 +44,12 @@ public class PurchaseRequest {
     @Column(name = "status", nullable = false)
     private PurchaseRequestStatus status = PurchaseRequestStatus.PENDING;
 
+    @Column(name = "idempotency_hash", length = 64)
+    private String idempotencyHash;
+
+    @Column(name = "rsa_signature", columnDefinition = "TEXT")
+    private String rsaSignature;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -121,6 +127,22 @@ public class PurchaseRequest {
 
     public void setStatus(PurchaseRequestStatus status) {
         this.status = status;
+    }
+
+    public String getIdempotencyHash() {
+        return idempotencyHash;
+    }
+
+    public void setIdempotencyHash(String idempotencyHash) {
+        this.idempotencyHash = idempotencyHash;
+    }
+
+    public String getRsaSignature() {
+        return rsaSignature;
+    }
+
+    public void setRsaSignature(String rsaSignature) {
+        this.rsaSignature = rsaSignature;
     }
 
     public LocalDateTime getCreatedAt() {
