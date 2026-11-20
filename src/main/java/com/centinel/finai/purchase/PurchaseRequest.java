@@ -101,24 +101,48 @@ public class PurchaseRequest {
         return siteDomain;
     }
 
+    public void setSiteDomain(String siteDomain) {
+        this.siteDomain = siteDomain;
+    }
+
     public String getItemName() {
         return itemName;
+    }
+
+    public void setItemName(String itemName) {
+        this.itemName = itemName;
     }
 
     public BigDecimal getAmount() {
         return amount;
     }
 
+    public void setAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
+
     public String getCurrency() {
         return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 
     public String getCategory() {
         return category;
     }
 
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
     public String getNote() {
         return note;
+    }
+
+    public void setNote(String note) {
+        this.note = note;
     }
 
     public PurchaseRequestStatus getStatus() {
