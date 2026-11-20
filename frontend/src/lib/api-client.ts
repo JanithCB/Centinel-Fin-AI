@@ -42,8 +42,17 @@ export interface PurchaseRequestDTO {
   category?: string;
   note?: string;
   status: 'PENDING' | 'APPROVED' | 'DENIED';
+  idempotencyHash?: string;
+  rsaSignature?: string;
   createdAt: string;
   decidedAt?: string;
+}
+
+export interface PublicKeyResponseDTO {
+  algorithm: string;
+  signatureAlgorithm: string;
+  publicKey: string;
+  publicKeyPem: string;
 }
 
 export interface CreatePurchaseRequestPayload {
@@ -152,5 +161,10 @@ export class ApiClient {
     return this.request<PurchaseRequestDTO>(`/purchase-requests/${requestId}/deny`, {
       method: 'POST',
     });
+  }
+
+  // Security & Cryptographic Discovery Endpoints
+  static async getPublicKey(): Promise<PublicKeyResponseDTO> {
+    return this.request<PublicKeyResponseDTO>('/security/public-key');
   }
 }

@@ -56,6 +56,13 @@ public class PurchaseRequest {
     @Column(name = "decided_at")
     private LocalDateTime decidedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+    }
+
     public PurchaseRequest() {
         this.createdAt = LocalDateTime.now();
     }
@@ -171,6 +178,10 @@ public class PurchaseRequest {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 
     public LocalDateTime getDecidedAt() {
