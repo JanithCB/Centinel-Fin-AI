@@ -1,0 +1,59 @@
+$kind: http-request
+url: "{{baseURL}}/api/v1/purchase-requests"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"siteDomain\": \"store.steampowered.com\",\r
+
+    \  \"itemName\": \"Cyberpunk 2077 Expansion Pack\",\r
+
+    \  \"amount\": 29.99,\r
+
+    \  \"currency\": \"USD\",\r
+
+    \  \"category\": \"GAMING\",\r
+
+    \  \"note\": \"Weekend gaming with friends\"\r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: "{{childToken}}"
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Status code is 201 Created\", function () {\r
+
+      \    pm.response.to.have.status(201);\r
+
+      });\r
+
+      \r
+
+      const res = pm.response.json();\r
+
+      pm.test(\"Contains 64-char SHA-256 idempotency hash and pending status\", function () {\r
+
+      \    pm.expect(res.status).to.eql(\"PENDING\");\r
+
+      \    pm.expect(res.idempotencyHash).to.be.a(\"string\").and.have.lengthOf(64);\r
+
+      \    pm.expect(res.rsaSignature).to.be.null;\r
+
+      });\r
+
+      \r
+
+      // Harvest requestId into environment\r
+
+      if (res.id) {\r
+
+      \    pm.environment.set(\"requestId\", res.id);\r
+
+      \    console.log(\"Harvested requestId:\", res.id);\r
+
+      }"
+    language: text/javascript
+order: 7000
