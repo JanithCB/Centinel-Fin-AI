@@ -1,0 +1,236 @@
+{
+  "info": {
+    "_postman_id": "c1f10001-centinel-fin-ai-m1-approval-flow",
+    "name": "Centinel Fin AI - Milestone 1 Cryptographic Approval Verification",
+    "description": "End-to-End API verification suite for Milestone 1 (PG-2 & PG-3, CW1 Task 1.c):\n1. RSA-2048 Public Key Retrieval\n2. Child Purchase Request Submission (SHA-256 Idempotency Hash)\n3. Duplicate Request Deduplication Verification\n4. RBAC Protection (Child blocked from approving - 403)\n5. Parent Cryptographic Approval & RSA-2048 Digital Signature Generation",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "childJwt",
+      "value": "REPLACE_WITH_CHILD_SUPABASE_JWT",
+      "type": "string"
+    },
+    {
+      "key": "parentJwt",
+      "value": "REPLACE_WITH_PARENT_SUPABASE_JWT",
+      "type": "string"
+    },
+    {
+      "key": "requestId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Public Key Discovery (RSA-2048)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/security/public-key",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "security", "public-key"]
+        },
+        "description": "Fulfills CW1 ENC-2 & Algorithm Security. Unauthenticated endpoint returning backend RSA-2048 public key for WebCrypto client verification."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Returns valid RSA-2048 and SHA256withRSA metadata', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.algorithm).to.eql('RSA-2048');",
+              "    pm.expect(jsonData.signatureAlgorithm).to.eql('SHA256withRSA');",
+              "    pm.expect(jsonData.publicKeyBase64).to.be.a('string').and.not.empty;",
+              "    pm.expect(jsonData.publicKeyPem).to.include('BEGIN PUBLIC KEY');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Child Submits Purchase Request",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{childJwt}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"siteDomain\": \"https://store.steampowered.com/app/1091500/Cyberpunk_2077/\",\n  \"itemName\": \"Cyberpunk 2077 Expansion Pack\",\n  \"amount\": 29.99,\n  \"currency\": \"USD\",\n  \"category\": \"GAMING\",\n  \"note\": \"Birthday gift request for the weekend\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase-requests",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase-requests"]
+        },
+        "description": "Child submits purchase request. Backend masks URL, computes SHA-256 idempotency hash, and stores request as PENDING."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Request is PENDING and has 64-char SHA-256 idempotency hash', function () {",
+              "    pm.expect(jsonData.status).to.eql('PENDING');",
+              "    pm.expect(jsonData.idempotencyHash).to.be.a('string').and.have.lengthOf(64);",
+              "    pm.expect(jsonData.rsaSignature).to.be.null;",
+              "});",
+              "if (jsonData.id) {",
+              "    pm.collectionVariables.set('requestId', jsonData.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Deduplication Check (Same Request Replayed)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{childJwt}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"siteDomain\": \"https://store.steampowered.com/app/1091500/Cyberpunk_2077/\",\n  \"itemName\": \"Cyberpunk 2077 Expansion Pack\",\n  \"amount\": 29.99,\n  \"currency\": \"USD\",\n  \"category\": \"GAMING\",\n  \"note\": \"Birthday gift request for the weekend\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase-requests",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase-requests"]
+        },
+        "description": "Verifies idempotency protection. When duplicate request is replayed, the existing pending request is returned without duplicating database records."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201 Created or 200 OK', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Deduplication returns the existing pending request ID', function () {",
+              "    var originalId = pm.collectionVariables.get('requestId');",
+              "    pm.expect(jsonData.id).to.eql(Number(originalId));",
+              "    pm.expect(jsonData.status).to.eql('PENDING');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. RBAC Check: Child Forbidden From Approving",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{childJwt}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase-requests/{{requestId}}/approve",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase-requests", "{{requestId}}", "approve"]
+        },
+        "description": "Enforces Role-Based Access Control (ACP-3). Child attempting to approve a request receives 403 Forbidden."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 403 Forbidden for ROLE_CHILD approval attempt', function () {",
+              "    pm.response.to.have.status(403);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Parent Approves & Generates RSA-2048 Signature",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{parentJwt}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase-requests/{{requestId}}/approve",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase-requests", "{{requestId}}", "approve"]
+        },
+        "description": "Parent approves request. Backend transitions status to APPROVED, records decided_at, and cryptographically signs canonical payload with RSA-2048."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Status is APPROVED and RSA-2048 signature is attached', function () {",
+              "    pm.expect(jsonData.status).to.eql('APPROVED');",
+              "    pm.expect(jsonData.decidedAt).to.not.be.null;",
+              "    pm.expect(jsonData.rsaSignature).to.be.a('string').and.not.empty;",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
