@@ -296,6 +296,32 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {/* PARENT APPROVALS QUEUE BANNER */}
+      {profile?.role === "PARENT" && profile.familyId && (
+        <div className="p-4 bg-sun/20 border-[3px] border-ink rounded-xl shadow-[4px_4px_0px_#151515] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-sun border-2 border-ink flex items-center justify-center shadow-[2px_2px_0px_#151515] shrink-0">
+              <span className="material-symbols-outlined text-ink text-xl">verified</span>
+            </div>
+            <div>
+              <h4 className="font-headline-sm font-bold text-ink uppercase text-sm">
+                Dedicated Parent Approvals Queue
+              </h4>
+              <p className="font-caption text-xs text-outline">
+                Filter by pending, review merchant domains, and issue RSA-2048 cryptographic signatures.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/dashboard/approvals"
+            className="px-4 py-2 bg-sun text-ink font-bold text-xs uppercase tracking-wider rounded border-2 border-ink shadow-[2px_2px_0px_#151515] hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center gap-1.5 shrink-0"
+          >
+            <span>Open Approvals Center</span>
+            <span className="material-symbols-outlined text-xs">arrow_forward</span>
+          </Link>
+        </div>
+      )}
+
       {/* STATE 1: Authenticated user without backend profile (AC-60, AC-95) */}
       {!profile && syncError && (
         <div className="bg-surface rounded-xl p-8 border-[3px] border-ink shadow-[6px_6px_0px_#151515] max-w-lg mx-auto flex flex-col gap-6 text-center">
@@ -542,13 +568,22 @@ export default function DashboardPage() {
                   <h3 className="font-headline-sm font-bold text-ink uppercase">Family Purchase Requests</h3>
                   <p className="font-caption text-xs text-outline">Review and approve items requested by children</p>
                 </div>
-                <button
-                  onClick={() => loadRequests("PARENT")}
-                  className="p-1.5 bg-surface border-2 border-ink rounded hover:bg-surface-container transition-colors"
-                  aria-label="Refresh requests"
-                >
-                  <span className="material-symbols-outlined text-sm">refresh</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/dashboard/approvals"
+                    className="px-2.5 py-1 bg-sun text-ink font-bold text-[11px] uppercase rounded border-2 border-ink shadow-[1px_1px_0px_#151515] hover:bg-sun/80 flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-xs">open_in_new</span>
+                    <span>Full Queue</span>
+                  </Link>
+                  <button
+                    onClick={() => loadRequests("PARENT")}
+                    className="p-1.5 bg-surface border-2 border-ink rounded hover:bg-surface-container transition-colors"
+                    aria-label="Refresh requests"
+                  >
+                    <span className="material-symbols-outlined text-sm">refresh</span>
+                  </button>
+                </div>
               </div>
 
               {loadingRequests ? (

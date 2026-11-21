@@ -19,6 +19,13 @@ export default function Header() {
         </div>
         <nav className="flex items-center gap-3 lg:gap-4">
           <Link
+            href="/dashboard/approvals"
+            className="font-label-md text-label-md uppercase tracking-wider px-3 py-2 bg-sun border-[2px] border-ink text-ink shadow-[3px_3px_0_#151515] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#151515] transition-all flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-sm">verified_user</span>
+            <span>Approvals</span>
+          </Link>
+          <Link
             href="/centinel_dev_log_3d.html"
             target="_blank"
             className="font-label-md text-label-md uppercase tracking-wider px-3 py-2 bg-mint border-[2px] border-ink text-ink shadow-[3px_3px_0_#151515] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#151515] transition-all flex items-center gap-1.5"
