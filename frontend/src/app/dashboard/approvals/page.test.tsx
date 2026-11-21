@@ -87,11 +87,18 @@ describe('ApprovalsPage Component', () => {
       expect(screen.getByText(/Parent Approvals Center/i)).toBeInTheDocument()
       expect(screen.getByText(/PG-4 SUPERVISOR/i)).toBeInTheDocument()
       expect(screen.getByText(/Hollow Knight Game/i)).toBeInTheDocument()
-      expect(screen.getByText(/store.steampowered.com/i)).toBeInTheDocument()
+      expect(screen.getByText('store.steampowered.com')).toBeInTheDocument()
       expect(screen.getByText(/Leo Turner/i)).toBeInTheDocument()
-      expect(screen.getByText(/\$14.99/i)).toBeInTheDocument()
+      expect(screen.getByText('$14.99')).toBeInTheDocument()
       expect(screen.getByText(/Completed all chores for the week/i)).toBeInTheDocument()
     })
+
+    const merchantLink = screen.getByRole('link', {
+      name: /Visit Merchant \(store\.steampowered\.com\)/i,
+    })
+    expect(merchantLink).toHaveAttribute('href', 'https://store.steampowered.com')
+    expect(merchantLink).toHaveAttribute('target', '_blank')
+    expect(merchantLink).toHaveAttribute('rel', 'noopener noreferrer')
   })
 
   it('allows parent to approve a pending request and receive RSA signature', async () => {

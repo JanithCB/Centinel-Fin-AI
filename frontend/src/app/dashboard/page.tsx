@@ -2,9 +2,23 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { ApiClient, UserProfile, PurchaseRequestDTO, FamilyMemberDTO } from "@/lib/api-client";
+import {
+  ApiClient,
+  UserProfile,
+  PurchaseRequestDTO,
+  FamilyMemberDTO,
+  PublicKeyResponseDTO,
+} from "@/lib/api-client";
+import AddChildModal from "@/components/AddChildModal";
+import CryptographicProofModal from "@/components/CryptographicProofModal";
+import PurchaseRequestCard from "@/components/PurchaseRequestCard";
+import {
+  buildSafeMerchantUrl,
+  formatCurrencyAmount,
+  getDisplayDomain,
+} from "@/lib/format-utils";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -21,7 +35,8 @@ export default function DashboardPage() {
   const [isCreatingFamily, setIsCreatingFamily] = useState<boolean>(false);
   const [familyError, setFamilyError] = useState<string | null>(null);
 
-  // Add child state (Parent with family)
+  // Add child modal & form state (Parent with family)
+  const [isAddChildModalOpen, setIsAddChildModalOpen] = useState<boolean>(false);
   const [childUserIdInput, setChildUserIdInput] = useState<string>("");
   const [isAddingChild, setIsAddingChild] = useState<boolean>(false);
   const [addChildMessage, setAddChildMessage] = useState<string | null>(null);
@@ -31,16 +46,25 @@ export default function DashboardPage() {
   const [familyMembers, setFamilyMembers] = useState<FamilyMemberDTO[]>([]);
   const [loadingMembers, setLoadingMembers] = useState<boolean>(false);
 
-  // Purchase requests state
+  // Purchase requests state & parent mission control filters
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequestDTO[]>([]);
   const [loadingRequests, setLoadingRequests] = useState<boolean>(false);
+  const [filter, setFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "DENIED">("ALL");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  // Cryptographic Proof Modal state
+  const [selectedProofRequest, setSelectedProofRequest] = useState<PurchaseRequestDTO | null>(null);
+  const [publicKeyData, setPublicKeyData] = useState<PublicKeyResponseDTO | null>(null);
 
   // Create purchase request form state (Child)
   const [siteDomain, setSiteDomain] = useState<string>("");
   const [itemName, setItemName] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
-  const [currency, setCurrency] = useState<string>("USD");
-  const [category, setCategory] = useState<string>("EDUCATION");
+  const [currency] = useState<string>("USD");
+  const [category] = useState<string>("EDUCATION");
   const [note, setNote] = useState<string>("");
   const [isSubmittingRequest, setIsSubmittingRequest] = useState<boolean>(false);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -111,9 +135,21 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const loadPublicKey = useCallback(async () => {
+    try {
+      if (typeof ApiClient.getPublicKey === "function") {
+        const keyInfo = await ApiClient.getPublicKey();
+        setPublicKeyData(keyInfo);
+      }
+    } catch (err) {
+      console.warn("Could not fetch RSA public key:", err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchProfile();
-  }, [fetchProfile]);
+    loadPublicKey();
+  }, [fetchProfile, loadPublicKey]);
 
   useEffect(() => {
     if (profile && profile.familyId) {
@@ -179,7 +215,7 @@ export default function DashboardPage() {
 
     try {
       await ApiClient.addFamilyMember(profile.familyId, childId);
-      setAddChildMessage(`Successfully added child (ID #${childId}) to your family!`);
+      setAddChildMessage(`Successfully added child (ID #${childId}) to your family.`);
       setChildUserIdInput("");
       await loadFamilyMembers(profile.familyId);
       await loadRequests(profile.role);
@@ -191,20 +227,40 @@ export default function DashboardPage() {
   };
 
   const handleApproveRequest = async (requestId: number) => {
+    setActionLoadingId(requestId);
+    setActionError(null);
+    setActionSuccess(null);
+
     try {
-      await ApiClient.approvePurchaseRequest(requestId);
-      if (profile) loadRequests(profile.role);
+      const updated = await ApiClient.approvePurchaseRequest(requestId);
+      setPurchaseRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, ...updated, status: "APPROVED" } : r))
+      );
+      setActionSuccess(
+        `Request #${requestId} approved. Cryptographic RSA-2048 signature generated.`
+      );
     } catch (err: any) {
-      alert(err?.message || "Failed to approve request.");
+      setActionError(err?.message || "Failed to approve request.");
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
   const handleDenyRequest = async (requestId: number) => {
+    setActionLoadingId(requestId);
+    setActionError(null);
+    setActionSuccess(null);
+
     try {
-      await ApiClient.denyPurchaseRequest(requestId);
-      if (profile) loadRequests(profile.role);
+      const updated = await ApiClient.denyPurchaseRequest(requestId);
+      setPurchaseRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, ...updated, status: "DENIED" } : r))
+      );
+      setActionSuccess(`Request #${requestId} was denied.`);
     } catch (err: any) {
-      alert(err?.message || "Failed to deny request.");
+      setActionError(err?.message || "Failed to deny request.");
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -231,7 +287,7 @@ export default function DashboardPage() {
         note: note.trim() || undefined,
       });
 
-      setRequestSuccess("Purchase request submitted for parent approval!");
+      setRequestSuccess("Purchase request submitted for parent approval.");
       setSiteDomain("");
       setItemName("");
       setAmount("");
@@ -243,6 +299,71 @@ export default function DashboardPage() {
       setIsSubmittingRequest(false);
     }
   };
+
+  const linkedChildrenCount = useMemo(
+    () => familyMembers.filter((m) => m.role === "CHILD").length,
+    [familyMembers]
+  );
+
+  const requestStats = useMemo(() => {
+    const pendingReqs = purchaseRequests.filter((r) => r.status === "PENDING");
+    const approvedReqs = purchaseRequests.filter((r) => r.status === "APPROVED");
+    const deniedReqs = purchaseRequests.filter((r) => r.status === "DENIED");
+
+    const pendingTotal = pendingReqs.reduce(
+      (sum, r) => sum + (Number.isFinite(Number(r.amount)) ? Number(r.amount) : 0),
+      0
+    );
+    const approvedTotal = approvedReqs.reduce(
+      (sum, r) => sum + (Number.isFinite(Number(r.amount)) ? Number(r.amount) : 0),
+      0
+    );
+
+    const primaryCurrency = (
+      pendingReqs[0]?.currency ||
+      purchaseRequests[0]?.currency ||
+      "USD"
+    ).toUpperCase();
+
+    return {
+      pendingCount: pendingReqs.length,
+      approvedCount: approvedReqs.length,
+      deniedCount: deniedReqs.length,
+      totalCount: purchaseRequests.length,
+      pendingTotal,
+      approvedTotal,
+      primaryCurrency,
+    };
+  }, [purchaseRequests]);
+
+  const filteredSortedRequests = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    const statusOrder: Record<PurchaseRequestDTO["status"], number> = {
+      PENDING: 0,
+      APPROVED: 1,
+      DENIED: 2,
+    };
+
+    return purchaseRequests
+      .filter((r) => {
+        const matchesFilter = filter === "ALL" ? true : r.status === filter;
+        const matchesSearch =
+          !q ||
+          r.itemName.toLowerCase().includes(q) ||
+          r.siteDomain.toLowerCase().includes(q) ||
+          (r.childName && r.childName.toLowerCase().includes(q)) ||
+          (r.category && r.category.toLowerCase().includes(q)) ||
+          (r.note && r.note.toLowerCase().includes(q));
+        return matchesFilter && matchesSearch;
+      })
+      .sort((a, b) => {
+        const rankDiff = statusOrder[a.status] - statusOrder[b.status];
+        if (rankDiff !== 0) return rankDiff;
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+  }, [purchaseRequests, filter, searchQuery]);
 
   if (loading) {
     return (
@@ -256,7 +377,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col w-full max-w-6xl mx-auto p-4 sm:p-6 space-y-8">
+    <div className="flex flex-col w-full max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
       {/* Top Header / Status Bar */}
       <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-surface rounded-xl border-[3px] border-ink shadow-[4px_4px_0px_#151515]">
         <div className="flex items-center gap-3 flex-wrap">
@@ -295,32 +416,6 @@ export default function DashboardPage() {
           </button>
         </div>
       </header>
-
-      {/* PARENT APPROVALS QUEUE BANNER */}
-      {profile?.role === "PARENT" && profile.familyId && (
-        <div className="p-4 bg-sun/20 border-[3px] border-ink rounded-xl shadow-[4px_4px_0px_#151515] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-sun border-2 border-ink flex items-center justify-center shadow-[2px_2px_0px_#151515] shrink-0">
-              <span className="material-symbols-outlined text-ink text-xl">verified</span>
-            </div>
-            <div>
-              <h4 className="font-headline-sm font-bold text-ink uppercase text-sm">
-                Dedicated Parent Approvals Queue
-              </h4>
-              <p className="font-caption text-xs text-outline">
-                Filter by pending, review merchant domains, and issue RSA-2048 cryptographic signatures.
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/dashboard/approvals"
-            className="px-4 py-2 bg-sun text-ink font-bold text-xs uppercase tracking-wider rounded border-2 border-ink shadow-[2px_2px_0px_#151515] hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center gap-1.5 shrink-0"
-          >
-            <span>Open Approvals Center</span>
-            <span className="material-symbols-outlined text-xs">arrow_forward</span>
-          </Link>
-        </div>
-      )}
 
       {/* STATE 1: Authenticated user without backend profile (AC-60, AC-95) */}
       {!profile && syncError && (
@@ -470,189 +565,287 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* STATE 4: Parent with a family (AC-53, AC-54) */}
+      {/* STATE 4: Parent with a family (Full-Width Parent Mission Control) */}
       {profile && profile.role === "PARENT" && profile.familyId && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Family Management */}
-          <div className="lg:col-span-1 flex flex-col gap-6">
-            <div className="bg-surface rounded-xl p-6 border-[3px] border-ink shadow-[4px_4px_0px_#151515] flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b-2 border-ink pb-3">
-                <h3 className="font-headline-sm font-bold text-ink uppercase">Family Members</h3>
-                <span className="material-symbols-outlined text-ink">group</span>
+        <div className="flex flex-col gap-6">
+          {/* Pending Decision Spend Tally & Family Controls Card */}
+          <section className="p-5 bg-sun/20 border-[3px] border-ink rounded-xl shadow-[4px_4px_0px_#151515] flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
+              <div className="w-12 h-12 rounded-xl bg-sun border-2 border-ink flex items-center justify-center shadow-[2px_2px_0px_#151515] shrink-0">
+                <span className="material-symbols-outlined text-ink text-2xl">
+                  account_balance_wallet
+                </span>
               </div>
 
-              {addChildError && (
-                <div className="p-2.5 bg-danger/10 border-2 border-danger rounded text-danger text-xs">
-                  {addChildError}
-                </div>
-              )}
-
-              {addChildMessage && (
-                <div className="p-2.5 bg-mint/40 border-2 border-ink rounded text-ink text-xs font-bold">
-                  {addChildMessage}
-                </div>
-              )}
-
-              <form onSubmit={handleAddChild} className="flex flex-col gap-3">
-                <label htmlFor="child-id" className="font-label-sm text-ink font-bold uppercase">
-                  Add Child by User ID
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    id="child-id"
-                    type="number"
-                    required
-                    value={childUserIdInput}
-                    onChange={(e) => setChildUserIdInput(e.target.value)}
-                    placeholder="Child ID (e.g. 2)"
-                    className="w-full px-3 py-2 bg-surface border-2 border-ink rounded font-mono text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary shadow-[2px_2px_0px_#151515]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isAddingChild || !childUserIdInput.trim()}
-                    className="px-4 py-2 bg-primary text-ink font-bold uppercase text-xs rounded border-2 border-ink shadow-[2px_2px_0px_#151515] shrink-0 disabled:opacity-50"
-                  >
-                    {isAddingChild ? "Adding..." : "Add"}
-                  </button>
+              <div className="flex flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="font-headline-sm font-bold text-ink uppercase text-base sm:text-lg">
+                    {requestStats.pendingCount} Pending Request
+                    {requestStats.pendingCount === 1 ? "" : "s"} Requiring Authorization
+                  </h2>
+                  <span className="px-2.5 py-0.5 bg-surface border-2 border-ink rounded font-mono text-xs font-bold text-ink shadow-[1px_1px_0px_#151515]">
+                    Pending Cost:{" "}
+                    {formatCurrencyAmount(
+                      requestStats.pendingTotal,
+                      requestStats.primaryCurrency
+                    )}{" "}
+                    {requestStats.primaryCurrency}
+                  </span>
                 </div>
                 <p className="font-caption text-xs text-outline">
-                  Enter the numeric ID displayed on the child&apos;s waiting screen.
+                  Approved Spend Total:{" "}
+                  <strong className="text-ink font-mono">
+                    {formatCurrencyAmount(
+                      requestStats.approvedTotal,
+                      requestStats.primaryCurrency
+                    )}{" "}
+                    {requestStats.primaryCurrency}
+                  </strong>{" "}
+                  across {requestStats.approvedCount} authorized purchase
+                  {requestStats.approvedCount === 1 ? "" : "s"}. Clicking Approve generates a tamper-proof RSA-2048 signature.
                 </p>
-              </form>
+              </div>
+            </div>
 
-              {/* Linked Children Roster */}
-              <div className="border-t-2 border-ink pt-3 flex flex-col gap-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-label-sm font-bold text-ink uppercase text-[11px]">
-                    Linked Children ({familyMembers.filter(m => m.role === "CHILD").length})
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsAddChildModalOpen(true)}
+                className="px-3.5 py-2 bg-surface text-ink font-bold text-xs uppercase tracking-wider rounded border-2 border-ink shadow-[2px_2px_0px_#151515] hover:bg-surface-container hover:translate-x-[1px] hover:translate-y-[1px] transition-all inline-flex items-center gap-2 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">group</span>
+                <span>Manage Children ({linkedChildrenCount})</span>
+                <span className="material-symbols-outlined text-sm text-outline">person_add</span>
+              </button>
+
+              <Link
+                href="/dashboard/approvals"
+                className="px-4 py-2 bg-sun text-ink font-bold text-xs uppercase tracking-wider rounded border-2 border-ink shadow-[2px_2px_0px_#151515] hover:translate-x-[1px] hover:translate-y-[1px] transition-all inline-flex items-center gap-1.5"
+              >
+                <span>Open Approvals Center</span>
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </Link>
+            </div>
+          </section>
+
+          {/* Action Feedback Alerts */}
+          {actionSuccess && (
+            <div className="p-3 bg-mint/40 border-[2px] border-ink rounded-lg text-ink font-bold text-xs flex items-center justify-between shadow-[2px_2px_0px_#151515]">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-ink text-base">check_circle</span>
+                <span>{actionSuccess}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActionSuccess(null)}
+                aria-label="Dismiss success notice"
+                className="text-ink hover:opacity-75 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+          )}
+
+          {actionError && (
+            <div className="p-3 bg-danger/10 border-[2px] border-danger rounded-lg text-danger font-bold text-xs flex items-center justify-between shadow-[2px_2px_0px_#151515]">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-danger text-base">error</span>
+                <span>{actionError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActionError(null)}
+                aria-label="Dismiss error notice"
+                className="text-danger hover:opacity-75 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+          )}
+
+          {/* Full-Width Family Purchase Requests Feed */}
+          <section className="bg-surface rounded-xl p-5 sm:p-6 border-[3px] border-ink shadow-[4px_4px_0px_#151515] flex flex-col gap-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-ink pb-4">
+              <div>
+                <h3 className="font-headline-sm font-bold text-ink uppercase text-lg">
+                  Family Purchase Requests
+                </h3>
+                <p className="font-caption text-xs text-outline">
+                  Inspect merchant links, child notes, and exact purchase totals before authorizing.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/dashboard/approvals"
+                  className="px-3 py-1.5 bg-paper text-ink font-bold text-xs uppercase rounded border-2 border-ink shadow-[2px_2px_0px_#151515] hover:bg-surface-container inline-flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-sm">open_in_new</span>
+                  <span>Full Queue</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => loadRequests("PARENT")}
+                  disabled={loadingRequests}
+                  className="p-2 bg-surface border-2 border-ink rounded hover:bg-surface-container transition-colors disabled:opacity-50 cursor-pointer"
+                  aria-label="Refresh requests"
+                >
+                  <span
+                    className={`material-symbols-outlined text-sm ${
+                      loadingRequests ? "animate-spin" : ""
+                    }`}
+                  >
+                    refresh
                   </span>
-                  {loadingMembers && <span className="font-mono text-[10px] text-outline">Refreshing...</span>}
-                </div>
+                </button>
+              </div>
+            </div>
 
-                {familyMembers.filter(m => m.role === "CHILD").length === 0 ? (
-                  <p className="font-caption text-xs text-outline italic py-2 text-center bg-surface-container/40 rounded border border-dashed border-outline/40">
-                    No children linked yet. Enter their Child ID above to link them.
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {familyMembers.filter(m => m.role === "CHILD").map((member) => (
-                      <div
-                        key={member.id}
-                        className="p-2.5 bg-surface-container/60 rounded border-2 border-ink shadow-[2px_2px_0px_#151515] flex items-center justify-between gap-2"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-7 h-7 rounded-full bg-sun border border-ink flex items-center justify-center font-bold text-xs shrink-0 text-ink">
-                            {(member.displayName || member.email).charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-body-sm font-bold text-xs text-ink truncate">{member.displayName}</span>
-                            <span className="font-caption text-[10px] text-outline truncate">{member.email}</span>
-                          </div>
-                        </div>
-                        <span className="px-1.5 py-0.5 bg-surface border border-ink rounded font-mono text-[10px] font-bold text-ink shrink-0">
-                          ID: {member.userId}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+            {/* Filter Tabs & Search Bar */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+                <button
+                  type="button"
+                  onClick={() => setFilter("ALL")}
+                  className={`px-3 py-1.5 rounded-lg border-2 border-ink text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                    filter === "ALL"
+                      ? "bg-primary text-ink shadow-[2px_2px_0px_#151515]"
+                      : "bg-surface hover:bg-surface-container text-outline"
+                  }`}
+                >
+                  <span>All</span>
+                  <span className="px-1.5 py-0.2 bg-ink text-paper rounded-full text-[10px] font-mono font-bold">
+                    {requestStats.totalCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFilter("PENDING")}
+                  className={`px-3 py-1.5 rounded-lg border-2 border-ink text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                    filter === "PENDING"
+                      ? "bg-sun text-ink shadow-[2px_2px_0px_#151515]"
+                      : "bg-surface hover:bg-surface-container text-outline"
+                  }`}
+                >
+                  <span>Pending Review</span>
+                  <span className="px-1.5 py-0.2 bg-ink text-paper rounded-full text-[10px] font-mono font-bold">
+                    {requestStats.pendingCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFilter("APPROVED")}
+                  className={`px-3 py-1.5 rounded-lg border-2 border-ink text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                    filter === "APPROVED"
+                      ? "bg-mint text-ink shadow-[2px_2px_0px_#151515]"
+                      : "bg-surface hover:bg-surface-container text-outline"
+                  }`}
+                >
+                  <span>Approved</span>
+                  <span className="px-1.5 py-0.2 bg-ink text-paper rounded-full text-[10px] font-mono font-bold">
+                    {requestStats.approvedCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFilter("DENIED")}
+                  className={`px-3 py-1.5 rounded-lg border-2 border-ink text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                    filter === "DENIED"
+                      ? "bg-coral text-ink shadow-[2px_2px_0px_#151515]"
+                      : "bg-surface hover:bg-surface-container text-outline"
+                  }`}
+                >
+                  <span>Denied</span>
+                  <span className="px-1.5 py-0.2 bg-ink text-paper rounded-full text-[10px] font-mono font-bold">
+                    {requestStats.deniedCount}
+                  </span>
+                </button>
+              </div>
+
+              <div className="relative min-w-[240px]">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm pointer-events-none">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search domain, item, child..."
+                  className="w-full pl-9 pr-8 py-1.5 bg-paper border-2 border-ink rounded-lg font-body-sm text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    aria-label="Clear search query"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-outline hover:text-ink cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-xs">close</span>
+                  </button>
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Right Column: Family Purchase Requests Feed */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            <div className="bg-surface rounded-xl p-6 border-[3px] border-ink shadow-[4px_4px_0px_#151515] flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b-2 border-ink pb-3">
-                <div>
-                  <h3 className="font-headline-sm font-bold text-ink uppercase">Family Purchase Requests</h3>
-                  <p className="font-caption text-xs text-outline">Review and approve items requested by children</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link
-                    href="/dashboard/approvals"
-                    className="px-2.5 py-1 bg-sun text-ink font-bold text-[11px] uppercase rounded border-2 border-ink shadow-[1px_1px_0px_#151515] hover:bg-sun/80 flex items-center gap-1"
-                  >
-                    <span className="material-symbols-outlined text-xs">open_in_new</span>
-                    <span>Full Queue</span>
-                  </Link>
-                  <button
-                    onClick={() => loadRequests("PARENT")}
-                    className="p-1.5 bg-surface border-2 border-ink rounded hover:bg-surface-container transition-colors"
-                    aria-label="Refresh requests"
-                  >
-                    <span className="material-symbols-outlined text-sm">refresh</span>
-                  </button>
-                </div>
+            {loadingRequests ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3">
+                <div className="w-8 h-8 border-4 border-ink border-t-primary rounded-full animate-spin"></div>
+                <p className="font-mono text-xs uppercase text-outline">Loading requests...</p>
               </div>
+            ) : filteredSortedRequests.length === 0 ? (
+              <div className="text-center py-12 bg-surface-container/50 rounded-xl border-2 border-dashed border-outline/50 px-4">
+                <span className="material-symbols-outlined text-4xl text-outline mb-2">
+                  shopping_bag
+                </span>
+                <p className="font-body-sm text-ink font-bold">
+                  {purchaseRequests.length === 0
+                    ? "No purchase requests yet"
+                    : `No ${filter === "ALL" ? "" : filter.toLowerCase() + " "}purchase requests match your filters`}
+                </p>
+                <p className="font-caption text-xs text-outline mt-1">
+                  {purchaseRequests.length === 0
+                    ? "Requests from linked children will appear here with clickable store verification links."
+                    : "Adjust your filter tabs or search query to inspect other requests."}
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {filteredSortedRequests.map((req) => (
+                  <PurchaseRequestCard
+                    key={req.id}
+                    request={req}
+                    isProcessing={actionLoadingId === req.id}
+                    onApprove={handleApproveRequest}
+                    onDeny={handleDenyRequest}
+                    onInspectProof={setSelectedProofRequest}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
 
-              {loadingRequests ? (
-                <p className="text-center py-6 font-mono text-xs text-outline">Loading requests...</p>
-              ) : purchaseRequests.length === 0 ? (
-                <div className="text-center py-10 bg-surface-container/50 rounded-lg border-2 border-dashed border-outline/50">
-                  <span className="material-symbols-outlined text-4xl text-outline mb-2">shopping_bag</span>
-                  <p className="font-body-sm text-ink font-bold">No purchase requests yet</p>
-                  <p className="font-caption text-xs text-outline mt-1">Requests from linked children will appear here.</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {purchaseRequests.map((req) => (
-                    <div
-                      key={req.id}
-                      className="p-4 bg-surface rounded-lg border-2 border-ink shadow-[2px_2px_0px_#151515] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                    >
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-headline-sm font-bold text-ink">{req.itemName}</span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                            req.status === "APPROVED"
-                              ? "bg-mint text-ink border-ink"
-                              : req.status === "DENIED"
-                              ? "bg-coral text-ink border-ink"
-                              : "bg-sun text-ink border-ink"
-                          }`}>
-                            {req.status}
-                          </span>
-                        </div>
-                        <p className="font-caption text-xs text-outline">
-                          Store: <strong className="text-ink">{req.siteDomain}</strong> | Category: {req.category || "General"}
-                        </p>
-                        <div className="flex items-center gap-1.5 text-xs text-outline">
-                          <span>Requested by:</span>
-                          <span className="font-bold text-ink bg-surface-container px-1.5 py-0.5 rounded border border-ink/30 text-[11px]">
-                            {req.childName || `Child #${req.childId}`}
-                          </span>
-                        </div>
-                        {req.note && <p className="font-body-sm text-xs text-ink/80 italic">&quot;{req.note}&quot;</p>}
-                      </div>
+          {/* Add Child & Family Roster Modal */}
+          <AddChildModal
+            isOpen={isAddChildModalOpen}
+            onClose={() => setIsAddChildModalOpen(false)}
+            familyName={profile.familyName}
+            familyMembers={familyMembers}
+            loadingMembers={loadingMembers}
+            childUserIdInput={childUserIdInput}
+            onChildUserIdChange={setChildUserIdInput}
+            onAddChild={handleAddChild}
+            isAddingChild={isAddingChild}
+            addChildError={addChildError}
+            addChildMessage={addChildMessage}
+          />
 
-                      <div className="flex items-center gap-3 self-end sm:self-center">
-                        <span className="font-mono font-bold text-base text-ink">
-                          ${req.amount.toFixed(2)}
-                        </span>
-                        {req.status === "PENDING" && (
-                          <div className="flex gap-1.5">
-                            <button
-                              onClick={() => handleApproveRequest(req.id)}
-                              className="px-3 py-1 bg-mint text-ink font-bold text-xs rounded border border-ink shadow-[1px_1px_0px_#151515] hover:brightness-105 active:translate-x-[1px]"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleDenyRequest(req.id)}
-                              className="px-3 py-1 bg-coral text-ink font-bold text-xs rounded border border-ink shadow-[1px_1px_0px_#151515] hover:brightness-105 active:translate-x-[1px]"
-                            >
-                              Deny
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Cryptographic Proof Modal */}
+          <CryptographicProofModal
+            request={selectedProofRequest}
+            publicKeyData={publicKeyData}
+            onClose={() => setSelectedProofRequest(null)}
+          />
         </div>
       )}
 
@@ -778,8 +971,8 @@ export default function DashboardPage() {
                       key={req.id}
                       className="p-4 bg-surface rounded-lg border-2 border-ink shadow-[2px_2px_0px_#151515] flex items-center justify-between gap-4"
                     >
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-headline-sm font-bold text-ink">{req.itemName}</span>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
                             req.status === "APPROVED"
@@ -791,14 +984,28 @@ export default function DashboardPage() {
                             {req.status}
                           </span>
                         </div>
-                        <p className="font-caption text-xs text-outline">
-                          Store: <strong className="text-ink">{req.siteDomain}</strong>
-                        </p>
+                        <div className="font-caption text-xs text-outline flex items-center gap-1.5">
+                          <span>Store:</span>
+                          <a
+                            href={buildSafeMerchantUrl(req.siteDomain)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-bold text-ink hover:underline inline-flex items-center gap-1"
+                          >
+                            <span>{getDisplayDomain(req.siteDomain)}</span>
+                            <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                          </a>
+                        </div>
                       </div>
 
-                      <span className="font-mono font-bold text-base text-ink">
-                        ${req.amount.toFixed(2)}
-                      </span>
+                      <div className="flex flex-col items-end shrink-0">
+                        <span className="font-mono font-bold text-base text-ink">
+                          {formatCurrencyAmount(req.amount, req.currency)}
+                        </span>
+                        <span className="font-mono text-[10px] text-outline uppercase">
+                          {(req.currency || "USD").toUpperCase()}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
