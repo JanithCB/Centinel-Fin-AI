@@ -28,6 +28,13 @@
     else if (/\bGBP\b|£/i.test(text)) currency = "GBP";
     else if (/\bCAD\b|CDN\$/i.test(text)) currency = "CAD";
     else if (/\bAUD\b|A\$/i.test(text)) currency = "AUD";
+    else if (/\bJPY\b|¥/i.test(text)) currency = "JPY";
+    else if (/\bINR\b|₹/i.test(text)) currency = "INR";
+    else if (/\bBRL\b|R\$/i.test(text)) currency = "BRL";
+    else if (/\bNZD\b|NZ\$/i.test(text)) currency = "NZD";
+    else if (/\bCHF\b/i.test(text)) currency = "CHF";
+    else if (/\bPLN\b|zł/i.test(text)) currency = "PLN";
+    else if (/\bSEK\b|\bkr\b/i.test(text)) currency = "SEK";
     else if (/\bUSD\b|\$/i.test(text)) currency = "USD";
 
     // Match decimal price like 8.99 or 12,99

@@ -6,7 +6,8 @@
  * - Authenticate child via Supabase Auth
  * - Auto-detect active browser tab (domain, URL, title)
  * - Extract all purchase options, editions, and bundles with live prices from the store DOM
- * - Auto-populate title, price, currency, category, and discount context when user selects an option
+ * - Auto-populate title, price, currency, category, and discount context
+ * - Tamper-Proof Security: Locks amount & currency to the authoritative store values
  * - Submit purchase requests with SHA-256 idempotency hashes to Spring Boot
  * - Fetch and display submitted requests with live parent approval statuses
  */
@@ -22,7 +23,14 @@ const CURRENCY_SYMBOLS = {
   EUR: "\u20AC",
   GBP: "\u00A3",
   CAD: "$",
-  AUD: "$"
+  AUD: "$",
+  JPY: "\u00A5",
+  INR: "\u20B9",
+  BRL: "R$",
+  NZD: "$",
+  CHF: "CHF",
+  PLN: "z\u0142",
+  SEK: "kr"
 };
 
 // State
@@ -69,9 +77,12 @@ const discountContextText = document.getElementById("discountContextText");
 
 const purchaseForm = document.getElementById("purchaseForm");
 const itemNameInput = document.getElementById("itemNameInput");
+const titleLockStatus = document.getElementById("titleLockStatus");
 const amountInput = document.getElementById("amountInput");
+const amountLockStatus = document.getElementById("amountLockStatus");
 const currencyPrefixSymbol = document.getElementById("currencyPrefixSymbol");
 const currencySelect = document.getElementById("currencySelect");
+const currencyLockStatus = document.getElementById("currencyLockStatus");
 const categorySelect = document.getElementById("categorySelect");
 const reasonInput = document.getElementById("reasonInput");
 const submitRequestBtn = document.getElementById("submitRequestBtn");
@@ -154,6 +165,7 @@ async function detectActiveTab(forceRescan = false) {
       detectedUrlDisplay.textContent = "Active tab is not a web store. Manual entry active.";
       optionsCountBadge.classList.add("hidden");
       productOptionGroup.classList.add("hidden");
+      enableManualInputs();
       return;
     }
 
@@ -187,6 +199,7 @@ async function detectActiveTab(forceRescan = false) {
       currentTabInfo.detectedOptions = [];
       optionsCountBadge.classList.add("hidden");
       productOptionGroup.classList.add("hidden");
+      enableManualInputs();
 
       if (extraction && extraction.defaultCategory) {
         categorySelect.value = extraction.defaultCategory;
@@ -200,19 +213,16 @@ async function detectActiveTab(forceRescan = false) {
     console.error("[Centinel Fin AI] Failed to read active tab:", err);
     detectedDomainDisplay.textContent = "store.steampowered.com";
     detectedUrlDisplay.textContent = "https://store.steampowered.com";
+    enableManualInputs();
   }
 }
 
 /**
  * Communicates with content.js in the active tab to extract products/bundles.
- * If content.js is not loaded yet (e.g. tab was opened prior to extension reload),
- * injects content.js dynamically via chrome.scripting.executeScript so the user
- * does not even need to refresh the page!
  */
 async function scrapeProductsFromTab(tabId) {
   if (!tabId) return null;
 
-  // Attempt 1: Ask already-injected content.js
   try {
     const response = await chrome.tabs.sendMessage(tabId, { type: "EXTRACT_PAGE_PRODUCTS" });
     if (response && response.success && response.data) {
@@ -222,7 +232,6 @@ async function scrapeProductsFromTab(tabId) {
     // Content script not running in this tab yet; proceed to Attempt 2
   }
 
-  // Attempt 2: Inject content.js dynamically via chrome.scripting and call extractor
   try {
     if (chrome.scripting) {
       await chrome.scripting.executeScript({
@@ -252,7 +261,8 @@ async function scrapeProductsFromTab(tabId) {
 }
 
 /**
- * Populate the Smart Option / Bundle Selector Dropdown and auto-fill the first option
+ * Populate the Smart Option / Bundle Selector Dropdown and auto-fill the first option.
+ * Compacts dropdown labels to prevent browser layout blowout.
  */
 function renderProductOptionsDropdown(options) {
   const count = options.length;
@@ -266,12 +276,13 @@ function renderProductOptionsDropdown(options) {
     const optionEl = document.createElement("option");
     optionEl.value = String(index);
 
-    const symbol = CURRENCY_SYMBOLS[opt.currency] || "$";
-    const priceStr = `${symbol}${opt.amount.toFixed(2)} ${opt.currency}`;
+    const symbol = CURRENCY_SYMBOLS[opt.currency] || (opt.currency + " ");
+    const priceStr = `${symbol}${opt.amount.toFixed(2)}`;
     const discountStr = opt.discountPct ? ` (${opt.discountPct})` : "";
 
-    // Truncate long titles inside dropdown label while keeping full title on selection
-    const shortTitle = opt.title.length > 38 ? opt.title.substring(0, 36) + "..." : opt.title;
+    // Keep option label compact so Chromium doesn't blow out the popup menu width
+    const maxTitleLen = 22;
+    const shortTitle = opt.title.length > maxTitleLen ? opt.title.substring(0, maxTitleLen - 2) + ".." : opt.title;
     optionEl.textContent = `[${opt.kind}] ${shortTitle} \u2014 ${priceStr}${discountStr}`;
     productOptionSelect.appendChild(optionEl);
   });
@@ -279,7 +290,7 @@ function renderProductOptionsDropdown(options) {
   // Add manual custom option at the bottom
   const manualOptionEl = document.createElement("option");
   manualOptionEl.value = "MANUAL";
-  manualOptionEl.textContent = "[MANUAL] Custom / Enter Title & Price Manually...";
+  manualOptionEl.textContent = "[MANUAL] Custom / Enter Title & Price...";
   productOptionSelect.appendChild(manualOptionEl);
 
   // Auto-select the first detected game/bundle option
@@ -288,11 +299,12 @@ function renderProductOptionsDropdown(options) {
 }
 
 /**
- * Auto-populate Item Title, Amount, Currency, Category, and Discount bar
+ * Auto-populate and lock Title, Amount, Currency, and Category
  * when the child chooses a game or bundle from the dropdown.
  */
 function applySelectedOption(selectedValue) {
   if (selectedValue === "MANUAL") {
+    enableManualInputs();
     priceVerifiedTag.textContent = "MANUAL ENTRY";
     selectedOptionDiscountBar.classList.add("hidden");
     itemNameInput.focus();
@@ -305,14 +317,42 @@ function applySelectedOption(selectedValue) {
 
   priceVerifiedTag.textContent = "LIVE STORE PRICE";
 
-  // Auto-fill exact product / bundle title
+  // Lock Item Title to detected product
   itemNameInput.value = opt.title;
+  itemNameInput.readOnly = true;
+  itemNameInput.classList.add("neo-input-locked");
+  if (titleLockStatus) {
+    titleLockStatus.textContent = "[ VERIFIED ]";
+    titleLockStatus.className = "locked-badge";
+  }
 
-  // Auto-fill exact price & currency
+  // Lock Amount to detected store price (tamper-proof!)
   amountInput.value = opt.amount.toFixed(2);
-  if (["USD", "EUR", "GBP", "CAD", "AUD"].includes(opt.currency)) {
-    currencySelect.value = opt.currency;
-    updateCurrencySymbol(opt.currency);
+  amountInput.readOnly = true;
+  amountInput.classList.add("neo-input-locked");
+  if (amountLockStatus) {
+    amountLockStatus.textContent = "[ STORE LOCKED ]";
+    amountLockStatus.className = "locked-badge";
+  }
+
+  // Detect and Lock Currency to detected store currency
+  if (opt.currency) {
+    const cur = opt.currency.toUpperCase();
+    if (!currencySelect.querySelector(`option[value="${cur}"]`)) {
+      const optEl = document.createElement("option");
+      optEl.value = cur;
+      const sym = CURRENCY_SYMBOLS[cur] || cur;
+      optEl.textContent = `${cur} (${sym})`;
+      currencySelect.appendChild(optEl);
+    }
+    currencySelect.value = cur;
+    updateCurrencySymbol(cur);
+  }
+  currencySelect.disabled = true;
+  currencySelect.classList.add("neo-select-locked");
+  if (currencyLockStatus) {
+    currencyLockStatus.textContent = "[ STORE ]";
+    currencyLockStatus.className = "locked-badge";
   }
 
   // Auto-fill category
@@ -329,6 +369,29 @@ function applySelectedOption(selectedValue) {
     selectedOptionDiscountBar.classList.remove("hidden");
   } else {
     selectedOptionDiscountBar.classList.add("hidden");
+  }
+}
+
+function enableManualInputs() {
+  itemNameInput.readOnly = false;
+  itemNameInput.classList.remove("neo-input-locked");
+  if (titleLockStatus) {
+    titleLockStatus.textContent = "[ MANUAL ]";
+    titleLockStatus.className = "locked-badge manual";
+  }
+
+  amountInput.readOnly = false;
+  amountInput.classList.remove("neo-input-locked");
+  if (amountLockStatus) {
+    amountLockStatus.textContent = "[ MANUAL ]";
+    amountLockStatus.className = "locked-badge manual";
+  }
+
+  currencySelect.disabled = false;
+  currencySelect.classList.remove("neo-select-locked");
+  if (currencyLockStatus) {
+    currencyLockStatus.textContent = "[ MANUAL ]";
+    currencyLockStatus.className = "locked-badge manual";
   }
 }
 
@@ -460,8 +523,6 @@ async function handlePurchaseSubmit(e) {
   submitRequestBtn.textContent = "SUBMITTING TO PARENT...";
 
   try {
-    // Send full store URL if on a real http(s) product page so the parent's
-    // "Visit Merchant" button opens the exact game/bundle page!
     const siteTarget =
       currentTabInfo.url && currentTabInfo.url.startsWith("http")
         ? currentTabInfo.url
