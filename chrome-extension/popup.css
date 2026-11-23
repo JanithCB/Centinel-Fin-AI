@@ -731,3 +731,30 @@ body::-webkit-scrollbar-thumb {
 .hidden {
   display: none !important;
 }
+
+.crypto-proof-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #F8FAFC;
+  border: 1px dashed var(--ink);
+  padding: 3px 6px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.crypto-proof-row.verified {
+  background-color: #DCFCE7;
+  border-style: solid;
+  border-color: #166534;
+  color: #166534;
+}
+
+.crypto-proof-row.invalid {
+  background-color: var(--red-light);
+  border-style: solid;
+  border-color: #991B1B;
+  color: #991B1B;
+}
+

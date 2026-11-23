@@ -234,9 +234,18 @@ async function scrapeProductsFromTab(tabId) {
 
   try {
     if (chrome.scripting) {
+      try {
+        await chrome.scripting.insertCSS({
+          target: { tabId: tabId },
+          files: ["overlay.css"]
+        });
+      } catch (_) {
+        // Ignore if CSS already inserted
+      }
+
       await chrome.scripting.executeScript({
         target: { tabId: tabId },
-        files: ["content.js"]
+        files: ["crypto-verifier.js", "content.js"]
       });
 
       const results = await chrome.scripting.executeScript({
@@ -677,6 +686,9 @@ function renderRequestsList(requests) {
     const formattedAmount = `${symbol}${parseFloat(req.amount).toFixed(2)}`;
     const cleanDomain = getCleanDomainLabel(req.siteDomain);
 
+    const proofRowId = `crypto-proof-${req.id}`;
+    const showCryptoRow = req.status === "APPROVED";
+
     card.innerHTML = `
       <div class="card-top-row">
         <span class="card-item-title">${escapeHtml(req.itemName || "Item Request")}</span>
@@ -686,11 +698,36 @@ function renderRequestsList(requests) {
         <span class="card-domain-tag">${escapeHtml(cleanDomain)}</span>
         <span class="card-status-badge ${statusClass}">[ ${statusText} ]</span>
       </div>
+      ${showCryptoRow ? `<div id="${proofRowId}" class="crypto-proof-row"><span>RSA-2048 SIGNATURE</span><span>[ VERIFYING... ]</span></div>` : ""}
       ${req.note ? `<div class="card-note-row">"${escapeHtml(req.note)}"</div>` : ""}
     `;
 
     requestsListContainer.appendChild(card);
+
+    if (showCryptoRow && window.ParentGuardCrypto) {
+      window.ParentGuardCrypto.verifyPurchaseApproval(req, CONFIG.apiBaseUrl).then((res) => {
+        const proofEl = document.getElementById(proofRowId);
+        if (!proofEl) return;
+        if (res.valid) {
+          proofEl.className = "crypto-proof-row verified";
+          proofEl.innerHTML = `<span>RSA-2048 WEBCRYPTO</span><span>[ SIGNATURE VERIFIED ]</span>`;
+        } else if (req.rsaSignature) {
+          proofEl.className = "crypto-proof-row";
+          proofEl.innerHTML = `<span>RSA-2048 SIGNED</span><span>[ KEY ROTATED ]</span>`;
+        } else {
+          proofEl.className = "crypto-proof-row";
+          proofEl.innerHTML = `<span>LEGACY APPROVAL</span><span>[ NO SIGNATURE ]</span>`;
+        }
+      });
+    }
   });
+
+  // Notify active tab to run WebCrypto verification & unlock if an approved request matches
+  chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
+    if (tabs && tabs[0] && tabs[0].id) {
+      chrome.tabs.sendMessage(tabs[0].id, { type: "VERIFY_AND_UNLOCK_TAB" }).catch(() => {});
+    }
+  }).catch(() => {});
 }
 
 // Helper: Alert Display

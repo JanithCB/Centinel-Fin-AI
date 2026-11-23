@@ -162,7 +162,10 @@ public class PurchaseRequestService {
             throw new IllegalStateException("Request is already processed");
         }
 
-        LocalDateTime decidedAt = LocalDateTime.now();
+        LocalDateTime decidedAt = LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        if ((decidedAt.getNano() / 1000) % 10 == 0) {
+            decidedAt = decidedAt.plusNanos(1000);
+        }
         request.setStatus(newStatus);
         request.setDecidedAt(decidedAt);
 

@@ -5,7 +5,7 @@
  * Responsibilities:
  * - Coordinates state between extension popup and content scripts
  * - Persists authentication tokens and configuration in chrome.storage.local
- * - Relays authenticated API requests to Spring Boot backend (http://localhost:8080)
+ * - Relays API requests to Spring Boot backend (http://localhost:8080) to avoid HTTPS->HTTP mixed-content blocks on external stores
  */
 
 const DEFAULT_CONFIG = {
@@ -16,8 +16,7 @@ const DEFAULT_CONFIG = {
 // Lifecycle: Installation and setup
 chrome.runtime.onInstalled.addListener(async (details) => {
   console.log("[Centinel Fin AI] Extension installed. Reason:", details.reason);
-  
-  // Initialize storage defaults if not already set
+
   const current = await chrome.storage.local.get(["apiBaseUrl", "childToken"]);
   if (!current.apiBaseUrl) {
     await chrome.storage.local.set({ apiBaseUrl: DEFAULT_CONFIG.apiBaseUrl });
@@ -27,7 +26,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 // Message listener for popup and content script communication
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("[Centinel Fin AI] Received background message:", message.type);
+  if (!message || !message.type) return false;
 
   if (message.type === "PING") {
     sendResponse({ status: "OK", timestamp: Date.now() });
@@ -42,7 +41,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         childEmail: data.childEmail || null
       });
     });
-    return true; // Keep channel open for async response
+    return true;
   }
 
   if (message.type === "SET_AUTH") {
@@ -61,6 +60,51 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.storage.local.remove(["childToken", "childEmail"]).then(() => {
       sendResponse({ success: true });
     });
+    return true;
+  }
+
+  // Relay: Fetch RSA-2048 Public Key from Spring Boot backend
+  if (message.type === "FETCH_PUBLIC_KEY") {
+    (async () => {
+      try {
+        const res = await fetch(`${DEFAULT_CONFIG.apiBaseUrl}/api/v1/security/public-key`);
+        if (!res.ok) {
+          throw new Error(`Public key fetch failed (HTTP ${res.status})`);
+        }
+        const data = await res.json();
+        sendResponse({ success: true, data });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  // Relay: Fetch Child's Purchase Requests from Spring Boot backend
+  if (message.type === "FETCH_MY_REQUESTS") {
+    (async () => {
+      try {
+        const stored = await chrome.storage.local.get(["childToken"]);
+        if (!stored.childToken) {
+          sendResponse({ success: false, error: "NOT_AUTHENTICATED" });
+          return;
+        }
+        const res = await fetch(`${DEFAULT_CONFIG.apiBaseUrl}/api/v1/purchase-requests/me`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${stored.childToken}`
+          }
+        });
+        if (!res.ok) {
+          sendResponse({ success: false, status: res.status, error: `HTTP ${res.status}` });
+          return;
+        }
+        const requests = await res.json();
+        sendResponse({ success: true, data: requests });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
     return true;
   }
 
