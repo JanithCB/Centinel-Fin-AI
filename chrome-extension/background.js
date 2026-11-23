@@ -13,15 +13,62 @@ const DEFAULT_CONFIG = {
   version: "1.0.0"
 };
 
+// Helper: Ensure content script and CSS are injected into a tab
+async function ensureContentScriptInTab(tabId, url) {
+  if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) return;
+
+  try {
+    const ping = await chrome.tabs.sendMessage(tabId, { type: "PING" }).catch(() => null);
+    if (ping && (ping.status === "PONG" || ping.status === "OK")) {
+      // Content script is already active in this tab
+      return;
+    }
+
+    await chrome.scripting.insertCSS({
+      target: { tabId },
+      files: ["overlay.css"]
+    }).catch(() => {});
+
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["crypto-verifier.js", "content.js"]
+    });
+    console.log("[Centinel Fin AI] Auto-injected ParentGuard into tab:", tabId, url);
+  } catch (err) {
+    // Tab closed or restricted internal page (e.g. chrome://)
+  }
+}
+
 // Lifecycle: Installation and setup
 chrome.runtime.onInstalled.addListener(async (details) => {
-  console.log("[Centinel Fin AI] Extension installed. Reason:", details.reason);
+  console.log("[Centinel Fin AI] Extension installed/reloaded. Reason:", details.reason);
 
   const current = await chrome.storage.local.get(["apiBaseUrl", "childToken"]);
   if (!current.apiBaseUrl) {
     await chrome.storage.local.set({ apiBaseUrl: DEFAULT_CONFIG.apiBaseUrl });
   }
   console.log("[Centinel Fin AI] Service worker initialized with API:", current.apiBaseUrl || DEFAULT_CONFIG.apiBaseUrl);
+
+  // Proactive auto-injection into all existing open web tabs upon installation or developer reload
+  try {
+    const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+    for (const tab of tabs) {
+      if (tab.id && tab.url) {
+        ensureContentScriptInTab(tab.id, tab.url);
+      }
+    }
+  } catch (err) {
+    console.debug("[Centinel Fin AI] Auto-injection on install skipped:", err);
+  }
+});
+
+// Tab Navigation / URL Update listener: Auto-injects whenever a web page navigates or completes loading
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === "complete" || changeInfo.url) {
+    if (tab && tab.url && (tab.url.startsWith("http://") || tab.url.startsWith("https://"))) {
+      ensureContentScriptInTab(tabId, tab.url);
+    }
+  }
 });
 
 // Message listener for popup and content script communication

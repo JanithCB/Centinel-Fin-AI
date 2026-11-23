@@ -362,7 +362,13 @@
 
   window.__PARENTGUARD_EXTRACT_PRODUCTS__ = extractPageProducts;
 
-  if (window.__PARENTGUARD_CONTENT_INITIALIZED__) return;
+  if (window.__PARENTGUARD_CONTENT_INITIALIZED__) {
+    // If already initialized on this tab, rescan immediately (e.g. after SPA navigation or URL update)
+    if (typeof scanPage === "function") {
+      scanPage();
+    }
+    return;
+  }
   window.__PARENTGUARD_CONTENT_INITIALIZED__ = true;
 
   console.log("[Centinel Fin AI] ParentGuard Dual-Stage Cart & Checkout Guard active on:", window.location.hostname);
@@ -379,6 +385,11 @@
     // Stage 2: Cart & Checkout Finalization
     /continue\s*to\s*payment/i,
     /proceed\s*to\s*checkout/i,
+    /continue\s*to\s*checkout/i,
+    /proceed\s*to\s*payment/i,
+    /purchase\s*for\s*myself/i,
+    /purchase\s*as\s*a\s*gift/i,
+    /^checkout(\s*now)?$/i,
     /pay\s*now/i,
     /place\s*order/i,
     /complete\s*purchase/i,
@@ -778,6 +789,29 @@
     }
   }
 
+  // SPA Navigation / HTML5 History API listeners (handles client-side store page changes, e.g. Steam /cart, Amazon)
+  window.addEventListener("popstate", scheduleScan);
+  try {
+    const origPushState = history.pushState;
+    if (origPushState) {
+      history.pushState = function () {
+        const result = origPushState.apply(this, arguments);
+        scheduleScan();
+        return result;
+      };
+    }
+    const origReplaceState = history.replaceState;
+    if (origReplaceState) {
+      history.replaceState = function () {
+        const result = origReplaceState.apply(this, arguments);
+        scheduleScan();
+        return result;
+      };
+    }
+  } catch (_) {
+    // Ignore restricted contexts
+  }
+
   // Periodic background poll every 5 seconds while locked buttons exist on screen
   setInterval(() => {
     if (interceptedButtons.size > 0) {
@@ -787,6 +821,11 @@
 
   // Communication Channel
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "PING") {
+      sendResponse({ status: "PONG" });
+      return false;
+    }
+
     if (message.type === "EXTRACT_PAGE_PRODUCTS") {
       try {
         const extractionResult = extractPageProducts();
