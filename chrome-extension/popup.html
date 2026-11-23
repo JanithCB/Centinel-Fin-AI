@@ -2,39 +2,164 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Centinel Fin AI – ParentGuard</title>
-  <style>
-    body {
-      width: 360px;
-      margin: 0;
-      padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #FFFDF7;
-      color: #151515;
-    }
-    .header {
-      border-bottom: 2px solid #151515;
-      padding-bottom: 8px;
-      margin-bottom: 12px;
-      font-weight: 800;
-      text-transform: uppercase;
-      font-size: 13px;
-      letter-spacing: 0.05em;
-    }
-    .notice {
-      background: #FFFFFF;
-      border: 2px solid #151515;
-      box-shadow: 2px 2px 0px #151515;
-      padding: 12px;
-      font-size: 12px;
-    }
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="header">Centinel Fin AI // ParentGuard</div>
-  <div class="notice">
-    <strong>Task 3.1 Initialized</strong>
-    <p>Extension Manifest V3 and background worker active.</p>
-  </div>
+  <!-- Brand Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-badge">C</div>
+      <div class="brand-text">
+        <h1 class="brand-title">CENTINEL FIN AI</h1>
+        <span class="brand-sub">PARENTGUARD // EXTENSION</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-indicator">
+        <span class="pulse-dot"></span>
+        <span class="status-text">ONLINE</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Auth State Panel -->
+  <section id="authSection" class="auth-card">
+    <div id="loggedOutView" class="auth-view">
+      <div class="section-title-bar">
+        <span class="section-tag">AUTH</span>
+        <span class="section-name">CHILD SESSION LOGIN</span>
+      </div>
+      <p class="auth-hint">Sign in with your registered child account to submit purchase requests.</p>
+      <form id="loginForm" class="auth-form">
+        <div class="form-group">
+          <label for="loginEmail" class="form-label">EMAIL ADDRESS</label>
+          <input type="email" id="loginEmail" class="neo-input" value="child.test@example.com" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="loginPassword" class="form-label">PASSWORD</label>
+          <input type="password" id="loginPassword" class="neo-input" value="Password123!" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="loginSubmitBtn" class="neo-btn neo-btn-primary full-width">
+          SIGN IN AS CHILD &rarr;
+        </button>
+      </form>
+      <div id="loginErrorMsg" class="alert-box alert-error hidden"></div>
+    </div>
+
+    <div id="loggedInView" class="auth-view hidden">
+      <div class="user-chip-bar">
+        <div class="user-chip">
+          <span class="role-badge">CHILD</span>
+          <span id="userEmailDisplay" class="user-email-text">child.test@example.com</span>
+        </div>
+        <button id="logoutBtn" class="neo-btn-sm neo-btn-ghost" title="Sign out of child session">SIGN OUT</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Navigation Tabs (Only visible when logged in) -->
+  <nav id="appNav" class="nav-tabs hidden">
+    <button id="tabNewRequest" class="tab-btn active" data-tab="newRequestView">
+      NEW REQUEST
+    </button>
+    <button id="tabMyRequests" class="tab-btn" data-tab="myRequestsView">
+      MY REQUESTS <span id="requestCountBadge" class="count-badge">0</span>
+    </button>
+  </nav>
+
+  <!-- Tab 1: New Purchase Request Form -->
+  <main id="newRequestView" class="tab-content hidden">
+    <!-- Active Tab Auto-Detection Card -->
+    <div class="detection-card">
+      <div class="card-header-sm">
+        <span class="tag-label">DETECTED MERCHANT</span>
+        <button id="refreshTabBtn" class="refresh-btn" title="Refresh current tab information">RE-DETECT</button>
+      </div>
+      <div class="store-info-row">
+        <span class="store-domain-pill" id="detectedDomainDisplay">Detecting active tab...</span>
+      </div>
+      <div class="store-url-row" id="detectedUrlDisplay">
+        Reading current browser tab...
+      </div>
+    </div>
+
+    <!-- Purchase Request Form -->
+    <form id="purchaseForm" class="request-form">
+      <div class="form-group">
+        <label for="itemNameInput" class="form-label">ITEM / GAME / PRODUCT TITLE *</label>
+        <input type="text" id="itemNameInput" class="neo-input" placeholder="e.g. Roblox 1000 Robux Pack" required>
+      </div>
+
+      <div class="form-row-split">
+        <div class="form-group flex-1">
+          <label for="amountInput" class="form-label">AMOUNT *</label>
+          <div class="amount-input-wrap">
+            <span class="currency-prefix">$</span>
+            <input type="number" id="amountInput" class="neo-input amount-field" placeholder="19.99" step="0.01" min="0.01" required>
+          </div>
+        </div>
+        <div class="form-group w-30">
+          <label for="currencySelect" class="form-label">CURRENCY</label>
+          <select id="currencySelect" class="neo-select">
+            <option value="USD" selected>USD ($)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="CAD">CAD ($)</option>
+            <option value="AUD">AUD ($)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="categorySelect" class="form-label">CATEGORY</label>
+        <select id="categorySelect" class="neo-select">
+          <option value="GAMING" selected>GAMING</option>
+          <option value="ENTERTAINMENT">ENTERTAINMENT</option>
+          <option value="SHOPPING">SHOPPING / RETAIL</option>
+          <option value="EDUCATION">EDUCATION / SOFTWARE</option>
+          <option value="OTHER">OTHER</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="reasonInput" class="form-label">NOTE FOR PARENT (WHY DO YOU NEED THIS?) *</label>
+        <textarea id="reasonInput" class="neo-textarea" rows="2" placeholder="e.g. Weekend gaming session with my friends from school." required></textarea>
+      </div>
+
+      <div id="submissionAlert" class="alert-box hidden"></div>
+
+      <button type="submit" id="submitRequestBtn" class="neo-btn neo-btn-primary full-width action-btn">
+        [ SEND TO PARENT FOR APPROVAL ]
+      </button>
+    </form>
+  </main>
+
+  <!-- Tab 2: My Requests List View -->
+  <section id="myRequestsView" class="tab-content hidden">
+    <div class="list-controls-bar">
+      <span class="list-title">MY SUBMITTED REQUESTS</span>
+      <button id="refreshRequestsBtn" class="neo-btn-sm neo-btn-secondary">REFRESH</button>
+    </div>
+
+    <div id="requestsListContainer" class="requests-list">
+      <!-- Cards rendered dynamically by popup.js -->
+      <div class="empty-state">
+        <span class="empty-title">NO REQUESTS YET</span>
+        <span class="empty-sub">When you submit requests on game or store pages, they will appear here.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-row">
+      <span class="footer-tag">CW2 ALGORITHM</span>
+      <span class="footer-meta">RSA-2048 CRYPTOGRAPHIC APPROVAL</span>
+    </div>
+  </footer>
+
+  <script src="popup.js"></script>
 </body>
 </html>

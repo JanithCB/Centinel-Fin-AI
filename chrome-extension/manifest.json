@@ -28,7 +28,8 @@
   ],
   "host_permissions": [
     "http://localhost:8080/*",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://*.supabase.co/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self';"
