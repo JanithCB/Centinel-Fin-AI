@@ -104,17 +104,28 @@ export default function PurchaseRequestCard({
 
       {/* Clickable Merchant Verification Strip */}
       <div className="p-3 bg-paper rounded-lg border-2 border-ink/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <div className="w-8 h-8 rounded bg-sky/40 border-2 border-ink flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-base text-ink">storefront</span>
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="font-mono font-bold text-xs text-ink truncate">
-              {displayDomain || request.siteDomain}
-            </span>
-            <span className="font-caption text-[11px] text-outline">
-              Verify site legitimacy before authorizing payment
-            </span>
+          <div className="flex flex-col min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-bold text-xs text-ink truncate">
+                {displayDomain || request.siteDomain}
+              </span>
+              <span className="font-caption text-[10px] text-outline hidden sm:inline">
+                &bull; Verify site legitimacy before authorizing payment
+              </span>
+            </div>
+            <a
+              href={merchantUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-[11px] text-primary hover:underline truncate"
+              title={merchantUrl}
+            >
+              {merchantUrl}
+            </a>
           </div>
         </div>
 

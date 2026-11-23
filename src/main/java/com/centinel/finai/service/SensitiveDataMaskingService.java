@@ -59,25 +59,31 @@ public class SensitiveDataMaskingService {
     }
 
     /**
-     * Extracts the domain from a URL to minimize data collection.
-     * For example, "https://www.amazon.com/dp/12345?ref=xyz" becomes "amazon.com"
+     * Sanitizes a merchant URL by stripping query parameters, user credentials, and fragments
+     * while preserving the clean merchant domain and product path for parent verification.
      *
-     * @param url the full URL
-     * @return the base domain
+     * @param url the full URL or domain
+     * @return the sanitized product URL or base domain
      */
     public String maskUrl(String url) {
         if (url == null || url.trim().isEmpty()) {
             return null;
         }
         try {
-            String domain = url.trim();
-            if (!domain.startsWith("http://") && !domain.startsWith("https://")) {
-                domain = "http://" + domain;
-            }
-            java.net.URI uri = new java.net.URI(domain);
+            String trimmed = url.trim();
+            boolean hadScheme = trimmed.startsWith("http://") || trimmed.startsWith("https://");
+            String parseTarget = hadScheme ? trimmed : "https://" + trimmed;
+            java.net.URI uri = new java.net.URI(parseTarget);
             String host = uri.getHost();
             if (host != null) {
-                return host.replaceFirst("^www\\.", "");
+                String cleanHost = host.replaceFirst("^www\\.", "");
+                String path = uri.getRawPath();
+                if (path != null && !path.isEmpty() && !path.equals("/")) {
+                    String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase() : "https";
+                    String cleanFullUrl = scheme + "://" + cleanHost + path;
+                    return cleanFullUrl.length() <= 255 ? cleanFullUrl : cleanHost;
+                }
+                return cleanHost;
             }
         } catch (java.net.URISyntaxException e) {
             // fallback
