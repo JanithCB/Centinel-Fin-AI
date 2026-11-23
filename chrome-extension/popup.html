@@ -75,10 +75,11 @@
     <div class="detection-card">
       <div class="card-header-sm">
         <span class="tag-label">DETECTED MERCHANT</span>
-        <button id="refreshTabBtn" class="refresh-btn" title="Refresh current tab information">RE-DETECT</button>
+        <button id="refreshTabBtn" class="refresh-btn" title="Re-scan current page for products and bundles">RE-DETECT</button>
       </div>
       <div class="store-info-row">
         <span class="store-domain-pill" id="detectedDomainDisplay">Detecting active tab...</span>
+        <span class="options-count-pill hidden" id="optionsCountBadge">0 OPTIONS</span>
       </div>
       <div class="store-url-row" id="detectedUrlDisplay">
         Reading current browser tab...
@@ -87,6 +88,21 @@
 
     <!-- Purchase Request Form -->
     <form id="purchaseForm" class="request-form">
+      <!-- Smart Detected Game / Bundle Selector -->
+      <div id="productOptionGroup" class="form-group option-selector-card hidden">
+        <div class="label-row-between">
+          <label for="productOptionSelect" class="form-label mb-0">SELECT GAME / BUNDLE OPTION *</label>
+          <span id="priceVerifiedTag" class="verified-price-tag">LIVE STORE PRICE</span>
+        </div>
+        <select id="productOptionSelect" class="neo-select neo-select-highlight">
+          <!-- Options dynamically populated from store DOM -->
+        </select>
+        <div id="selectedOptionDiscountBar" class="discount-callout-bar hidden">
+          <span id="discountPctBadge" class="discount-pct-pill">-30%</span>
+          <span id="discountContextText" class="discount-context-text">Special Deal (Original: $12.98 USD)</span>
+        </div>
+      </div>
+
       <div class="form-group">
         <label for="itemNameInput" class="form-label">ITEM / GAME / PRODUCT TITLE *</label>
         <input type="text" id="itemNameInput" class="neo-input" placeholder="e.g. Roblox 1000 Robux Pack" required>
@@ -96,7 +112,7 @@
         <div class="form-group flex-1">
           <label for="amountInput" class="form-label">AMOUNT *</label>
           <div class="amount-input-wrap">
-            <span class="currency-prefix">$</span>
+            <span id="currencyPrefixSymbol" class="currency-prefix">$</span>
             <input type="number" id="amountInput" class="neo-input amount-field" placeholder="19.99" step="0.01" min="0.01" required>
           </div>
         </div>
@@ -104,8 +120,8 @@
           <label for="currencySelect" class="form-label">CURRENCY</label>
           <select id="currencySelect" class="neo-select">
             <option value="USD" selected>USD ($)</option>
-            <option value="EUR">EUR (€)</option>
-            <option value="GBP">GBP (£)</option>
+            <option value="EUR">EUR (&euro;)</option>
+            <option value="GBP">GBP (&pound;)</option>
             <option value="CAD">CAD ($)</option>
             <option value="AUD">AUD ($)</option>
           </select>

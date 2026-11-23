@@ -1,9 +1,10 @@
 /**
  * Centinel Fin AI – ParentGuard
- * Content Script: Checkout Detection & DOM Overlay Lock
+ * Content Script: Checkout Detection, DOM Overlay Lock & Multi-Option Product Scraper
  *
  * Responsibilities:
  * - Detects checkout pages via URL patterns and DOM heuristics
+ * - Extracts all available purchase options, editions, and bundles (with prices & discounts)
  * - Intercepts "Pay Now", "Place Order", and checkout action buttons
  * - Injects the Neo-Brutalist [ PARENTGUARD: APPROVAL REQUIRED ] barrier
  * - Observes DOM mutations for dynamically rendered SPAs (e.g. Steam, Roblox, Amazon)
@@ -13,7 +14,336 @@
 (function () {
   "use strict";
 
-  // Prevent multiple injections
+  // Helper: Parse a raw price text (e.g. "$8.99 USD", "€14,99", "£19.99") into { amount, currency, formatted }
+  function parsePriceText(rawText) {
+    if (!rawText || typeof rawText !== "string") return null;
+    const text = rawText.replace(/\s+/g, " ").trim();
+
+    if (/free/i.test(text) && !/\d/.test(text)) {
+      return null;
+    }
+
+    let currency = "USD";
+    if (/\bEUR\b|€/i.test(text)) currency = "EUR";
+    else if (/\bGBP\b|£/i.test(text)) currency = "GBP";
+    else if (/\bCAD\b|CDN\$/i.test(text)) currency = "CAD";
+    else if (/\bAUD\b|A\$/i.test(text)) currency = "AUD";
+    else if (/\bUSD\b|\$/i.test(text)) currency = "USD";
+
+    // Match decimal price like 8.99 or 12,99
+    const priceMatch = text.match(/(\d{1,5}(?:[.,]\d{2}))/);
+    if (!priceMatch) return null;
+
+    const normalizedNum = parseFloat(priceMatch[1].replace(",", "."));
+    if (isNaN(normalizedNum) || normalizedNum <= 0) return null;
+
+    return {
+      amount: normalizedNum,
+      currency: currency,
+      raw: text
+    };
+  }
+
+  // Helper: Detect default merchant category from hostname
+  function inferMerchantCategory(hostname) {
+    const h = (hostname || "").toLowerCase();
+    if (
+      h.includes("steampowered") ||
+      h.includes("steamcommunity") ||
+      h.includes("roblox") ||
+      h.includes("epicgames") ||
+      h.includes("playstation") ||
+      h.includes("xbox") ||
+      h.includes("nintendo") ||
+      h.includes("gog.com") ||
+      h.includes("itch.io")
+    ) {
+      return "GAMING";
+    }
+    if (
+      h.includes("netflix") ||
+      h.includes("spotify") ||
+      h.includes("twitch") ||
+      h.includes("youtube") ||
+      h.includes("disney")
+    ) {
+      return "ENTERTAINMENT";
+    }
+    if (
+      h.includes("udemy") ||
+      h.includes("coursera") ||
+      h.includes("edx") ||
+      h.includes("khanacademy")
+    ) {
+      return "EDUCATION";
+    }
+    return "SHOPPING";
+  }
+
+  /**
+   * Multi-Tier DOM Product, Edition & Bundle Extractor
+   * Extracts all buyable options and their exact live prices from the active page.
+   */
+  function extractPageProducts() {
+    const hostname = window.location.hostname || "";
+    const options = [];
+    const seenKeys = new Set();
+
+    function addOption(item) {
+      if (!item || !item.title || typeof item.amount !== "number" || isNaN(item.amount) || item.amount <= 0) {
+        return;
+      }
+      const cleanTitle = item.title.replace(/\s+/g, " ").trim();
+      if (!cleanTitle) return;
+
+      const dedupeKey = `${cleanTitle.toLowerCase()}|${item.amount.toFixed(2)}`;
+      if (seenKeys.has(dedupeKey)) return;
+      seenKeys.add(dedupeKey);
+
+      options.push({
+        id: `opt_${options.length + 1}`,
+        kind: item.kind || "PRODUCT",
+        title: cleanTitle,
+        amount: Number(item.amount.toFixed(2)),
+        currency: item.currency || "USD",
+        discountPct: item.discountPct || null,
+        originalPrice: item.originalPrice || null,
+        category: item.category || inferMerchantCategory(hostname)
+      });
+    }
+
+    // TIER 0: Explicit ParentGuard Annotated Options (Demo Store & Partner Sites)
+    const annotatedNodes = document.querySelectorAll("[data-parentguard-option]");
+    annotatedNodes.forEach((node) => {
+      const title = node.getAttribute("data-title") || node.getAttribute("data-parentguard-option");
+      const priceVal = parseFloat(node.getAttribute("data-price") || "");
+      const currency = node.getAttribute("data-currency") || "USD";
+      const kind = node.getAttribute("data-kind") || "GAME";
+      const discountPct = node.getAttribute("data-discount") || null;
+      const originalPrice = node.getAttribute("data-original-price") || null;
+
+      if (title && !isNaN(priceVal) && priceVal > 0) {
+        addOption({
+          kind,
+          title,
+          amount: priceVal,
+          currency,
+          discountPct,
+          originalPrice,
+          category: node.getAttribute("data-category") || inferMerchantCategory(hostname)
+        });
+      }
+    });
+
+    // TIER 1: Steam Store & Bundle Scraper (store.steampowered.com)
+    if (hostname.includes("steampowered.com")) {
+      const purchaseBoxes = document.querySelectorAll(".game_area_purchase_game");
+      purchaseBoxes.forEach((box) => {
+        const headingEl = box.querySelector("h1, h2");
+        if (!headingEl) return;
+
+        // Clone heading to strip noisy sub-nodes like (?) tooltip or promotion countdown
+        const clonedHeading = headingEl.cloneNode(true);
+        clonedHeading.querySelectorAll(".bundle_label, p, .game_purchase_discount_countdown").forEach((n) => n.remove());
+
+        let rawTitle = (clonedHeading.textContent || "").replace(/\s+/g, " ").trim();
+        // Remove leading "Buy " prefix
+        rawTitle = rawTitle.replace(/^Buy\s+/i, "").trim();
+        // Remove trailing "(?)" if still present
+        rawTitle = rawTitle.replace(/\(\?\)\s*$/, "").trim();
+
+        // Skip free demos
+        if (/^Download\s+.*\s+Demo$/i.test(rawTitle)) return;
+
+        // Determine if Bundle, DLC, or Base Game
+        let kind = "GAME";
+        if (
+          /\bBUNDLE\b/i.test(rawTitle) ||
+          /\bPACK\b/i.test(rawTitle) ||
+          box.querySelector(".bundle_label_tooltip")
+        ) {
+          kind = "BUNDLE";
+        } else if (/\bDLC\b|\bSoundtrack\b|\bExpansion\b|\bPass\b/i.test(rawTitle)) {
+          kind = "EDITION";
+        }
+
+        // Extract final price inside this purchase box
+        let priceContainer =
+          box.querySelector(".discount_final_price") ||
+          box.querySelector(".game_purchase_price.price") ||
+          box.querySelector(".your_price div:last-child") ||
+          box.querySelector(".game_area_purchase_game_dropdown_selection");
+
+        let parsedPrice = priceContainer ? parsePriceText(priceContainer.textContent) : null;
+
+        // Fallback: scan action bar inside box for any currency pattern
+        if (!parsedPrice) {
+          const actionBg = box.querySelector(".game_purchase_action_bg, .game_purchase_action");
+          if (actionBg) {
+            parsedPrice = parsePriceText(actionBg.textContent);
+          }
+        }
+
+        if (!parsedPrice) return;
+
+        const discountEl = box.querySelector(".discount_pct");
+        const originalEl = box.querySelector(".discount_original_price");
+
+        const discountPct = discountEl ? discountEl.textContent.trim() : null;
+        const originalPrice = originalEl ? originalEl.textContent.trim() : null;
+
+        addOption({
+          kind,
+          title: rawTitle,
+          amount: parsedPrice.amount,
+          currency: parsedPrice.currency,
+          discountPct,
+          originalPrice,
+          category: "GAMING"
+        });
+      });
+    }
+
+    // TIER 2: Amazon Product & Edition Twister Scraper
+    if (hostname.includes("amazon.")) {
+      const mainTitleEl = document.getElementById("productTitle");
+      const mainTitle = mainTitleEl ? mainTitleEl.textContent.replace(/\s+/g, " ").trim() : "";
+
+      // Check main buybox price
+      const mainPriceEl =
+        document.querySelector("#corePrice_feature_div .a-price .a-offscreen") ||
+        document.querySelector("#corePriceDisplay_desktop_feature_div .a-price .a-offscreen") ||
+        document.querySelector(".a-price .a-offscreen") ||
+        document.getElementById("priceblock_ourprice");
+
+      if (mainTitle && mainPriceEl) {
+        const parsed = parsePriceText(mainPriceEl.textContent);
+        if (parsed) {
+          addOption({
+            kind: "PRODUCT",
+            title: mainTitle,
+            amount: parsed.amount,
+            currency: parsed.currency,
+            category: "SHOPPING"
+          });
+        }
+      }
+
+      // Check edition/variant swatches if present
+      const swatches = document.querySelectorAll("#twister li, .swatchElement");
+      swatches.forEach((swatch) => {
+        const text = (swatch.textContent || "").replace(/\s+/g, " ").trim();
+        const parsed = parsePriceText(text);
+        if (parsed && mainTitle) {
+          const lines = text.split(" ").filter(Boolean);
+          const editionName = lines.slice(0, 3).join(" ");
+          addOption({
+            kind: "OPTION",
+            title: `${mainTitle} (${editionName})`,
+            amount: parsed.amount,
+            currency: parsed.currency,
+            category: "SHOPPING"
+          });
+        }
+      });
+    }
+
+    // TIER 3: Schema.org JSON-LD & OpenGraph Product Metadata
+    const jsonLdScripts = document.querySelectorAll("script[type='application/ld+json']");
+    jsonLdScripts.forEach((script) => {
+      try {
+        const rawJson = JSON.parse(script.textContent || "{}");
+        const nodes = Array.isArray(rawJson)
+          ? rawJson
+          : rawJson["@graph"] && Array.isArray(rawJson["@graph"])
+          ? rawJson["@graph"]
+          : [rawJson];
+
+        nodes.forEach((node) => {
+          if (!node || !node["@type"]) return;
+          const isProduct =
+            node["@type"] === "Product" ||
+            node["@type"] === "VideoGame" ||
+            node["@type"] === "SoftwareApplication";
+          if (!isProduct) return;
+
+          const baseName = node.name || document.title;
+          const offers = Array.isArray(node.offers)
+            ? node.offers
+            : node.offers
+            ? [node.offers]
+            : [];
+
+          offers.forEach((offer) => {
+            const priceNum = parseFloat(offer.price || offer.lowPrice || "");
+            if (!isNaN(priceNum) && priceNum > 0) {
+              addOption({
+                kind: offers.length > 1 ? "OPTION" : "PRODUCT",
+                title: offer.name ? `${baseName} - ${offer.name}` : baseName,
+                amount: priceNum,
+                currency: (offer.priceCurrency || "USD").toUpperCase(),
+                category: inferMerchantCategory(hostname)
+              });
+            }
+          });
+        });
+      } catch (_) {
+        // Ignore malformed JSON-LD blocks on third-party sites
+      }
+    });
+
+    // OpenGraph fallback if no options found yet
+    if (options.length === 0) {
+      const ogTitle = document.querySelector("meta[property='og:title']")?.getAttribute("content");
+      const ogPrice =
+        document.querySelector("meta[property='product:price:amount']")?.getAttribute("content") ||
+        document.querySelector("meta[property='og:price:amount']")?.getAttribute("content");
+      const ogCurrency =
+        document.querySelector("meta[property='product:price:currency']")?.getAttribute("content") ||
+        document.querySelector("meta[property='og:price:currency']")?.getAttribute("content") ||
+        "USD";
+
+      if (ogTitle && ogPrice) {
+        const priceNum = parseFloat(ogPrice);
+        if (!isNaN(priceNum) && priceNum > 0) {
+          addOption({
+            kind: "PRODUCT",
+            title: ogTitle,
+            amount: priceNum,
+            currency: ogCurrency.toUpperCase(),
+            category: inferMerchantCategory(hostname)
+          });
+        }
+      }
+    }
+
+    // Clean page title fallback
+    let cleanPageTitle = (document.title || "")
+      .replace(/^Save\s+\d+%\s+on\s+/i, "")
+      .replace(/\s+on\s+Steam$/i, "")
+      .replace(/\s+-\s+Steam$/i, "")
+      .replace(/\s+\|\s+Roblox$/i, "")
+      .replace(/\s*:\s*Amazon\.[a-z.]+.*$/i, "")
+      .trim();
+
+    const apphubTitle = document.querySelector(".apphub_AppName");
+    if (apphubTitle && apphubTitle.textContent.trim()) {
+      cleanPageTitle = apphubTitle.textContent.trim();
+    }
+
+    return {
+      domain: hostname,
+      url: window.location.href,
+      pageTitle: cleanPageTitle || document.title || "",
+      defaultCategory: inferMerchantCategory(hostname),
+      options: options
+    };
+  }
+
+  // Expose globally so chrome.scripting.executeScript can also invoke it directly
+  window.__PARENTGUARD_EXTRACT_PRODUCTS__ = extractPageProducts;
+
+  // Prevent duplicate content script initialization
   if (window.__PARENTGUARD_CONTENT_INITIALIZED__) return;
   window.__PARENTGUARD_CONTENT_INITIALIZED__ = true;
 
@@ -177,7 +507,7 @@
         alert(
           "Centinel Fin AI ParentGuard\n\n" +
           "1. Click the Centinel Fin AI extension icon in your Chrome toolbar.\n" +
-          "2. Review the detected item title and price.\n" +
+          "2. Select the game or bundle option from the dropdown (price auto-fills).\n" +
           "3. Click [ Send to Parent for Approval ].\n" +
           "4. Once your parent approves on their dashboard, this checkout unlocks automatically!"
         );
@@ -209,10 +539,8 @@
 
   // 5. Scan Page DOM for Checkout Controls
   function scanPage() {
-    // If not a checkout URL, only scan if page contains payment forms
     const urlMatches = isCheckoutUrl();
 
-    // Query candidate buttons and links
     const candidates = document.querySelectorAll("button, a, input[type='submit'], input[type='button']");
     for (const el of candidates) {
       if (isPaymentButton(el)) {
@@ -220,7 +548,6 @@
       }
     }
 
-    // If URL matches checkout keywords and no specific button matched yet, scan form submit buttons
     if (urlMatches && interceptedButtons.size === 0) {
       const forms = document.querySelectorAll("form");
       forms.forEach(form => {
@@ -232,7 +559,6 @@
     }
   }
 
-  // Debounced scanning to protect browser performance
   let scanTimeout = null;
   function scheduleScan() {
     if (scanTimeout) clearTimeout(scanTimeout);
@@ -253,7 +579,6 @@
     }
   });
 
-  // Start initial scan and observer
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       scanPage();
@@ -266,8 +591,18 @@
     }
   }
 
-  // 7. Communication Channel (Support for Task 3.4 Cryptographic Unlock)
+  // 7. Communication Channel (Product Extraction + Cryptographic Unlock)
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "EXTRACT_PAGE_PRODUCTS") {
+      try {
+        const extractionResult = extractPageProducts();
+        sendResponse({ success: true, data: extractionResult });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+      return false;
+    }
+
     if (message.type === "CHECKOUT_STATUS_QUERY") {
       sendResponse({
         isIntercepted: interceptedButtons.size > 0,
@@ -281,20 +616,17 @@
       console.log("[Centinel Fin AI] Unlocking checkout via cryptographic approval token!");
       isLocked = false;
 
-      // Unlock all intercepted buttons
       interceptedButtons.forEach(btn => {
         btn.classList.remove("parentguard-locked-btn");
         btn.disabled = false;
       });
 
-      // Update in-place shields
       document.querySelectorAll(".parentguard-in-place-shield").forEach(shield => {
         shield.style.backgroundColor = "#CCFF00";
         shield.style.color = "#151515";
         shield.textContent = "[ PARENTGUARD: RSA APPROVED & UNLOCKED ]";
       });
 
-      // Update floating barrier status pill
       const statusPill = document.getElementById("parentguard-status-pill");
       if (statusPill) {
         statusPill.textContent = "[ APPROVED & UNLOCKED ]";

@@ -26,6 +26,16 @@ export function buildSafeMerchantUrl(siteDomain: string): string {
 
 export function getDisplayDomain(siteDomain: string): string {
   const trimmed = (siteDomain || "").trim();
+  if (!trimmed) return "";
+  try {
+    const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const parsed = new URL(candidate);
+    if (parsed.hostname) {
+      return parsed.hostname;
+    }
+  } catch {
+    // Fallback to simple strip
+  }
   return trimmed.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
 

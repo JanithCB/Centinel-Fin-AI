@@ -26,7 +26,7 @@
 body {
   width: 380px;
   min-height: 480px;
-  max-height: 580px;
+  max-height: 590px;
   overflow-y: auto;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background-color: var(--bg);
@@ -239,7 +239,7 @@ body::-webkit-scrollbar-thumb {
   border: var(--border);
   box-shadow: var(--shadow-sm);
   padding: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .card-header-sm {
@@ -271,6 +271,10 @@ body::-webkit-scrollbar-thumb {
 }
 
 .store-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   margin-bottom: 4px;
 }
 
@@ -282,10 +286,21 @@ body::-webkit-scrollbar-thumb {
   font-size: 11px;
   font-weight: 700;
   padding: 2px 6px;
-  max-width: 100%;
+  max-width: 220px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.options-count-pill {
+  background-color: var(--yellow);
+  border: 1px solid var(--ink);
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 6px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  white-space: nowrap;
 }
 
 .store-url-row {
@@ -294,6 +309,68 @@ body::-webkit-scrollbar-thumb {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Smart Detected Option & Bundle Selector Card */
+.option-selector-card {
+  background-color: #FEF9C3;
+  border: var(--border);
+  box-shadow: var(--shadow-sm);
+  padding: 9px;
+  margin-bottom: 10px;
+}
+
+.label-row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.mb-0 {
+  margin-bottom: 0 !important;
+}
+
+.verified-price-tag {
+  background-color: var(--ink);
+  color: var(--lime);
+  font-size: 8px;
+  font-weight: 900;
+  padding: 2px 5px;
+  letter-spacing: 0.05em;
+}
+
+.neo-select-highlight {
+  background-color: #FFFFFF !important;
+  border: 2px solid #151515 !important;
+  font-weight: 800 !important;
+  font-size: 11px !important;
+  cursor: pointer;
+}
+
+.discount-callout-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px dashed var(--ink);
+}
+
+.discount-pct-pill {
+  background-color: var(--lime);
+  border: 1px solid var(--ink);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 1px 5px;
+  color: var(--ink);
+}
+
+.discount-context-text {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink);
 }
 
 /* Forms */
