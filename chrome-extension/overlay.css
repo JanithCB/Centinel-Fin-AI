@@ -1,0 +1,221 @@
+/* Centinel Fin AI – ParentGuard Injected Checkout Lock Overlay */
+/* Strictly Zero Emojis // Neo-Brutalist Design Tokens */
+
+/* Intercepted and Locked Native Payment Button */
+.parentguard-locked-btn {
+  position: relative !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+  opacity: 0.45 !important;
+  filter: grayscale(80%) !important;
+  outline: 3px dashed #151515 !important;
+  outline-offset: 2px !important;
+  transition: opacity 0.2s ease !important;
+}
+
+/* Floating Checkout Barrier Container */
+#parentguard-barrier-root {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  width: 420px !important;
+  max-width: calc(100vw - 48px) !important;
+  z-index: 2147483647 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  box-sizing: border-box !important;
+  line-height: 1.4 !important;
+}
+
+#parentguard-barrier-root * {
+  box-sizing: border-box !important;
+}
+
+.parentguard-barrier-card {
+  background-color: #FFFDF7 !important;
+  border: 3px solid #151515 !important;
+  box-shadow: 5px 5px 0px #151515 !important;
+  padding: 14px 16px !important;
+  color: #151515 !important;
+  position: relative !important;
+  animation: parentguard-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes parentguard-slide-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Barrier Header */
+.parentguard-barrier-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  border-bottom: 2px solid #151515 !important;
+  padding-bottom: 8px !important;
+  margin-bottom: 10px !important;
+  gap: 8px !important;
+}
+
+.parentguard-header-brand {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.parentguard-badge-c {
+  width: 24px !important;
+  height: 24px !important;
+  background-color: #CCFF00 !important;
+  border: 2px solid #151515 !important;
+  box-shadow: 2px 2px 0px #151515 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 900 !important;
+  font-size: 14px !important;
+  color: #151515 !important;
+  flex-shrink: 0 !important;
+}
+
+.parentguard-brand-text {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.parentguard-brand-title {
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.05em !important;
+  color: #151515 !important;
+}
+
+.parentguard-brand-sub {
+  font-size: 8px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  color: #64748B !important;
+}
+
+.parentguard-status-badge {
+  background-color: #FFE600 !important;
+  border: 2px solid #151515 !important;
+  box-shadow: 2px 2px 0px #151515 !important;
+  padding: 2px 6px !important;
+  font-size: 9px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.05em !important;
+  color: #151515 !important;
+  white-space: nowrap !important;
+}
+
+.parentguard-status-badge.unlocked {
+  background-color: #CCFF00 !important;
+}
+
+/* Barrier Body */
+.parentguard-barrier-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+.parentguard-detected-info {
+  background-color: #FFFFFF !important;
+  border: 1px solid #151515 !important;
+  padding: 6px 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 10px !important;
+}
+
+.parentguard-domain-label {
+  font-family: ui-monospace, SFMono-Regular, monospace !important;
+  font-weight: 700 !important;
+  color: #2563EB !important;
+}
+
+.parentguard-target-tag {
+  background-color: #151515 !important;
+  color: #FFFFFF !important;
+  padding: 1px 4px !important;
+  font-size: 8px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.05em !important;
+}
+
+.parentguard-message-text {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #151515 !important;
+  line-height: 1.35 !important;
+  margin: 0 !important;
+}
+
+/* Barrier Actions */
+.parentguard-actions-row {
+  display: flex !important;
+  gap: 8px !important;
+  margin-top: 4px !important;
+}
+
+.parentguard-action-btn {
+  flex: 1 !important;
+  background-color: #CCFF00 !important;
+  border: 2px solid #151515 !important;
+  box-shadow: 2px 2px 0px #151515 !important;
+  padding: 7px 10px !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  color: #151515 !important;
+  cursor: pointer !important;
+  text-align: center !important;
+  transition: transform 0.05s ease, box-shadow 0.05s ease !important;
+}
+
+.parentguard-action-btn:hover {
+  transform: translate(-1px, -1px) !important;
+  box-shadow: 3px 3px 0px #151515 !important;
+}
+
+.parentguard-action-btn:active {
+  transform: translate(1px, 1px) !important;
+  box-shadow: 1px 1px 0px #151515 !important;
+}
+
+.parentguard-minimize-btn {
+  background: transparent !important;
+  border: 2px solid #151515 !important;
+  padding: 7px 9px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  cursor: pointer !important;
+  color: #151515 !important;
+}
+
+.parentguard-minimize-btn:hover {
+  background-color: #E2E8F0 !important;
+}
+
+/* In-Place Button Overlay Shield */
+.parentguard-in-place-shield {
+  display: block !important;
+  margin-top: 6px !important;
+  background-color: #FEF08A !important;
+  border: 2px solid #151515 !important;
+  box-shadow: 2px 2px 0px #151515 !important;
+  padding: 6px 10px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  color: #854D0E !important;
+  text-align: center !important;
+  letter-spacing: 0.03em !important;
+}
