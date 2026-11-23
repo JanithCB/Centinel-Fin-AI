@@ -523,10 +523,16 @@ async function handlePurchaseSubmit(e) {
   submitRequestBtn.textContent = "SUBMITTING TO PARENT...";
 
   try {
-    const siteTarget =
-      currentTabInfo.url && currentTabInfo.url.startsWith("http")
-        ? currentTabInfo.url
-        : currentTabInfo.domain || "store.steampowered.com";
+    let siteTarget = currentTabInfo.domain || "store.steampowered.com";
+    if (currentTabInfo.url && currentTabInfo.url.startsWith("http")) {
+      try {
+        const cleanUrlObj = new URL(currentTabInfo.url);
+        const originAndPath = `${cleanUrlObj.origin}${cleanUrlObj.pathname}`;
+        siteTarget = originAndPath.length <= 250 ? originAndPath : cleanUrlObj.hostname;
+      } catch (_) {
+        siteTarget = currentTabInfo.domain || "store.steampowered.com";
+      }
+    }
 
     const idempotencyRaw = `${childSession.email || "child"}:${siteTarget}:${itemName}:${amount.toFixed(2)}`;
     const idempotencyKey = await computeSha256(idempotencyRaw);
@@ -550,19 +556,29 @@ async function handlePurchaseSubmit(e) {
       body: JSON.stringify(payload)
     });
 
-    const result = await response.json();
+    let result = {};
+    const rawText = await response.text();
+    if (rawText) {
+      try {
+        result = JSON.parse(rawText);
+      } catch (_) {
+        result = { message: rawText };
+      }
+    }
 
-    if (response.status === 201) {
+    if (response.status === 201 || response.status === 200) {
       showAlert("Request submitted! Your parent will review it shortly.", "success");
       reasonInput.value = "";
       fetchMyRequests();
     } else if (response.status === 409) {
       showAlert("Duplicate request detected. This item is already in your parent's queue.", "error");
     } else if (response.status === 401 || response.status === 403) {
-      showAlert("Session expired. Please sign in again.", "error");
-      handleLogout();
+      showAlert(result.message || "Session expired or unauthorized. Please sign in again.", "error");
+      if (response.status === 401) {
+        handleLogout();
+      }
     } else {
-      showAlert(result.message || "Failed to submit request to parent.", "error");
+      showAlert(result.message || `Failed to submit request (HTTP ${response.status}).`, "error");
     }
   } catch (err) {
     console.error("[Centinel Fin AI] Purchase submit error:", err);
