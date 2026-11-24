@@ -6,9 +6,14 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.List;
 
 /**
  * Enterprise RSA-2048 Cryptographic Signing & Verification Service.
@@ -24,12 +29,12 @@ public class RsaSignatureService {
     private static final String SIGNATURE_ALGORITHM = "SHA256withRSA";
     private static final String KEY_ALGORITHM = "RSA";
     private static final int KEY_SIZE_BITS = 2048;
+    private static final Path KEYPAIR_STORAGE_PATH = Path.of("target", "parentguard-rsa-keypair.key");
 
     private final KeyPair keyPair;
 
     public RsaSignatureService() {
-        this.keyPair = generateRsaKeyPair();
-        log.info("Initialized RsaSignatureService with fresh {}-bit RSA keypair", KEY_SIZE_BITS);
+        this.keyPair = loadOrGenerateRsaKeyPair();
     }
 
     public RsaSignatureService(KeyPair keyPair) {
@@ -37,6 +42,39 @@ public class RsaSignatureService {
             throw new IllegalArgumentException("KeyPair and its keys cannot be null");
         }
         this.keyPair = keyPair;
+    }
+
+    private KeyPair loadOrGenerateRsaKeyPair() {
+        try {
+            if (Files.exists(KEYPAIR_STORAGE_PATH)) {
+                List<String> lines = Files.readAllLines(KEYPAIR_STORAGE_PATH, StandardCharsets.UTF_8);
+                if (lines.size() >= 2 && !lines.get(0).isBlank() && !lines.get(1).isBlank()) {
+                    byte[] pubBytes = Base64.getDecoder().decode(lines.get(0).trim());
+                    byte[] privBytes = Base64.getDecoder().decode(lines.get(1).trim());
+                    KeyFactory kf = KeyFactory.getInstance(KEY_ALGORITHM);
+                    PublicKey pub = kf.generatePublic(new X509EncodedKeySpec(pubBytes));
+                    PrivateKey priv = kf.generatePrivate(new PKCS8EncodedKeySpec(privBytes));
+                    log.info("Loaded persisted {}-bit RSA keypair from {}", KEY_SIZE_BITS, KEYPAIR_STORAGE_PATH);
+                    return new KeyPair(pub, priv);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not load persisted RSA keypair ({}), generating fresh keypair", e.getMessage());
+        }
+
+        KeyPair generated = generateRsaKeyPair();
+        try {
+            if (KEYPAIR_STORAGE_PATH.getParent() != null) {
+                Files.createDirectories(KEYPAIR_STORAGE_PATH.getParent());
+            }
+            String pubB64 = Base64.getEncoder().encodeToString(generated.getPublic().getEncoded());
+            String privB64 = Base64.getEncoder().encodeToString(generated.getPrivate().getEncoded());
+            Files.writeString(KEYPAIR_STORAGE_PATH, pubB64 + "\n" + privB64 + "\n", StandardCharsets.UTF_8);
+            log.info("Generated and persisted {}-bit RSA keypair to {}", KEY_SIZE_BITS, KEYPAIR_STORAGE_PATH);
+        } catch (Exception e) {
+            log.warn("Initialized RsaSignatureService with in-memory {}-bit RSA keypair: {}", KEY_SIZE_BITS, e.getMessage());
+        }
+        return generated;
     }
 
     private KeyPair generateRsaKeyPair() {

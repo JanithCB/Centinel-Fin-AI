@@ -44,6 +44,9 @@ let childSession = {
   token: null,
   email: null
 };
+let activeTrackedRequestId = null;
+let userDismissedTrackerForForm = false;
+let livePollInterval = null;
 
 // DOM Elements
 const loggedOutView = document.getElementById("loggedOutView");
@@ -62,6 +65,21 @@ const tabMyRequests = document.getElementById("tabMyRequests");
 const requestCountBadge = document.getElementById("requestCountBadge");
 const newRequestView = document.getElementById("newRequestView");
 const myRequestsView = document.getElementById("myRequestsView");
+
+const liveApprovalTracker = document.getElementById("liveApprovalTracker");
+const requestFormContainer = document.getElementById("requestFormContainer");
+const trackerStatusBadge = document.getElementById("trackerStatusBadge");
+const trackerRequestId = document.getElementById("trackerRequestId");
+const trackerLoaderAnim = document.getElementById("trackerLoaderAnim");
+const trackerApprovedIcon = document.getElementById("trackerApprovedIcon");
+const trackerDeniedIcon = document.getElementById("trackerDeniedIcon");
+const trackerHeadline = document.getElementById("trackerHeadline");
+const trackerSubtext = document.getElementById("trackerSubtext");
+const trackerItemTitle = document.getElementById("trackerItemTitle");
+const trackerItemAmount = document.getElementById("trackerItemAmount");
+const trackerItemDomain = document.getElementById("trackerItemDomain");
+const trackerAutoSyncTag = document.getElementById("trackerAutoSyncTag");
+const showFormAgainBtn = document.getElementById("showFormAgainBtn");
 
 const detectedDomainDisplay = document.getElementById("detectedDomainDisplay");
 const detectedUrlDisplay = document.getElementById("detectedUrlDisplay");
@@ -96,7 +114,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupEventListeners();
   await detectActiveTab();
   await loadAuthState();
+  startLivePolling();
 });
+
+function startLivePolling() {
+  if (livePollInterval) clearInterval(livePollInterval);
+  livePollInterval = setInterval(() => {
+    if (childSession.token) {
+      fetchMyRequests(false);
+    }
+  }, 3000);
+}
 
 // Event Listeners
 function setupEventListeners() {
@@ -105,6 +133,14 @@ function setupEventListeners() {
   refreshTabBtn.addEventListener("click", () => detectActiveTab(true));
   purchaseForm.addEventListener("submit", handlePurchaseSubmit);
   refreshRequestsBtn.addEventListener("click", () => fetchMyRequests(true));
+
+  if (showFormAgainBtn) {
+    showFormAgainBtn.addEventListener("click", () => {
+      userDismissedTrackerForForm = true;
+      activeTrackedRequestId = null;
+      hideLiveApprovalTracker();
+    });
+  }
 
   // Product / Bundle Option Dropdown Selection
   productOptionSelect.addEventListener("change", (e) => {
@@ -122,6 +158,66 @@ function setupEventListeners() {
     switchTab("myRequestsView");
     fetchMyRequests();
   });
+}
+
+function showLiveApprovalTracker(req) {
+  if (!req || !liveApprovalTracker || !requestFormContainer) return;
+
+  activeTrackedRequestId = req.id || activeTrackedRequestId;
+  requestFormContainer.classList.add("hidden");
+  liveApprovalTracker.classList.remove("hidden");
+
+  const symbol = CURRENCY_SYMBOLS[req.currency] || ((req.currency || "USD") + " ");
+  const formattedAmount = `${symbol}${parseFloat(req.amount || 0).toFixed(2)} ${req.currency || "USD"}`;
+  const cleanDomain = getCleanDomainLabel(req.siteDomain || currentTabInfo.domain);
+
+  trackerRequestId.textContent = req.id ? `REQ #${req.id}` : "SENT JUST NOW";
+  trackerItemTitle.textContent = req.itemName || itemNameInput.value || "Selected Store Item";
+  trackerItemAmount.textContent = formattedAmount;
+  trackerItemDomain.textContent = cleanDomain;
+
+  liveApprovalTracker.classList.remove("state-approved", "state-denied");
+  trackerStatusBadge.classList.remove("pending", "approved", "denied");
+
+  if (req.status === "APPROVED") {
+    liveApprovalTracker.classList.add("state-approved");
+    trackerStatusBadge.classList.add("approved");
+    trackerStatusBadge.textContent = "[ APPROVED BY PARENT ]";
+    trackerLoaderAnim.classList.add("hidden");
+    trackerApprovedIcon.classList.remove("hidden");
+    trackerDeniedIcon.classList.add("hidden");
+    trackerHeadline.textContent = "APPROVED — YOU CAN BUY NOW!";
+    trackerSubtext.textContent =
+      "Your parent approved this purchase! The Add to Cart and Checkout buttons on this page are now unlocked and ready to use.";
+    trackerAutoSyncTag.textContent = "BUTTONS UNLOCKED";
+  } else if (req.status === "DENIED") {
+    liveApprovalTracker.classList.add("state-denied");
+    trackerStatusBadge.classList.add("denied");
+    trackerStatusBadge.textContent = "[ DECLINED BY PARENT ]";
+    trackerLoaderAnim.classList.add("hidden");
+    trackerApprovedIcon.classList.add("hidden");
+    trackerDeniedIcon.classList.remove("hidden");
+    trackerHeadline.textContent = "REQUEST NOT APPROVED";
+    trackerSubtext.textContent =
+      "Your parent declined this request. You can talk with your parent or select a different option below.";
+    trackerAutoSyncTag.textContent = "STORE REMAINS LOCKED";
+  } else {
+    trackerStatusBadge.classList.add("pending");
+    trackerStatusBadge.textContent = "[ WAITING FOR PARENT ]";
+    trackerLoaderAnim.classList.remove("hidden");
+    trackerApprovedIcon.classList.add("hidden");
+    trackerDeniedIcon.classList.add("hidden");
+    trackerHeadline.textContent = "WAITING FOR PARENT APPROVAL...";
+    trackerSubtext.textContent =
+      "Sent to your parent! Keep this page open — Add to Cart and Checkout will unlock automatically as soon as they approve.";
+    trackerAutoSyncTag.textContent = "CHECKING FOR APPROVAL...";
+  }
+}
+
+function hideLiveApprovalTracker() {
+  if (!liveApprovalTracker || !requestFormContainer) return;
+  liveApprovalTracker.classList.add("hidden");
+  requestFormContainer.classList.remove("hidden");
 }
 
 function updateCurrencySymbol(currencyCode) {
@@ -576,11 +672,24 @@ async function handlePurchaseSubmit(e) {
     }
 
     if (response.status === 201 || response.status === 200) {
-      showAlert("Request submitted! Your parent will review it shortly.", "success");
       reasonInput.value = "";
+      userDismissedTrackerForForm = false;
+      const submittedReq = (result && result.id) ? result : {
+        id: result.id || null,
+        itemName: itemName,
+        amount: amount,
+        currency: currency,
+        siteDomain: siteTarget,
+        status: "PENDING"
+      };
+      showLiveApprovalTracker(submittedReq);
       fetchMyRequests();
     } else if (response.status === 409) {
-      showAlert("Duplicate request detected. This item is already in your parent's queue.", "error");
+      userDismissedTrackerForForm = false;
+      if (result && result.id) {
+        showLiveApprovalTracker(result);
+      }
+      fetchMyRequests();
     } else if (response.status === 401 || response.status === 403) {
       showAlert(result.message || "Session expired or unauthorized. Please sign in again.", "error");
       if (response.status === 401) {
@@ -625,6 +734,7 @@ async function fetchMyRequests(manualRefresh = false) {
 
     const requests = await response.json();
     renderRequestsList(requests);
+    syncLiveTrackerWithRequests(requests);
   } catch (err) {
     console.error("[Centinel Fin AI] Failed to fetch requests:", err);
   } finally {
@@ -632,6 +742,48 @@ async function fetchMyRequests(manualRefresh = false) {
       refreshRequestsBtn.disabled = false;
       refreshRequestsBtn.textContent = "REFRESH";
     }
+  }
+}
+
+function syncLiveTrackerWithRequests(requests) {
+  if (!Array.isArray(requests) || requests.length === 0) return;
+
+  // 1. If we are already tracking a specific request ID, keep its live status updated
+  if (activeTrackedRequestId) {
+    const tracked = requests.find((r) => r.id === activeTrackedRequestId);
+    if (tracked) {
+      showLiveApprovalTracker(tracked);
+      return;
+    }
+  }
+
+  if (userDismissedTrackerForForm) return;
+
+  // 2. Otherwise, check if the active store page already has a recent PENDING or APPROVED request
+  const currentUrlClean = (currentTabInfo.url || "").split("?")[0].replace(/\/$/, "").toLowerCase();
+  const currentTitleClean = (itemNameInput.value || currentTabInfo.title || "").trim().toLowerCase();
+
+  const matchingForPage = requests.find((r) => {
+    if (r.status !== "PENDING" && r.status !== "APPROVED") return false;
+    const reqSiteClean = (r.siteDomain || "").split("?")[0].replace(/\/$/, "").toLowerCase();
+    const reqTitleClean = (r.itemName || "").trim().toLowerCase();
+
+    const exactPageUrlMatch =
+      currentUrlClean &&
+      reqSiteClean &&
+      reqSiteClean.includes("/") &&
+      (currentUrlClean === reqSiteClean || currentUrlClean.startsWith(reqSiteClean));
+
+    const exactItemTitleMatch =
+      currentTitleClean &&
+      reqTitleClean &&
+      currentTitleClean === reqTitleClean;
+
+    return exactPageUrlMatch || exactItemTitleMatch;
+  });
+
+  if (matchingForPage) {
+    showLiveApprovalTracker(matchingForPage);
   }
 }
 
@@ -672,14 +824,14 @@ function renderRequestsList(requests) {
     card.className = "request-item-card";
 
     let statusClass = "status-pending";
-    let statusText = "PENDING REVIEW";
+    let statusText = "WAITING FOR PARENT";
 
     if (req.status === "APPROVED") {
       statusClass = "status-approved";
       statusText = "APPROVED";
     } else if (req.status === "DENIED") {
       statusClass = "status-denied";
-      statusText = "DENIED";
+      statusText = "DECLINED";
     }
 
     const symbol = CURRENCY_SYMBOLS[req.currency] || (req.currency + " ");
@@ -698,7 +850,7 @@ function renderRequestsList(requests) {
         <span class="card-domain-tag">${escapeHtml(cleanDomain)}</span>
         <span class="card-status-badge ${statusClass}">[ ${statusText} ]</span>
       </div>
-      ${showCryptoRow ? `<div id="${proofRowId}" class="crypto-proof-row"><span>RSA-2048 SIGNATURE</span><span>[ VERIFYING... ]</span></div>` : ""}
+      ${showCryptoRow ? `<div id="${proofRowId}" class="crypto-proof-row verified"><span>PARENT APPROVAL</span><span>[ READY TO BUY ]</span></div>` : ""}
       ${req.note ? `<div class="card-note-row">"${escapeHtml(req.note)}"</div>` : ""}
     `;
 
@@ -710,19 +862,13 @@ function renderRequestsList(requests) {
         if (!proofEl) return;
         if (res.valid) {
           proofEl.className = "crypto-proof-row verified";
-          proofEl.innerHTML = `<span>RSA-2048 WEBCRYPTO</span><span>[ SIGNATURE VERIFIED ]</span>`;
-        } else if (req.rsaSignature) {
-          proofEl.className = "crypto-proof-row";
-          proofEl.innerHTML = `<span>RSA-2048 SIGNED</span><span>[ KEY ROTATED ]</span>`;
-        } else {
-          proofEl.className = "crypto-proof-row";
-          proofEl.innerHTML = `<span>LEGACY APPROVAL</span><span>[ NO SIGNATURE ]</span>`;
+          proofEl.innerHTML = `<span>PARENT APPROVAL</span><span>[ UNLOCKED &amp; READY ]</span>`;
         }
       });
     }
   });
 
-  // Notify active tab to run WebCrypto verification & unlock if an approved request matches
+  // Notify active tab to run verification & unlock if an approved request matches
   chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
     if (tabs && tabs[0] && tabs[0].id) {
       chrome.tabs.sendMessage(tabs[0].id, { type: "VERIFY_AND_UNLOCK_TAB" }).catch(() => {});

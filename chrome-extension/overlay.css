@@ -14,23 +14,32 @@
   transition: opacity 0.2s ease, filter 0.2s ease !important;
 }
 
-/* Unlocked & Cryptographically Verified Button */
+/* Unlocked & Parent-Approved Button */
 .parentguard-unlocked-btn {
-  outline: 2px solid #CCFF00 !important;
+  outline: 3px solid #CCFF00 !important;
   outline-offset: 2px !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+  filter: none !important;
+  animation: parentguard-unlock-pulse 1.2s ease-out 2 !important;
 }
 
-/* Floating Checkout Barrier Container */
+@keyframes parentguard-unlock-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(204, 255, 0, 0.85);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(204, 255, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(204, 255, 0, 0);
+  }
+}
+
+/* Legacy Floating Checkout Barrier Container (Disabled for cleaner child UX) */
 #parentguard-barrier-root {
-  position: fixed !important;
-  bottom: 24px !important;
-  right: 24px !important;
-  width: 420px !important;
-  max-width: calc(100vw - 48px) !important;
-  z-index: 2147483647 !important;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-  box-sizing: border-box !important;
-  line-height: 1.4 !important;
+  display: none !important;
 }
 
 #parentguard-barrier-root * {

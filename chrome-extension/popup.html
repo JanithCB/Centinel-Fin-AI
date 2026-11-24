@@ -69,96 +69,138 @@
     </button>
   </nav>
 
-  <!-- Tab 1: New Purchase Request Form -->
+  <!-- Tab 1: New Purchase Request Form & Live Status Tracker -->
   <main id="newRequestView" class="tab-content hidden">
-    <!-- Active Tab Auto-Detection Card -->
-    <div class="detection-card">
-      <div class="card-header-sm">
-        <span class="tag-label">DETECTED MERCHANT</span>
-        <button id="refreshTabBtn" class="refresh-btn" title="Re-scan current page for products and bundles">RE-DETECT</button>
+    <!-- Live Post-Submission Waiting / Approved Status Card -->
+    <div id="liveApprovalTracker" class="live-tracker-card hidden">
+      <div class="tracker-top-bar">
+        <span id="trackerStatusBadge" class="tracker-status-pill pending">[ WAITING FOR PARENT ]</span>
+        <span id="trackerRequestId" class="tracker-req-id">REQ #--</span>
       </div>
-      <div class="store-info-row">
-        <span class="store-domain-pill" id="detectedDomainDisplay">Detecting active tab...</span>
-        <span class="options-count-pill hidden" id="optionsCountBadge">0 OPTIONS</span>
+
+      <div id="trackerVisualBox" class="tracker-visual-box">
+        <div id="trackerLoaderAnim" class="neo-buffer-loader" aria-label="Waiting for approval">
+          <span class="buffer-bar bar-1"></span>
+          <span class="buffer-bar bar-2"></span>
+          <span class="buffer-bar bar-3"></span>
+          <span class="buffer-bar bar-4"></span>
+        </div>
+        <div id="trackerApprovedIcon" class="tracker-state-symbol approved hidden">OK</div>
+        <div id="trackerDeniedIcon" class="tracker-state-symbol denied hidden">NO</div>
       </div>
-      <div class="store-url-row" id="detectedUrlDisplay">
-        Reading current browser tab...
+
+      <h2 id="trackerHeadline" class="tracker-headline">WAITING FOR PARENT APPROVAL...</h2>
+      <p id="trackerSubtext" class="tracker-subtext">
+        Your request has been sent. Keep this store tab open — the Add to Cart and Checkout buttons will unlock automatically as soon as your parent approves.
+      </p>
+
+      <div class="tracker-item-box">
+        <div class="tracker-item-row">
+          <span id="trackerItemTitle" class="tracker-item-title">Game Title</span>
+          <span id="trackerItemAmount" class="tracker-item-price">$0.00</span>
+        </div>
+        <div class="tracker-item-meta">
+          <span id="trackerItemDomain" class="tracker-item-domain">store.steampowered.com</span>
+          <span id="trackerAutoSyncTag" class="tracker-sync-tag">LIVE AUTO-UNLOCK ACTIVE</span>
+        </div>
       </div>
+
+      <button type="button" id="showFormAgainBtn" class="neo-btn neo-btn-secondary full-width">
+        [ CHOOSE A DIFFERENT OPTION / BUNDLE ]
+      </button>
     </div>
 
-    <!-- Purchase Request Form -->
-    <form id="purchaseForm" class="request-form">
-      <!-- Smart Detected Game / Bundle Selector -->
-      <div id="productOptionGroup" class="form-group option-selector-card hidden">
-        <div class="label-row-between">
-          <label for="productOptionSelect" class="form-label mb-0">SELECT GAME / BUNDLE OPTION *</label>
-          <span id="priceVerifiedTag" class="verified-price-tag">LIVE STORE PRICE</span>
+    <!-- Collapsible Form Container -->
+    <div id="requestFormContainer">
+      <!-- Active Tab Auto-Detection Card -->
+      <div class="detection-card">
+        <div class="card-header-sm">
+          <span class="tag-label">DETECTED MERCHANT</span>
+          <button id="refreshTabBtn" class="refresh-btn" title="Re-scan current page for products and bundles">RE-DETECT</button>
         </div>
-        <select id="productOptionSelect" class="neo-select neo-select-highlight">
-          <!-- Options dynamically populated from store DOM -->
-        </select>
-        <div id="selectedOptionDiscountBar" class="discount-callout-bar hidden">
-          <span id="discountPctBadge" class="discount-pct-pill">-30%</span>
-          <span id="discountContextText" class="discount-context-text">Special Deal (Original: $12.98 USD)</span>
+        <div class="store-info-row">
+          <span class="store-domain-pill" id="detectedDomainDisplay">Detecting active tab...</span>
+          <span class="options-count-pill hidden" id="optionsCountBadge">0 OPTIONS</span>
+        </div>
+        <div class="store-url-row" id="detectedUrlDisplay">
+          Reading current browser tab...
         </div>
       </div>
 
-      <div class="form-group">
-        <div class="label-row-between">
-          <label for="itemNameInput" class="form-label mb-0">ITEM / PRODUCT TITLE *</label>
-          <span id="titleLockStatus" class="locked-badge">[ VERIFIED ]</span>
+      <!-- Purchase Request Form -->
+      <form id="purchaseForm" class="request-form">
+        <!-- Smart Detected Game / Bundle Selector -->
+        <div id="productOptionGroup" class="form-group option-selector-card hidden">
+          <div class="label-row-between">
+            <label for="productOptionSelect" class="form-label mb-0">SELECT GAME / BUNDLE OPTION *</label>
+            <span id="priceVerifiedTag" class="verified-price-tag">LIVE STORE PRICE</span>
+          </div>
+          <select id="productOptionSelect" class="neo-select neo-select-highlight">
+            <!-- Options dynamically populated from store DOM -->
+          </select>
+          <div id="selectedOptionDiscountBar" class="discount-callout-bar hidden">
+            <span id="discountPctBadge" class="discount-pct-pill">-30%</span>
+            <span id="discountContextText" class="discount-context-text">Special Deal (Original: $12.98 USD)</span>
+          </div>
         </div>
-        <input type="text" id="itemNameInput" class="neo-input neo-input-locked" placeholder="e.g. Roblox 1000 Robux Pack" required readonly>
-      </div>
 
-      <div class="form-row-split">
-        <div class="form-group flex-1">
+        <div class="form-group">
           <div class="label-row-between">
-            <label for="amountInput" class="form-label mb-0">AMOUNT *</label>
-            <span id="amountLockStatus" class="locked-badge">[ STORE LOCKED ]</span>
+            <label for="itemNameInput" class="form-label mb-0">ITEM / PRODUCT TITLE *</label>
+            <span id="titleLockStatus" class="locked-badge">[ VERIFIED ]</span>
           </div>
-          <div class="amount-input-wrap">
-            <span id="currencyPrefixSymbol" class="currency-prefix">$</span>
-            <input type="number" id="amountInput" class="neo-input amount-field neo-input-locked" placeholder="19.99" step="0.01" min="0.01" required readonly>
+          <input type="text" id="itemNameInput" class="neo-input neo-input-locked" placeholder="e.g. Roblox 1000 Robux Pack" required readonly>
+        </div>
+
+        <div class="form-row-split">
+          <div class="form-group flex-1">
+            <div class="label-row-between">
+              <label for="amountInput" class="form-label mb-0">AMOUNT *</label>
+              <span id="amountLockStatus" class="locked-badge">[ STORE LOCKED ]</span>
+            </div>
+            <div class="amount-input-wrap">
+              <span id="currencyPrefixSymbol" class="currency-prefix">$</span>
+              <input type="number" id="amountInput" class="neo-input amount-field neo-input-locked" placeholder="19.99" step="0.01" min="0.01" required readonly>
+            </div>
+          </div>
+          <div class="form-group w-30">
+            <div class="label-row-between">
+              <label for="currencySelect" class="form-label mb-0">CURRENCY</label>
+              <span id="currencyLockStatus" class="locked-badge">[ STORE ]</span>
+            </div>
+            <select id="currencySelect" class="neo-select neo-select-locked" disabled>
+              <option value="USD" selected>USD ($)</option>
+              <option value="EUR">EUR (&euro;)</option>
+              <option value="GBP">GBP (&pound;)</option>
+              <option value="CAD">CAD ($)</option>
+              <option value="AUD">AUD ($)</option>
+            </select>
           </div>
         </div>
-        <div class="form-group w-30">
-          <div class="label-row-between">
-            <label for="currencySelect" class="form-label mb-0">CURRENCY</label>
-            <span id="currencyLockStatus" class="locked-badge">[ STORE ]</span>
-          </div>
-          <select id="currencySelect" class="neo-select neo-select-locked" disabled>
-            <option value="USD" selected>USD ($)</option>
-            <option value="EUR">EUR (&euro;)</option>
-            <option value="GBP">GBP (&pound;)</option>
-            <option value="CAD">CAD ($)</option>
-            <option value="AUD">AUD ($)</option>
+
+        <div class="form-group">
+          <label for="categorySelect" class="form-label">CATEGORY</label>
+          <select id="categorySelect" class="neo-select">
+            <option value="GAMING" selected>GAMING</option>
+            <option value="ENTERTAINMENT">ENTERTAINMENT</option>
+            <option value="SHOPPING">SHOPPING / RETAIL</option>
+            <option value="EDUCATION">EDUCATION / SOFTWARE</option>
+            <option value="OTHER">OTHER</option>
           </select>
         </div>
-      </div>
 
-      <div class="form-group">
-        <label for="categorySelect" class="form-label">CATEGORY</label>
-        <select id="categorySelect" class="neo-select">
-          <option value="GAMING" selected>GAMING</option>
-          <option value="ENTERTAINMENT">ENTERTAINMENT</option>
-          <option value="SHOPPING">SHOPPING / RETAIL</option>
-          <option value="EDUCATION">EDUCATION / SOFTWARE</option>
-          <option value="OTHER">OTHER</option>
-        </select>
-      </div>
+        <div class="form-group">
+          <label for="reasonInput" class="form-label">NOTE FOR PARENT (WHY DO YOU NEED THIS?) *</label>
+          <textarea id="reasonInput" class="neo-textarea" rows="2" placeholder="e.g. Weekend gaming session with my friends from school." required></textarea>
+        </div>
 
-      <div class="form-group">
-        <label for="reasonInput" class="form-label">NOTE FOR PARENT (WHY DO YOU NEED THIS?) *</label>
-        <textarea id="reasonInput" class="neo-textarea" rows="2" placeholder="e.g. Weekend gaming session with my friends from school." required></textarea>
-      </div>
+        <div id="submissionAlert" class="alert-box hidden"></div>
 
-      <div id="submissionAlert" class="alert-box hidden"></div>
-
-      <button type="submit" id="submitRequestBtn" class="neo-btn neo-btn-primary full-width action-btn">
-        [ SEND TO PARENT FOR APPROVAL ]
-      </button>
-    </form>
+        <button type="submit" id="submitRequestBtn" class="neo-btn neo-btn-primary full-width action-btn">
+          [ SEND TO PARENT FOR APPROVAL ]
+        </button>
+      </form>
+    </div>
   </main>
 
   <!-- Tab 2: My Requests List View -->
@@ -180,8 +222,8 @@
   <!-- Footer -->
   <footer class="app-footer">
     <div class="footer-row">
-      <span class="footer-tag">CW2 ALGORITHM</span>
-      <span class="footer-meta">RSA-2048 CRYPTOGRAPHIC APPROVAL</span>
+      <span class="footer-tag">PARENTGUARD</span>
+      <span class="footer-meta">PROTECTED FAMILY CHECKOUT</span>
     </div>
   </footer>
 

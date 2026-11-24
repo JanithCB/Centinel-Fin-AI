@@ -758,3 +758,220 @@ body::-webkit-scrollbar-thumb {
   color: #991B1B;
 }
 
+/* Live Post-Submission Waiting / Approved Status Card */
+.live-tracker-card {
+  background-color: var(--surface);
+  border: var(--border-thick);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.live-tracker-card.state-approved {
+  background-color: #F0FDF4;
+  border-color: #151515;
+}
+
+.live-tracker-card.state-denied {
+  background-color: #FEF2F2;
+  border-color: #991B1B;
+}
+
+.tracker-top-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 8px;
+}
+
+.tracker-status-pill {
+  font-size: 10px;
+  font-weight: 900;
+  padding: 3px 8px;
+  border: 2px solid var(--ink);
+  letter-spacing: 0.05em;
+}
+
+.tracker-status-pill.pending {
+  background-color: var(--yellow);
+  color: var(--ink);
+}
+
+.tracker-status-pill.approved {
+  background-color: var(--lime);
+  color: var(--ink);
+}
+
+.tracker-status-pill.denied {
+  background-color: var(--red-light);
+  color: #991B1B;
+}
+
+.tracker-req-id {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--gray-dark);
+}
+
+.tracker-visual-box {
+  margin: 6px 0 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Neo-Brutalist Animated Buffering Bars */
+.neo-buffer-loader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 4px 10px;
+  background-color: #FEF9C3;
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0px var(--ink);
+}
+
+.buffer-bar {
+  width: 8px;
+  background-color: var(--ink);
+  animation: neo-buffer-pulse 1s infinite ease-in-out;
+}
+
+.buffer-bar.bar-1 {
+  height: 12px;
+  animation-delay: 0s;
+}
+
+.buffer-bar.bar-2 {
+  height: 22px;
+  animation-delay: 0.18s;
+}
+
+.buffer-bar.bar-3 {
+  height: 16px;
+  animation-delay: 0.36s;
+}
+
+.buffer-bar.bar-4 {
+  height: 24px;
+  animation-delay: 0.54s;
+}
+
+@keyframes neo-buffer-pulse {
+  0%, 100% {
+    height: 8px;
+    background-color: #151515;
+  }
+  50% {
+    height: 24px;
+    background-color: #84CC16;
+  }
+}
+
+.tracker-state-symbol {
+  width: 48px;
+  height: 40px;
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0px var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.tracker-state-symbol.approved {
+  background-color: var(--lime);
+  color: var(--ink);
+}
+
+.tracker-state-symbol.denied {
+  background-color: var(--red-light);
+  color: #991B1B;
+}
+
+.tracker-headline {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  margin: 0;
+}
+
+.tracker-subtext {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-dark);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.tracker-item-box {
+  width: 100%;
+  background-color: var(--bg);
+  border: 2px solid var(--ink);
+  box-shadow: var(--shadow-sm);
+  padding: 9px 10px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tracker-item-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tracker-item-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.tracker-item-price {
+  background-color: var(--ink);
+  color: var(--lime);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.tracker-item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.tracker-item-domain {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: #2563EB;
+}
+
+.tracker-sync-tag {
+  background-color: #E2E8F0;
+  color: var(--ink);
+  padding: 1px 5px;
+  border: 1px solid var(--ink);
+}
+
+
