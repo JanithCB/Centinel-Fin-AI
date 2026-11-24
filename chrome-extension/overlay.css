@@ -37,9 +37,22 @@
   }
 }
 
-/* Legacy Floating Checkout Barrier Container (Disabled for cleaner child UX) */
-#parentguard-barrier-root {
+/* Legacy Floating Checkout Barrier Container (Permanently Removed for Clean Child UX) */
+#parentguard-barrier-root,
+.parentguard-barrier-card,
+.parentguard-barrier-header,
+.parentguard-barrier-body {
   display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  top: -9999px !important;
+  left: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 #parentguard-barrier-root * {

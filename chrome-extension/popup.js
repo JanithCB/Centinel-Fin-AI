@@ -115,6 +115,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   await detectActiveTab();
   await loadAuthState();
   startLivePolling();
+
+  // Proactively purge any legacy floating barrier from the active tab immediately
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs && tabs[0] && tabs[0].id && chrome.scripting) {
+      await chrome.scripting.executeScript({
+        target: { tabId: tabs[0].id },
+        func: () => {
+          const barrier = document.getElementById("parentguard-barrier-root");
+          if (barrier) barrier.remove();
+        }
+      }).catch(() => {});
+    }
+  } catch (_) {}
 });
 
 function startLivePolling() {
@@ -190,6 +204,9 @@ function showLiveApprovalTracker(req) {
     trackerSubtext.textContent =
       "Your parent approved this purchase! The Add to Cart and Checkout buttons on this page are now unlocked and ready to use.";
     trackerAutoSyncTag.textContent = "BUTTONS UNLOCKED";
+
+    // Directly unlock store buttons on the active tab and wipe any legacy floating popup
+    triggerDirectTabUnlock(req);
   } else if (req.status === "DENIED") {
     liveApprovalTracker.classList.add("state-denied");
     trackerStatusBadge.classList.add("denied");
@@ -218,6 +235,72 @@ function hideLiveApprovalTracker() {
   if (!liveApprovalTracker || !requestFormContainer) return;
   liveApprovalTracker.classList.add("hidden");
   requestFormContainer.classList.remove("hidden");
+}
+
+async function triggerDirectTabUnlock(approvedReq) {
+  if (!approvedReq) return;
+  const amtStr = Number(approvedReq.amount || 0).toFixed(2);
+  const titleStr = approvedReq.itemName || "";
+
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tabs || !tabs[0] || !tabs[0].id) return;
+    const tabId = tabs[0].id;
+
+    // 1. Message content script
+    chrome.tabs.sendMessage(tabId, {
+      type: "VERIFY_AND_UNLOCK_TAB",
+      approvedRequest: approvedReq
+    }).catch(() => {});
+
+    // 2. Direct DOM execution via chrome.scripting for instant, guaranteed unlocking
+    if (chrome.scripting) {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (amt, title) => {
+          // Immediately purge any legacy floating barrier
+          const barrier = document.getElementById("parentguard-barrier-root");
+          if (barrier) barrier.remove();
+
+          // Unlock all matching store buttons
+          const lockedBtns = document.querySelectorAll(
+            ".parentguard-locked-btn, [data-parentguard-locked='true'], [data-parentguard-intercepted='true']"
+          );
+          lockedBtns.forEach((btn) => {
+            const btnAmt = btn.getAttribute("data-parentguard-amount");
+            const btnTitle = (btn.getAttribute("data-parentguard-title") || "").toLowerCase().trim();
+            const targetTitle = (title || "").toLowerCase().trim();
+
+            const amtMatch = !btnAmt || btnAmt === amt;
+            const titleMatch = !btnTitle || !targetTitle || btnTitle.includes(targetTitle) || targetTitle.includes(btnTitle);
+
+            if (amtMatch || titleMatch) {
+              btn.classList.remove("parentguard-locked-btn");
+              btn.classList.add("parentguard-unlocked-btn");
+              btn.setAttribute("data-parentguard-unlocked", "true");
+              btn.setAttribute("data-parentguard-locked", "false");
+              btn.disabled = false;
+
+              const origHref = btn.getAttribute("data-parentguard-orig-href");
+              if (origHref) {
+                btn.setAttribute("href", origHref);
+              }
+
+              const container = btn.parentElement;
+              const shield = container ? container.querySelector(".parentguard-in-place-shield") : null;
+              if (shield) {
+                shield.classList.add("verified");
+                shield.textContent = `[ APPROVED — READY TO BUY ($${amt}) ]`;
+              }
+            }
+          });
+        },
+        args: [amtStr, titleStr]
+      });
+    }
+  } catch (err) {
+    console.debug("[Centinel Fin AI] Direct tab unlock error:", err);
+  }
 }
 
 function updateCurrencySymbol(currencyCode) {

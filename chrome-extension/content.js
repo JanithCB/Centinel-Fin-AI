@@ -362,10 +362,19 @@
 
   window.__PARENTGUARD_EXTRACT_PRODUCTS__ = extractPageProducts;
 
+  // Instantly eliminate any legacy floating barrier from the page
+  try {
+    const legacyCard = document.getElementById("parentguard-barrier-root");
+    if (legacyCard) legacyCard.remove();
+  } catch (_) {}
+
   if (window.__PARENTGUARD_CONTENT_INITIALIZED__) {
-    // If already initialized on this tab, rescan immediately (e.g. after SPA navigation or URL update)
+    // If already initialized on this tab, rescan and verify approvals immediately
     if (typeof scanPage === "function") {
       scanPage();
+    }
+    if (typeof verifyAndUnlockApprovedButtons === "function") {
+      verifyAndUnlockApprovedButtons();
     }
     return;
   }
@@ -758,6 +767,28 @@
     }
 
     if (message.type === "VERIFY_AND_UNLOCK_TAB" || message.type === "UNLOCK_CHECKOUT") {
+      try {
+        const legacy = document.getElementById("parentguard-barrier-root");
+        if (legacy) legacy.remove();
+      } catch (_) {}
+
+      if (message.approvedRequest) {
+        const directReq = message.approvedRequest;
+        const targetAmt = Number(directReq.amount || 0).toFixed(2);
+        const targetTitle = (directReq.itemName || "").toLowerCase().trim();
+
+        interceptedButtons.forEach((btn) => {
+          const btnAmt = btn.getAttribute("data-parentguard-amount");
+          const btnTitle = (btn.getAttribute("data-parentguard-title") || "").toLowerCase().trim();
+          const amtMatch = !btnAmt || btnAmt === targetAmt;
+          const titleMatch = !btnTitle || !targetTitle || btnTitle.includes(targetTitle) || targetTitle.includes(btnTitle);
+
+          if (amtMatch || titleMatch) {
+            unlockButtonWithProof(btn, directReq);
+          }
+        });
+      }
+
       verifyAndUnlockApprovedButtons().then(() => {
         sendResponse({ success: true });
       });
