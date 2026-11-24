@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Centinel Fin AI — Isometric Security Architecture (NB6005CEM)</title>
+  <title>Centinel Fin AI — Isometric Security Architecture</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Inter:wght@500;600;700;800&family=Space+Grotesk:wght@700;800&display=swap" rel="stylesheet">
@@ -197,7 +197,8 @@
       line-height: 1.1;
     }
 
-    .callout-cw1 {
+    .callout-cw1,
+    .callout-spec {
       display: none;
       font-family: 'IBM Plex Mono', monospace;
       font-size: 9.5px;
@@ -210,7 +211,9 @@
       text-align: left;
     }
 
-    body.show-cw1-tags .callout-cw1 {
+    body.show-cw1-tags .callout-cw1,
+    body.show-spec-tags .callout-spec,
+    body.show-spec-tags .callout-cw1 {
       display: block;
     }
 
@@ -248,7 +251,8 @@
       align-items: center;
     }
 
-    body.show-cw1-tags .mini-callout {
+    body.show-cw1-tags .mini-callout,
+    body.show-spec-tags .mini-callout {
       display: flex;
     }
 
@@ -366,7 +370,7 @@
           </span>
         </div>
         <p class="hidden md:block font-mono-code text-[9.5px] text-[#454934] uppercase tracking-wider">
-          NB6005CEM SECURITY ARCHITECTURE • ORTHOGRAPHIC ISOMETRIC TOPOLOGY
+          ENTERPRISE SECURITY ARCHITECTURE • ORTHOGRAPHIC ISOMETRIC TOPOLOGY
         </p>
       </div>
     </div>
@@ -394,9 +398,9 @@
         <span class="material-symbols-outlined text-[15px]">route</span>
         <span id="tour-btn-text">TOUR (1/7)</span>
       </button>
-      <button id="toggle-tags-btn" onclick="toggleCw1Tags()" class="px-2.5 py-1.5 text-[10px] md:text-[11px] uppercase neo-btn bg-white text-[#151515] hidden sm:flex items-center gap-1">
+      <button id="toggle-tags-btn" onclick="toggleSpecTags()" class="px-2.5 py-1.5 text-[10px] md:text-[11px] uppercase neo-btn bg-white text-[#151515] hidden sm:flex items-center gap-1">
         <span class="material-symbols-outlined text-[15px]">label</span>
-        <span id="toggle-tags-text">CW1 TAGS: OFF</span>
+        <span id="toggle-tags-text">SECURITY SPECS: OFF</span>
       </button>
       <a href="/" class="px-2.5 py-1.5 text-[10px] md:text-[11px] uppercase neo-btn bg-[#151515] text-white flex items-center gap-1 no-underline">
         <span class="material-symbols-outlined text-[15px]">arrow_back</span>
@@ -519,7 +523,7 @@
       <!-- Drawer Tabs -->
       <div class="grid grid-cols-3 gap-1 mt-3 border-2 border-[#151515] p-0.5 bg-[#FFFDF7]">
         <button id="tab-btn-sec" onclick="switchDrawerTab('security')" class="tab-btn active py-1.5 text-[10px] font-extrabold uppercase cursor-pointer">
-          SECURITY (CW1)
+          SECURITY MATRIX
         </button>
         <button id="tab-btn-ctrl" onclick="switchDrawerTab('controls')" class="tab-btn py-1.5 text-[10px] font-extrabold uppercase cursor-pointer">
           FLOW &amp; CONTROLS
@@ -532,53 +536,53 @@
 
     <!-- Scrollable Drawer Body -->
     <div class="flex-1 overflow-y-auto drawer-scroll p-4 space-y-3 bg-[#FFFDF7]">
-      <!-- TAB 1: CW1 SECURITY MATRIX -->
+      <!-- TAB 1: ZERO-TRUST SECURITY MATRIX -->
       <div id="tab-content-security" class="space-y-2.5">
         <div class="p-2.5 border-2 border-[#151515] bg-white shadow-[3px_3px_0px_#151515]">
           <span class="font-mono-code text-[9.5px] font-bold uppercase px-1.5 py-0.5 bg-[#B9A7FF] border border-[#151515] inline-block mb-1">
-            ACCESS CONTROL POINT (TASK 1.B)
+            ACCESS CONTROL POLICY (ACP)
           </span>
           <p id="card-acp" class="text-[11.5px] font-bold text-[#151515] leading-snug"></p>
         </div>
 
         <div class="p-2.5 border-2 border-[#151515] bg-white shadow-[3px_3px_0px_#151515]">
           <span class="font-mono-code text-[9.5px] font-bold uppercase px-1.5 py-0.5 bg-[#FFD64A] border border-[#151515] inline-block mb-1">
-            FIREWALL POINT (TASK 1.B)
+            FIREWALL &amp; PERIMETER GATE
           </span>
           <p id="card-fw" class="text-[11.5px] font-bold text-[#151515] leading-snug"></p>
         </div>
 
         <div class="p-2.5 border-2 border-[#151515] bg-white shadow-[3px_3px_0px_#151515]">
           <span class="font-mono-code text-[9.5px] font-bold uppercase px-1.5 py-0.5 bg-[#8EF0C0] border border-[#151515] inline-block mb-1">
-            ENCRYPTION POINT &amp; LEVEL (TASK 1.B)
+            ENCRYPTION &amp; CRYPTOGRAPHIC ASSURANCE
           </span>
           <p id="card-enc" class="text-[11.5px] font-bold text-[#151515] leading-snug"></p>
         </div>
 
         <div class="p-2.5 border-2 border-[#151515] bg-white shadow-[3px_3px_0px_#151515]">
           <span class="font-mono-code text-[9.5px] font-bold uppercase px-1.5 py-0.5 bg-[#FF8F7C] border border-[#151515] inline-block mb-1">
-            VULNERABILITY MITIGATED (TASK 1.B)
+            VULNERABILITY &amp; THREAT MITIGATION
           </span>
           <p id="card-vuln" class="text-[11.5px] font-bold text-[#151515] leading-snug"></p>
         </div>
 
-        <!-- 3-Layer Defense -->
+        <!-- Multi-Layer Defense-in-Depth -->
         <div class="p-3 border-2 border-[#151515] bg-white shadow-[3px_3px_0px_#151515]">
           <div class="font-display font-extrabold text-[11px] uppercase mb-2 flex items-center gap-1.5 border-b-2 border-[#151515] pb-1.5">
             <span class="w-2.5 h-2.5 bg-[#D9FF3F] border border-[#151515] inline-block"></span>
-            THREE-LAYER DEFENSE (TASK 1.C)
+            DEFENSE-IN-DEPTH ARCHITECTURE
           </div>
           <div class="space-y-2 text-[11px]">
             <div class="p-2 border border-[#151515] bg-[#FFFDF7]">
-              <strong class="font-mono-code text-[10px] uppercase block text-[#151515] mb-0.5">[1] ALGORITHM LEVEL (40%)</strong>
+              <strong class="font-mono-code text-[10px] uppercase block text-[#151515] mb-0.5">[1] ALGORITHM LAYER (CRYPTOGRAPHIC MECHANISM)</strong>
               <span id="card-algo" class="text-[#333] font-medium leading-snug"></span>
             </div>
             <div class="p-2 border border-[#151515] bg-[#FFFDF7]">
-              <strong class="font-mono-code text-[10px] uppercase block text-[#151515] mb-0.5">[2] PROTOCOL LEVEL (30%)</strong>
+              <strong class="font-mono-code text-[10px] uppercase block text-[#151515] mb-0.5">[2] PROTOCOL LAYER (TRANSPORT &amp; SESSION INTEGRITY)</strong>
               <span id="card-proto" class="text-[#333] font-medium leading-snug"></span>
             </div>
             <div class="p-2 border border-[#151515] bg-[#FFFDF7]">
-              <strong class="font-mono-code text-[10px] uppercase block text-[#151515] mb-0.5">[3] SYSTEM LEVEL (30%)</strong>
+              <strong class="font-mono-code text-[10px] uppercase block text-[#151515] mb-0.5">[3] SYSTEM LAYER (HOST &amp; RUNTIME ENFORCEMENT)</strong>
               <span id="card-sys" class="text-[#333] font-medium leading-snug"></span>
             </div>
           </div>
@@ -634,7 +638,6 @@
       'fw_db',
       'ledger_db'
     ];
-
     const STATIONS_DATA = {
       parentguard_client: {
         id: "parentguard_client",
@@ -644,8 +647,8 @@
         shortLabel: "CLIENT & EXT",
         cw1Short: "ACP-1 · ENC-1 · VULN-1",
         displayName: "Client Tier: Parent Portal & Child Extension",
-        tagline: "Next.js 16 Parent Dashboard + Manifest V3 Child Checkout Lock",
-        plainSummary: "Parents sign in via Supabase OAuth2 to review and approve spending requests. Meanwhile, the Child Chrome Extension locks online checkout Pay buttons until a backend RSA-2048 signature unlocks them.",
+        tagline: "Next.js 16 Parent Dashboard + Manifest V3 Dual-Stage DOM Lock",
+        plainSummary: "Parents manage child accounts, monitor spending tallies, inspect clean merchant URLs, and approve purchase requests in a dedicated Approvals Center with real-time cryptographic proof verification. Meanwhile, the Child Chrome Extension intercepts e-commerce purchases with a dual-stage DOM lock on Add to Cart and Checkout buttons, automatically verifies the backend RSA-2048 digital signature via client-side WebCrypto, and seamlessly auto-unlocks upon approval.",
         status: "operational",
         accentHex: "#B9A7FF",
         color: 0xB9A7FF,
@@ -656,31 +659,36 @@
         cw1: {
           acp: "ACP-1: Supabase OAuth2 Session Gate & Role-Aware Guard (ROLE_PARENT vs ROLE_CHILD)",
           fw: "FW-1: Edge Reverse Proxy + Strict Browser Content-Security-Policy (CSP)",
-          enc: "ENC-1: HTTPS / TLS 1.3 In-Transit + WebCrypto RSA-2048 Token Verification",
+          enc: "ENC-1: HTTPS / TLS 1.3 In-Transit + WebCrypto API RSA-2048 Client Verification",
           vuln: "VULN-1: Cross-Site Scripting (XSS), Clickjacking & Child Checkout Bypass",
-          algo: "WebCrypto API (crypto.subtle.verify RSA-2048 signature on parent approval token)",
+          algo: "WebCrypto API (crypto.subtle.verify RSA-2048 SHA-256 signature on approved purchase contract)",
           proto: "TLS 1.3 (ECDHE), HSTS, CSP, X-Frame-Options: DENY, SameSite=Strict Cookies",
-          sys: "Browser DOM Sandbox + Isolated Chrome Extension Manifest V3 Service Worker"
+          sys: "Browser DOM Sandbox + Isolated Chrome Extension Manifest V3 Background Service Worker"
         },
         files: [
           "frontend/src/app/dashboard/page.tsx",
-          "frontend/src/middleware.ts",
+          "frontend/src/app/dashboard/approvals/page.tsx",
+          "frontend/src/components/approvals/RSASignatureModal.tsx",
+          "frontend/src/components/dashboard/AddChildModal.tsx",
           "chrome-extension/manifest.json",
-          "chrome-extension/content.js"
+          "chrome-extension/content.js",
+          "chrome-extension/background.js",
+          "chrome-extension/popup.html"
         ],
         metrics: {
-          "Parent Portal": "Next.js 16 (Neo-Brutalist)",
-          "Child Agent": "Manifest V3 Extension",
-          "Auth Token": "Supabase RS256/ES256 JWT",
-          "Checkout Lock": "WebCrypto RSA Unlock"
+          "Parent Dashboard": "Next.js 16 (Approvals Center + Proof Modal)",
+          "Child Extension": "Manifest V3 Dual-Stage Lock",
+          "Client Crypto": "WebCrypto API (crypto.subtle RSA-2048)",
+          "Store Scraper": "Steam, Amazon & E-Commerce Cart/Checkout"
         },
         boundary: "Untrusted Client Browser DOM -> Edge L3 Router -> Firewall FW-1",
         inputs: "Child E-Commerce Checkout Attempt, Parent Approval Decision, Bearer JWT",
-        outputs: "Signed Purchase Request (POST /api/v1/purchase-requests)",
+        outputs: "Signed Purchase Request (POST /api/v1/purchase-requests), WebCrypto Unlock Event",
         controls: [
-          { name: "Next.js Middleware Gate", status: "operational", desc: "Intercepts unauthenticated routes and enforces session validity before rendering." },
-          { name: "Role-Aware Parent vs Child UI", status: "operational", desc: "Renders approval controls strictly for verified ROLE_PARENT accounts." },
-          { name: "Checkout DOM Lock Overlay", status: "in-development", desc: "Blocks e-commerce Pay button until RSA-2048 signed parent token is verified." }
+          { name: "Next.js Middleware & Auth Gate", status: "operational", desc: "Intercepts unauthenticated routes and enforces session validity before rendering." },
+          { name: "Dedicated Approvals Center", status: "operational", desc: "Real-time queue with status filters and RSASignatureModal cryptographic proof viewer." },
+          { name: "Multi-Option Store Scraper", status: "operational", desc: "Scrapes items, package variants, currencies, and exact prices across Steam and retail stores." },
+          { name: "Dual-Stage DOM Lock & WebCrypto Verifier", status: "operational", desc: "Locks Add to Cart and Checkout buttons, verifies RSA-2048 backend signature, and auto-unlocks." }
         ]
       },
       fw_edge: {
@@ -691,8 +699,8 @@
         shortLabel: "EDGE IDS FW-1",
         cw1Short: "FW-1 · IDS · HTTP 403/429",
         displayName: "FW-1: Edge Perimeter & IDS Firewall",
-        tagline: "Default-Deny Ingress Filter, Rate Limiter & SQLi/XSS Inspection",
-        plainSummary: "Every external request from the Client Portal, Chrome Extension, or n8n Bank Webhook must pass through FW-1 before touching Spring Boot. It strips malformed headers, throttles floods, and drops SQLi/XSS payloads with HTTP 403.",
+        tagline: "Default-Deny Ingress Filter, Token Bucket Rate Limiter, SQLi/XSS Inspection & CORS Gateway",
+        plainSummary: "Every external request from the Parent Portal, Child Chrome Extension, or n8n Bank Webhook must pass through FW-1 before touching Spring Boot. It strips malformed headers, throttles burst floods with HTTP 429, drops SQLi/XSS payloads with HTTP 403, and strictly permits chrome-extension://* origins.",
         status: "operational",
         accentHex: "#FF8F7C",
         color: 0xFF8F7C,
@@ -711,22 +719,22 @@
         },
         files: [
           "src/main/java/com/centinel/finai/security/IntrusionDetectionFilter.java",
-          "src/main/java/com/centinel/finai/common/SecurityConfig.java",
-          "security_labs/lab09_firewall_rules.py"
+          "src/main/java/com/centinel/finai/common/WebMvcConfig.java",
+          "src/main/java/com/centinel/finai/common/SecurityConfig.java"
         ],
         metrics: {
-          "Ingress Policy": "Default-Deny (443 Only)",
-          "Attack Blocks": "SQLi, XSS, Path Traversal",
-          "Flood Action": "HTTP 429 Rate Limit",
-          "Inspection": "Pre-Controller Servlet"
+          "Ingress Ports": "TCP 80 / 443 (HTTPS Only)",
+          "Attack Signatures": "Compiled Regex (SQLi / XSS / LFI)",
+          "Rate Limiting": "Sliding-Window Token Bucket (429)",
+          "CORS Gateway": "Strict + chrome-extension://* Allowed"
         },
-        boundary: "Untrusted Public Internet & Webhooks -> FW-1 -> Spring Boot Zero-Trust VPC",
-        inputs: "Raw HTTP Requests, n8n Bank Webhooks, Malicious SQLi/XSS Probes",
-        outputs: "Sanitized Valid Traffic to Core (or Immediate HTTP 403 Drop + Audit Log)",
+        boundary: "Public Internet Ingress -> FW-1 DMZ Perimeter -> Spring Boot Core VPC",
+        inputs: "External HTTPS Requests, Browser Extension API Calls, Webhook Payloads",
+        outputs: "Sanitized Ingress Stream to Spring DispatcherServlet (or HTTP 403/429 Drop)",
         controls: [
-          { name: "IntrusionDetectionFilter", status: "operational", desc: "Inspects query parameters and request payloads for SQLi and XSS signatures." },
-          { name: "Burst Rate Limiter", status: "operational", desc: "Prevents brute-force credential stuffing and webhook flood saturation." },
-          { name: "Default-Deny Port Filter", status: "operational", desc: "Blocks all non-HTTPS ports and enforces strict CORS origin allowlisting." }
+          { name: "IntrusionDetectionFilter", status: "operational", desc: "Inspects parameters and request payloads, terminating malicious SQLi/XSS with HTTP 403." },
+          { name: "Token Bucket Rate Limiter", status: "operational", desc: "Prevents brute-force credential stuffing and flood attacks by throttling bursts to HTTP 429." },
+          { name: "Extension CORS Gateway", status: "operational", desc: "Enforces strict origin whitelisting in WebMvcConfig, accommodating chrome-extension://*." }
         ]
       },
       ingestion_pipeline: {
@@ -738,7 +746,7 @@
         cw1Short: "ACP-2 · ENC-2 · VULN-2",
         displayName: "Ingestion Gateway: n8n Bank Webhook & Parser",
         tagline: "Automated Bank Notification Capture, HMAC Guard & SHA-256 Dedup",
-        plainSummary: "Captures permissioned bank SMS or email alerts via n8n and routes them through FW-1 into Spring Boot. Verifies constant-time HMAC-SHA256 signatures and computes SHA-256 hashes to block replay duplicates.",
+        plainSummary: "Listens for automated financial notification feeds and SMS alerts dispatched by n8n. Verifies authenticity using constant-time HMAC-SHA256 signatures and computes SHA-256 content hashes to block replay duplicates. Parses merchant, currency, and exact amount using Java BigDecimal to eliminate floating-point drift.",
         status: "operational",
         accentHex: "#8DDAFF",
         color: 0x8DDAFF,
@@ -762,10 +770,10 @@
           "feed_mock_data.ps1"
         ],
         metrics: {
-          "Webhook Endpoint": "POST /api/ingestion/webhook",
-          "Integrity Check": "HMAC-SHA256 + SHA-256",
-          "Currency Math": "Java BigDecimal (Exact)",
-          "Lab Proof": "security_labs/lab06_hashing.py"
+          "Webhook Ingress": "POST /api/ingestion/webhook",
+          "HMAC Guard": "HMAC-SHA256 (Constant-Time Compare)",
+          "Replay Defense": "SHA-256 Digest Fingerprint",
+          "Currency Precision": "Java BigDecimal (Zero Float Drift)"
         },
         boundary: "External n8n Automation Engine -> Firewall FW-1 -> IngestionController",
         inputs: "Raw Bank SMS / Notification JSON, X-API-KEY, X-HMAC-Signature",
@@ -773,7 +781,7 @@
         controls: [
           { name: "Constant-Time Key & HMAC Check", status: "operational", desc: "Uses MessageDigest.isEqual() to defeat byte-by-byte timing attacks." },
           { name: "SHA-256 Replay Prevention", status: "operational", desc: "Computes 256-bit digest of raw message to block duplicate bank alerts." },
-          { name: "BigDecimal Regex Parser", status: "operational", desc: "Extracts merchant, currency, and exact amount from unstructured text." }
+          { name: "BigDecimal Regex Parser", status: "operational", desc: "Extracts merchant, currency, and exact amount without IEEE-754 precision loss." }
         ]
       },
       security_core: {
@@ -784,8 +792,8 @@
         shortLabel: "SPRING CORE",
         cw1Short: "ACP-3 · ENC-3 · VULN-3",
         displayName: "Core Security Fortress: Spring Boot 3 Resource Server",
-        tagline: "OAuth2 JWKS Validator, RBAC, AES-256-GCM & RSA-2048 Signer",
-        plainSummary: "The central zero-trust brain of Centinel Fin AI. It verifies Supabase JWT signatures, checks database-authoritative Parent/Child roles, encrypts sensitive fields with AES-256-GCM, and signs approval tokens with RSA-2048.",
+        tagline: "OAuth2 JWKS Validator, RBAC, AES-256-GCM Field Encryption & RSA-2048 Signer",
+        plainSummary: "The central zero-trust hub of Centinel Fin AI. Enforces strict purchase request contracts, computes SHA-256 idempotency hashes to prevent duplicate orders, verifies Supabase JWT signatures, authorizes decisions via database-backed parent roles, signs approved contracts using RSA-2048 (SHA256withRSA), publishes public keys via discovery endpoint, masks sensitive PANs/URLs, and encrypts database attributes with AES-256-GCM.",
         status: "operational",
         accentHex: "#8EF0C0",
         color: 0x8EF0C0,
@@ -803,24 +811,28 @@
           sys: "IntrusionDetectionFilter (Blocks SQLi/XSS & floods with HTTP 403/429)"
         },
         files: [
-          "src/main/java/com/centinel/finai/common/SecurityConfig.java",
-          "src/main/java/com/centinel/finai/security/AesEncryptionService.java",
+          "src/main/java/com/centinel/finai/service/PurchaseRequestService.java",
           "src/main/java/com/centinel/finai/security/RsaSignatureService.java",
-          "src/main/java/com/centinel/finai/security/IntrusionDetectionFilter.java"
+          "src/main/java/com/centinel/finai/security/AesEncryptionService.java",
+          "src/main/java/com/centinel/finai/security/SensitiveDataMaskingService.java",
+          "src/main/java/com/centinel/finai/controller/SecurityController.java",
+          "src/main/java/com/centinel/finai/common/SecurityConfig.java"
         ],
         metrics: {
-          "Symmetric Crypto": "AES-256-GCM (At-Rest)",
-          "Asymmetric Crypto": "RSA-2048 (Signatures)",
-          "Unit Test Suite": "129+ JUnit 5 Tests Pass",
-          "Lab Proofs": "Labs 01-05 & Labs 07-10"
+          "Digital Signature": "RSA-2048 (SHA256withRSA)",
+          "Key Discovery": "GET /api/v1/security/public-key",
+          "Idempotency Engine": "SHA-256 Contract Digest",
+          "Automated Test Suite": "130+ Passing JUnit 5 Tests"
         },
         boundary: "Edge Firewall FW-1 -> Spring Security Filter Chain -> Internal Domain Services",
-        inputs: "Authenticated REST Requests, Purchase Approvals, Ingested Bank Alerts",
-        outputs: "RSA-Signed Approval Tokens, AES-Encrypted Entities, Security Audit Logs",
+        inputs: "Authenticated Bearer JWT Requests, Webhook Ingestion Entities, Purchase Submissions",
+        outputs: "Cryptographically Signed Purchase Tokens, Encrypted Transactions, Audit Logs",
         controls: [
-          { name: "OAuth2 JWKS & RBAC Gate", status: "operational", desc: "Verifies JWT signature and enforces ROLE_PARENT on approval endpoints." },
-          { name: "AES-256-GCM Field Encryption", status: "in-development", desc: "Encrypts sensitive payload fields with unique 12-byte IV + 128-bit GCM tag." },
-          { name: "RSA-2048 Approval Signer", status: "in-development", desc: "Signs parent approval decisions with backend private key for browser verification." }
+          { name: "OAuth2 JWKS & RBAC Gate", status: "operational", desc: "Verifies Supabase JWT signatures and enforces authoritative ROLE_PARENT vs ROLE_CHILD roles." },
+          { name: "Purchase Contract & Idempotency Engine", status: "operational", desc: "Validates canonical JSON contracts and computes SHA-256 hashes to block duplicate requests." },
+          { name: "RSA-2048 Approval Signer", status: "operational", desc: "Signs approved purchase contracts with SHA256withRSA and publishes public key endpoint." },
+          { name: "AES-256-GCM Field Encryption", status: "operational", desc: "Encrypts sensitive data columns at rest using 96-bit SecureRandom IV and 128-bit auth tags." },
+          { name: "Sensitive Data Masking Sieve", status: "operational", desc: "Detects and redacts card PANs with Luhn algorithm while preserving safe merchant paths." }
         ]
       },
       ai_engine: {
@@ -832,13 +844,13 @@
         cw1Short: "ACP-4 · ENC-4 · VULN-4",
         displayName: "AI Privacy Sieve & Gemini 3.8 Flash Intelligence",
         tagline: "Luhn PAN Masking Perimeter + Hybrid Merchant Classifier & Insights",
-        plainSummary: "Before any transaction description leaves the server for Gemini AI, the in-memory Luhn PII Sieve strips 13-19 digit card numbers and personal identifiers. Known merchants resolve locally in O(1) time with zero cloud exposure.",
+        plainSummary: "All transactions pass through an in-memory data redaction sieve before touching artificial intelligence. Luhn-valid credit card numbers (PANs) and sensitive credentials are scrubbed. Cleaned data is evaluated by local rule categorizers with fallback to Google Gemini 3.8 Flash for structured financial analytics.",
         status: "operational",
-        accentHex: "#D9FF3F",
-        color: 0xD9FF3F,
-        position: [-9.2, 0, -0.8],
-        labelAnchor: [-9.2, 2.75, -0.8],
-        focusLookAt: [-9.2, 0.7, -0.8],
+        accentHex: "#FFD64A",
+        color: 0xFFD64A,
+        position: [-8.8, 0, -2.4],
+        labelAnchor: [-8.8, 3.25, -2.4],
+        focusLookAt: [-8.8, 0.9, -2.4],
         focusZoom: 1.6,
         cw1: {
           acp: "ACP-4: Isolated Google GenAI API Key & Read-Only Grounded Service Scope",
@@ -851,23 +863,22 @@
         },
         files: [
           "src/main/java/com/centinel/finai/service/SensitiveDataMaskingService.java",
-          "src/main/java/com/centinel/finai/service/MerchantCategorizationService.java",
-          "src/main/java/com/centinel/finai/util/MaskingUtils.java",
-          "src/main/java/com/centinel/finai/ai/GeminiCategorizationClient.java"
+          "src/main/java/com/centinel/finai/service/TransactionCategorizerService.java",
+          "src/main/java/com/centinel/finai/service/GeminiAiService.java"
         ],
         metrics: {
-          "AI Model": "Google Gemini 3.8 Flash",
-          "Privacy Filter": "Luhn PAN + Regex Masking",
-          "Tier 1 Speed": "O(1) Deterministic Map",
-          "Tier 2 Fallback": "Masked AI Categorization"
+          "Pre-LLM Masking": "Luhn Checksum Algorithm (100% PII Strip)",
+          "Local Classifier": "Tier 1 Rule Engine (<1ms)",
+          "LLM Runtime": "Gemini 3.8 Flash (Structured JSON)",
+          "Egress Boundary": "TLS 1.3 Outbound Whitelist Only"
         },
-        boundary: "Spring Boot JVM Memory -> PII Masking Sieve -> Google Gemini Cloud API",
-        inputs: "Masked Transaction Text ('Card ****1234 at MERCHANT'), Aggregated Spend Totals",
-        outputs: "Standardized Category Enum, Grounded Family Spend Insights",
+        boundary: "Spring Boot Domain Services -> Luhn Privacy Sieve -> Google Gemini API",
+        inputs: "Masked Transaction Metadata, Aggregated Financial Spend Summaries",
+        outputs: "Category Labels, Structured Anomaly Flags, Contextual Insights",
         controls: [
-          { name: "Luhn PAN Scrubbing Sieve", status: "operational", desc: "Detects and masks 13-19 digit Luhn-valid card numbers before AI processing." },
-          { name: "Tier 1 Rule Categorizer", status: "operational", desc: "Classifies known merchants locally in <1ms without external network calls." },
-          { name: "Gemini 3.8 Flash Fallback", status: "in-development", desc: "Classifies unknown merchants and answers natural-language spend queries safely." }
+          { name: "Luhn PAN Scrubbing Sieve", status: "operational", desc: "Detects and masks 13-19 digit Luhn-valid card numbers, CVVs, and credentials." },
+          { name: "Tier 1 Rule Categorizer", status: "operational", desc: "Classifies known merchants locally in <1ms without network latency or API calls." },
+          { name: "Gemini 3.8 Flash Engine", status: "operational", desc: "Delivers contextual spend explanations with strict structured JSON schema enforcement." }
         ]
       },
       fw_db: {
@@ -879,13 +890,13 @@
         cw1Short: "FW-2 · PORT 5432 VPC",
         displayName: "FW-2: Internal Database Isolation Firewall",
         tagline: "Zero Public Internet Exposure • VPC-Only PostgreSQL Port 5432 Gate",
-        plainSummary: "Separates the application tier from the PostgreSQL ledger. No browser, child extension, or external webhook can ever reach port 5432 directly—only authenticated Spring Boot VPC connections over TLS 1.3 are permitted.",
+        plainSummary: "Strict internal security boundary separating the application tier from the database tier. PostgreSQL port 5432 is locked within a private VPC subnet, completely unexposed to the internet, accepting connections strictly from the Spring Boot application cluster with mandatory TLS 1.3 and SCRAM-SHA-256 authentication.",
         status: "operational",
         accentHex: "#B9A7FF",
         color: 0xB9A7FF,
-        position: [0, 0, -5.6],
-        labelAnchor: [0, 2.25, -5.6],
-        focusLookAt: [0, 0.7, -5.6],
+        position: [3.8, 0, -6.8],
+        labelAnchor: [3.8, 2.35, -6.8],
+        focusLookAt: [3.8, 0.7, -6.8],
         focusZoom: 1.75,
         cw1: {
           acp: "ACP-5 Pre-Gate: Mutual VPC Security Group + Least-Privilege Connection Pool",
@@ -898,14 +909,13 @@
         },
         files: [
           "src/main/resources/application.properties",
-          "src/main/java/com/centinel/finai/common/DataSourceConfig.java",
-          "security_labs/lab09_firewall_rules.py"
+          "src/main/java/com/centinel/finai/common/DataSourceConfig.java"
         ],
         metrics: {
-          "Exposed Port": "5432 (Private VPC Only)",
-          "Transport": "TLS 1.3 (verify-full)",
-          "Auth Method": "SCRAM-SHA-256",
-          "Public Access": "0% (Dropped at FW-2)"
+          "PostgreSQL Port": "5432 (Non-Public, VPC Only)",
+          "Subnet Isolation": "Spring Boot Cluster Binding",
+          "Wire Transport": "TLS 1.3 (sslmode=verify-full)",
+          "Authentication": "SCRAM-SHA-256"
         },
         boundary: "Spring Boot Domain Tier -> FW-2 Private Gate -> Isolated Data Vault",
         inputs: "TLS-Encrypted HikariCP Parameterized SQL Queries from Spring Boot",
@@ -923,9 +933,9 @@
         zoneLabel: "ZONE 05 // ISOLATED DATA VAULT",
         shortLabel: "POSTGRES VAULT",
         cw1Short: "ACP-5 · ENC-5 · VULN-5",
-        displayName: "Data Vault: Supabase PostgreSQL Unit & Backup Safe",
-        tagline: "Single-Unit Relational Vault (CW1 1.a) + AES-256-GCM Encrypted Backups",
-        plainSummary: "Stores family permissions, purchase logs, and encrypted financial records in a single unified PostgreSQL vault. All queries use parameterized JPA statements, and daily backups are locked with AES-256-GCM and RSA signatures.",
+        displayName: "Data Vault: PostgreSQL Relational Vault & Encrypted Backup Safe",
+        tagline: "Isolated Relational Vault + AES-256-GCM Encrypted Backups",
+        plainSummary: "Stores financial transactions, family account bindings, and purchase requests in Supabase PostgreSQL with encrypted field attributes. Enforces data integrity via parameterized JPA queries, eliminating SQL injection. Protected by an automated 3-2-1 backup rotation that signs and encrypts database archives with SHA-256 and AES-256-GCM.",
         status: "operational",
         accentHex: "#FFD64A",
         color: 0xFFD64A,
@@ -943,24 +953,24 @@
           sys: "3-2-1 Automated Encrypted Disaster Recovery Backups (automated_encrypted_backup.py)"
         },
         files: [
-          "src/main/java/com/centinel/finai/entity/Transaction.java",
-          "src/main/java/com/centinel/finai/purchase/PurchaseRequest.java",
+          "src/main/java/com/centinel/finai/repository/PurchaseRequestRepository.java",
+          "src/main/java/com/centinel/finai/repository/TransactionRepository.java",
           "src/main/resources/db/migration/V1__schema.sql",
           "security_ops/automated_encrypted_backup.py"
         ],
         metrics: {
-          "CW1 Representation": "Single Database Unit",
-          "Engine": "Supabase PostgreSQL 15+",
-          "SQLi Defense": "JPA PreparedStatements",
-          "Disaster Recovery": "AES-256-GCM Backup Safe"
+          "Database Engine": "PostgreSQL 15+ (Supabase Vault)",
+          "Data Isolation": "Isolated Subnet (No Public IP)",
+          "Column Security": "AES-256-GCM Field Protection",
+          "Disaster Recovery": "3-2-1 Encrypted Backup Safe"
         },
-        boundary: "Spring Boot JPA Pool -> Internal Firewall FW-2 -> PostgreSQL Single Unit Vault",
+        boundary: "Spring Boot JPA Pool -> Internal Firewall FW-2 -> PostgreSQL Dedicated Vault",
         inputs: "Parameterized SQL Queries, AES-256-GCM Ciphertext Blobs",
         outputs: "ACID Ledger Records, Encrypted Snapshot Archives (.enc)",
         controls: [
           { name: "Internal Firewall FW-2 Isolation", status: "operational", desc: "Blocks all public internet traffic from reaching PostgreSQL port 5432." },
           { name: "Parameterized JPA Queries", status: "operational", desc: "Eliminates SQL injection by separating query structure from user parameters." },
-          { name: "AES-256-GCM Backup Safe", status: "in-development", desc: "Hashes ledger dump with SHA-256, encrypts with AES-GCM, and signs manifest." }
+          { name: "AES-256-GCM Encrypted Backups", status: "operational", desc: "Hashes ledger dump with SHA-256, encrypts with AES-GCM, and signs backup manifest." }
         ]
       }
     };
@@ -1003,7 +1013,8 @@
     let selectedStationId = null;
     let hoveredStationId = null;
     let simulationMode = 'all';
-    let cw1TagsVisible = false;
+    let specTagsVisible = false;
+    let cw1TagsVisible = false; // alias
     let interactionMode = 'pan'; // 'pan' or 'orbit'
 
     let pointerDownPos = { x: 0, y: 0 };
@@ -1441,7 +1452,7 @@
       clickableGroups.push(group);
       stationMeshGroups[data.id] = group;
 
-      // --- Compact Edge L3 Switch Puck (CW1 Task 1.a Network Topology) ---
+      // --- Compact Edge L3 Switch Puck ---
       const sw = new THREE.Group();
       sw.position.set(0, 0, 7.2);
       sw.add(makeBox(1.6, 0.28, 1.1, 0xFFFFFF, 0, 0.14, 0));
@@ -1864,7 +1875,7 @@
               <span class="callout-code" style="background:${st.accentHex}">${st.code}</span>
               <span class="callout-title">${st.shortLabel}</span>
             </div>
-            <div class="callout-cw1">${st.cw1Short}</div>
+            <div class="callout-spec callout-cw1">${st.cw1Short}</div>
           </div>
           <div class="callout-stem"></div>
         `;
@@ -1897,10 +1908,10 @@
         });
       });
 
-      // Subtle optional mini callout for L3 Switch (shown only when CW1 TAGS are ON)
+      // Subtle optional mini callout for L3 Switch (shown only when SECURITY SPECS are ON)
       const l3El = document.createElement('div');
       l3El.className = 'mini-callout';
-      l3El.innerHTML = `<div class="mini-callout-pill">CW1 1.A · EDGE L3 SWITCH</div>`;
+      l3El.innerHTML = `<div class="mini-callout-pill">EDGE L3 SWITCH</div>`;
       layer.appendChild(l3El);
       routerMiniCallout = { el: l3El, worldPos: new THREE.Vector3(0, 1.25, 7.2) };
     }
@@ -1976,7 +1987,7 @@
       });
 
       // Mini L3 switch tag
-      if (routerMiniCallout && cw1TagsVisible) {
+      if (routerMiniCallout && (specTagsVisible || cw1TagsVisible)) {
         _projVec.copy(routerMiniCallout.worldPos).project(camera);
         const sx = (_projVec.x * 0.5 + 0.5) * vw;
         const sy = (-_projVec.y * 0.5 + 0.5) * vh;
@@ -2147,13 +2158,20 @@
       focusStation(TOUR_ORDER[nextIdx]);
     }
 
-    function toggleCw1Tags() {
-      cw1TagsVisible = !cw1TagsVisible;
-      document.body.classList.toggle('show-cw1-tags', cw1TagsVisible);
-      document.getElementById('toggle-tags-text').innerText = cw1TagsVisible ? 'CW1 TAGS: ON' : 'CW1 TAGS: OFF';
-      document.getElementById('toggle-tags-btn').classList.toggle('bg-[#D9FF3F]', cw1TagsVisible);
-      document.getElementById('toggle-tags-btn').classList.toggle('bg-white', !cw1TagsVisible);
+    function toggleSpecTags() {
+      specTagsVisible = !specTagsVisible;
+      cw1TagsVisible = specTagsVisible;
+      document.body.classList.toggle('show-cw1-tags', specTagsVisible);
+      document.body.classList.toggle('show-spec-tags', specTagsVisible);
+      const textEl = document.getElementById('toggle-tags-text');
+      if (textEl) textEl.innerText = specTagsVisible ? 'SECURITY SPECS: ON' : 'SECURITY SPECS: OFF';
+      const btn = document.getElementById('toggle-tags-btn');
+      if (btn) {
+        btn.classList.toggle('bg-[#D9FF3F]', specTagsVisible);
+        btn.classList.toggle('bg-white', !specTagsVisible);
+      }
     }
+    const toggleCw1Tags = toggleSpecTags;
 
     function updateDockButtons() {
       document.querySelectorAll('.dock-btn').forEach(btn => {
@@ -2199,13 +2217,13 @@
       const banner = document.getElementById('sim-status-banner');
       const dot = document.getElementById('telemetry-dot');
       if (mode === 'approval') {
-        banner.innerText = "FLOW A: CHILD CHECKOUT LOCK -> FW-1 -> CORE -> PARENT RSA-2048 SIGN -> UNLOCK";
+        banner.innerText = "FLOW A: CHILD CHECKOUT LOCK -> FW-1 -> CORE -> PARENT APPROVAL CENTER -> RSA-2048 SIGN -> WEBCRYPTO CLIENT UNLOCK";
         dot.style.background = '#B9A7FF';
       } else if (mode === 'webhook') {
-        banner.innerText = "FLOW B: N8N WEBHOOK (HMAC) -> FW-1 -> CORE -> LUHN PII MASK -> GEMINI 3.8 -> POSTGRES VAULT";
+        banner.innerText = "FLOW B: N8N BANK WEBHOOK (HMAC) -> FW-1 -> CORE DEDUP -> LUHN PII MASK -> GEMINI 3.8 FLASH -> POSTGRES VAULT";
         dot.style.background = '#D9FF3F';
       } else if (mode === 'attack') {
-        banner.innerText = "FLOW C: SQLi / XSS INTRUSION INTERCEPTED & DROPPED AT FW-1 EDGE (HTTP 403)";
+        banner.innerText = "FLOW C: SQLi / XSS INTRUSION ATTEMPT -> DROPPED AT FW-1 EDGE FIREWALL (HTTP 403 FORBIDDEN)";
         dot.style.background = '#E5484D';
       } else {
         banner.innerText = "ALL FLOWS ACTIVE // CLICK ANY SECTOR OR START GUIDED TOUR";
@@ -2233,13 +2251,14 @@
       document.getElementById('drawer-tagline').innerText = data.tagline;
       document.getElementById('drawer-plain-summary').innerText = data.plainSummary;
 
-      document.getElementById('card-acp').innerText = data.cw1.acp;
-      document.getElementById('card-fw').innerText = data.cw1.fw;
-      document.getElementById('card-enc').innerText = data.cw1.enc;
-      document.getElementById('card-vuln').innerText = data.cw1.vuln;
-      document.getElementById('card-algo').innerText = data.cw1.algo;
-      document.getElementById('card-proto').innerText = data.cw1.proto;
-      document.getElementById('card-sys').innerText = data.cw1.sys;
+      const specData = data.specs || data.cw1;
+      document.getElementById('card-acp').innerText = specData.acp;
+      document.getElementById('card-fw').innerText = specData.fw;
+      document.getElementById('card-enc').innerText = specData.enc;
+      document.getElementById('card-vuln').innerText = specData.vuln;
+      document.getElementById('card-algo').innerText = specData.algo;
+      document.getElementById('card-proto').innerText = specData.proto;
+      document.getElementById('card-sys').innerText = specData.sys;
 
       document.getElementById('card-boundary').innerText = data.boundary;
       document.getElementById('card-inputs').innerText = data.inputs;
