@@ -268,14 +268,11 @@ function showLiveApprovalTracker(req) {
     trackerApprovedIcon.classList.remove("hidden");
     trackerDeniedIcon.classList.add("hidden");
     trackerHeadline.textContent = "APPROVED — YOU CAN BUY NOW!";
-    trackerSubtext.textContent = currentTabInfo.isCartOrCheckout
-      ? "Your item on this store is already approved by your parent! Checkout is unlocked — you can complete your purchase."
-      : "Your parent approved this purchase! Add to Cart / Buy Now is unlocked on this page, and your cart checkout will stay unlocked.";
-    trackerAutoSyncTag.textContent = "READY FOR CHECKOUT";
+    trackerSubtext.textContent =
+      "Your parent approved this purchase! Continue to Payment / Checkout is unlocked on this page.";
+    trackerAutoSyncTag.textContent = "CHECKOUT UNLOCKED";
 
-    if (!currentTabInfo.isCartOrCheckout) {
-      triggerDirectTabUnlock(req);
-    }
+    triggerDirectTabUnlock(req);
   } else if (req.status === "DENIED") {
     liveApprovalTracker.classList.add("state-denied");
     trackerStatusBadge.classList.add("denied");
@@ -342,16 +339,9 @@ async function triggerDirectTabUnlock(approvedReq) {
           );
           lockedBtns.forEach((btn) => {
             const btnAmt = btn.getAttribute("data-parentguard-amount");
-            const btnTitle = (btn.getAttribute("data-parentguard-title") || "").toLowerCase().trim();
-            const targetTitle = (title || "").toLowerCase().trim();
+            const amtMatch = !btnAmt || btnAmt === amt;
 
-            const amtMatch = btnAmt ? btnAmt === amt : urlMatches;
-            const titleMatch =
-              btnTitle && targetTitle
-                ? btnTitle.includes(targetTitle) || targetTitle.includes(btnTitle)
-                : false;
-
-            if (amtMatch || (titleMatch && urlMatches)) {
+            if (amtMatch) {
               btn.classList.remove("parentguard-locked-btn");
               btn.classList.add("parentguard-unlocked-btn");
               btn.setAttribute("data-parentguard-unlocked", "true");
@@ -367,7 +357,7 @@ async function triggerDirectTabUnlock(approvedReq) {
               const shield = container ? container.querySelector(".parentguard-in-place-shield") : null;
               if (shield) {
                 shield.classList.add("verified");
-                shield.textContent = `[ APPROVED — READY TO BUY ($${amt}) ]`;
+                shield.textContent = `[ APPROVED — READY TO PAY ($${amt}) ]`;
               }
             }
           });
@@ -587,6 +577,8 @@ function applySelectedOption(selectedValue) {
   const opt = currentTabInfo.detectedOptions[index];
   if (!opt) return;
 
+  currentTabInfo.selectedProductUrl = opt.productUrl || null;
+
   priceVerifiedTag.textContent = "LIVE STORE PRICE";
 
   itemNameInput.value = opt.title;
@@ -788,8 +780,8 @@ async function handlePurchaseSubmit(e) {
   submitRequestBtn.textContent = "SUBMITTING TO PARENT...";
 
   try {
-    let siteTarget = currentTabInfo.domain || "online-store";
-    if (currentTabInfo.url && currentTabInfo.url.startsWith("http")) {
+    let siteTarget = currentTabInfo.selectedProductUrl || currentTabInfo.domain || "online-store";
+    if (!currentTabInfo.selectedProductUrl && currentTabInfo.url && currentTabInfo.url.startsWith("http")) {
       try {
         const cleanUrlObj = new URL(currentTabInfo.url);
         const originAndPath = `${cleanUrlObj.origin}${cleanUrlObj.pathname}`;
@@ -922,13 +914,19 @@ function syncLiveTrackerWithRequests(requests) {
 
   if (userDismissedTrackerForForm) return;
 
-  // 2. If the child is on a Shopping Cart / Checkout page, recognize their approved/pending item for this merchant domain
+  // 2. If the child is on a Shopping Cart / Checkout page, recognize their approved/pending item for this merchant domain & amount
   if (currentTabInfo.isCartOrCheckout && currentTabInfo.domain) {
     const currentHostClean = currentTabInfo.domain.replace(/^www\./i, "").toLowerCase();
+    const activeCartAmount = currentTabInfo.detectedOptions[0] ? currentTabInfo.detectedOptions[0].amount : null;
     const matchingDomainReq = sortedRequests.find((r) => {
       if (r.status !== "APPROVED" && r.status !== "PENDING") return false;
       const reqHost = getCleanDomainLabel(r.siteDomain).replace(/^www\./i, "").toLowerCase();
-      return reqHost === currentHostClean || reqHost.includes(currentHostClean) || currentHostClean.includes(reqHost);
+      const domainMatches = reqHost === currentHostClean || reqHost.includes(currentHostClean) || currentHostClean.includes(reqHost);
+      if (!domainMatches) return false;
+      if (activeCartAmount !== null && r.amount) {
+        return Math.abs(Number(r.amount) - activeCartAmount) < 0.02;
+      }
+      return true;
     });
     if (matchingDomainReq) {
       showLiveApprovalTracker(matchingDomainReq);

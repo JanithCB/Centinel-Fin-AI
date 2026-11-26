@@ -1,21 +1,21 @@
 /**
  * Centinel Fin AI – ParentGuard
- * Content Script: Universal E-Commerce Scraper, Single-Gate Product Ingress Lock & WebCrypto RSA-2048 Auto-Unlock
+ * Content Script: Cart-Gate Payment Lock, Smart Cart Item Scraper & WebCrypto RSA-2048 Auto-Unlock
  *
  * Responsibilities:
- * - Single-Gate Product Ingress Lock: Intercepts "Add to Cart", "Add to Bag", "Buy Now", and "Pre-Order" buttons
- *   across any e-commerce platform (Amazon, Shopify, WooCommerce, eBay, Walmart, Target, Epic Games, Steam, etc.)
- * - Frictionless Cart Flow: Never double-locks shopping cart or checkout continuation buttons after product approval
- * - 5-Tier Deterministic Universal Scraper: Extracts titles, variants/editions/bundles, prices, and currencies via
- *   JSON-LD Schema.org, OpenGraph/Microdata, platform adapters, and visual DOM heuristics (zero AI API latency)
- * - Uses window.ParentGuardCrypto (WebCrypto RSASSA-PKCS1-v1_5 / SHA-256) to verify parent RSA-2048 signatures
- *   before silently auto-unlocking product purchase buttons
+ * - Cart-Gate Payment Lock: Intercepts and locks ONLY the final payment / checkout buttons
+ *   ("Continue to payment", "Proceed to Checkout", "Pay Now", "Place Order", etc.) on /cart and /checkout pages
+ * - Free Browsing: "Add to Cart" and "Add to Bag" on product pages are 100% unlocked for normal shopping basket building
+ * - Smart Cart Scraper: Automatically extracts cart item titles, direct product page URLs (<a href="...">), and live cart totals
+ * - Breadcrumb Caching: Records product page visits in sessionStorage so cart requests can reference the exact product URL
+ * - WebCrypto RSA-2048 Verification: Unlocks cart payment buttons when parent approves the exact cart total
+ * - Anti-Tamper Re-Locking: If the child alters the cart after approval (changing the cart total), payment buttons immediately re-lock
  */
 
 (function () {
   "use strict";
 
-  // Helper: Parse a raw price text (e.g. "$1,299.99", "€14,99", "£19.99", "Rs. 4,500.00") into { amount, currency, raw }
+  // Helper: Parse a raw price text (e.g. "$8.39", "Estimated total $8.39", "€14,99", "£19.99") into { amount, currency, raw }
   function parsePriceText(rawText, fallbackCurrency) {
     if (rawText === null || rawText === undefined) return null;
     const text = String(rawText).replace(/[\u00A0\u200B-\u200D\uFEFF]/g, " ").replace(/\s+/g, " ").trim();
@@ -47,7 +47,6 @@
 
     let normalizedNum = NaN;
 
-    // 1. Match standard decimal prices including thousands separators (e.g. 1,299.99 or 1.299,99 or 29.99)
     const decimalMatch = text.match(/(\d{1,3}(?:,\d{3})+\.\d{2}|\d{1,3}(?:\.\d{3})+,\d{2}|\d{1,6}[.,]\d{2})(?!\d)/);
     if (decimalMatch) {
       let numStr = decimalMatch[1];
@@ -62,7 +61,6 @@
       }
       normalizedNum = parseFloat(numStr);
     } else if (hasExplicitCurrency) {
-      // 2. Support whole-number prices when an explicit currency symbol/code is present (e.g. "$49", "¥3,500", "Rs. 4,500")
       const intMatch = text.match(/(\d{1,3}(?:,\d{3})+|\d{1,6})(?!\d)/);
       if (intMatch) {
         normalizedNum = parseFloat(intMatch[1].replace(/,/g, ""));
@@ -122,8 +120,7 @@
       h.includes("pluralsight") ||
       h.includes("skillshare") ||
       h.includes("brilliant") ||
-      h.includes("duolingo") ||
-      h.includes("oreilly")
+      h.includes("duolingo")
     ) {
       return "EDUCATION";
     }
@@ -147,7 +144,7 @@
       .trim();
   }
 
-  // Helper: Detect dedicated Shopping Cart or Checkout pages so we never double-lock after product approval
+  // Helper: Check if current page is a Shopping Cart or Checkout page
   function isDedicatedCartOrCheckoutPage() {
     const pathname = (window.location.pathname || "").toLowerCase();
     const search = (window.location.search || "").toLowerCase();
@@ -157,110 +154,169 @@
     if (pathname.includes("/gp/cart") || pathname.includes("/gp/buy") || search.includes("step=contact_information")) {
       return true;
     }
+    // Also treat pages with prominent cart container as cart pages
+    if (document.querySelector(".cart_item, .cart-item, #cart_item_list, [data-testid*='cart-item']")) {
+      return true;
+    }
     return false;
   }
 
-  /**
-   * Extract Title & Price metadata from a Steam .game_area_purchase_game box
-   */
-  function extractSteamPurchaseBoxInfo(box) {
-    if (!box) return null;
-    const headingEl = box.querySelector("h1, h2");
-    if (!headingEl) return null;
-
-    const clonedHeading = headingEl.cloneNode(true);
-    clonedHeading.querySelectorAll(".bundle_label, p, .game_purchase_discount_countdown").forEach((n) => n.remove());
-
-    let rawTitle = (clonedHeading.textContent || "").replace(/\s+/g, " ").trim();
-    rawTitle = rawTitle.replace(/^Buy\s+/i, "").trim();
-    rawTitle = rawTitle.replace(/\(\?\)\s*$/, "").trim();
-
-    if (/^Download\s+.*\s+Demo$/i.test(rawTitle)) return null;
-
-    let kind = "GAME";
-    if (
-      /\bBUNDLE\b/i.test(rawTitle) ||
-      /\bPACK\b/i.test(rawTitle) ||
-      box.querySelector(".bundle_label_tooltip")
-    ) {
-      kind = "BUNDLE";
-    } else if (/\bDLC\b|\bSoundtrack\b|\bExpansion\b|\bPass\b/i.test(rawTitle)) {
-      kind = "EDITION";
-    }
-
-    const priceContainer =
-      box.querySelector(".discount_final_price") ||
-      box.querySelector(".game_purchase_price.price") ||
-      box.querySelector(".your_price div:last-child") ||
-      box.querySelector(".game_area_purchase_game_dropdown_selection");
-
-    let parsedPrice = priceContainer ? parsePriceText(priceContainer.textContent) : null;
-
-    if (!parsedPrice) {
-      const actionBg = box.querySelector(".game_purchase_action_bg, .game_purchase_action");
-      if (actionBg) {
-        parsedPrice = parsePriceText(actionBg.textContent);
-      }
-    }
-
-    if (!parsedPrice) return null;
-
-    const discountEl = box.querySelector(".discount_pct");
-    const originalEl = box.querySelector(".discount_original_price");
-
-    return {
-      kind,
-      title: rawTitle,
-      amount: parsedPrice.amount,
-      currency: parsedPrice.currency,
-      discountPct: discountEl ? discountEl.textContent.trim() : null,
-      originalPrice: originalEl ? originalEl.textContent.trim() : null,
-      category: "GAMING"
-    };
+  // Breadcrumb Cache: Record recently visited product page so cart can link directly to it
+  function updateProductBreadcrumb(productInfo) {
+    if (!productInfo || !productInfo.title || isDedicatedCartOrCheckoutPage()) return;
+    try {
+      const data = {
+        domain: window.location.hostname,
+        title: productInfo.title,
+        url: window.location.href,
+        amount: productInfo.amount,
+        currency: productInfo.currency,
+        timestamp: Date.now()
+      };
+      sessionStorage.setItem("__parentguard_last_product__", JSON.stringify(data));
+    } catch (_) {}
   }
 
-  // Helper: Extract clean text from a price container while ignoring strikethrough "was" / "compare-at" prices
-  function extractActivePriceFromElement(el, fallbackCurrency) {
-    if (!el) return null;
-    if (el.closest("del, s, strike, .was-price, .old-price, .compare-at-price, .discount_original_price")) {
-      return null;
-    }
+  function getProductBreadcrumb() {
+    try {
+      const raw = sessionStorage.getItem("__parentguard_last_product__");
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (data && data.domain === window.location.hostname && Date.now() - data.timestamp < 1000 * 60 * 60 * 2) {
+        return data;
+      }
+    } catch (_) {}
+    return null;
+  }
 
-    const contentAttr = el.getAttribute("content") || el.getAttribute("data-price") || el.getAttribute("data-product-price");
-    if (contentAttr) {
-      // Shopify data-price / data-product-price is occasionally in integer cents (e.g. "2999" with no decimal)
-      const trimmed = contentAttr.trim();
-      if (/^\d+$/.test(trimmed) && (el.hasAttribute("data-product-price") || el.hasAttribute("data-variant-price"))) {
-        const centsVal = parseInt(trimmed, 10) / 100;
-        if (centsVal > 0) {
-          return { amount: centsVal, currency: fallbackCurrency || "USD", raw: trimmed };
+  // Helper: Scrape the Cart Total from the page DOM
+  function extractCartTotal(metaCurrencyHint) {
+    const candidates = [
+      // Steam Cart
+      () => {
+        const estRow = document.querySelector(".cart_totals_area, .estimated_total_box, #cart_estimated_total");
+        if (estRow) return parsePriceText(estRow.textContent, metaCurrencyHint);
+        const match = (document.body ? document.body.innerText : "").match(/Estimated\s+total[\s\S]{0,50}?([$€£Rs₹A-Z\s]*\d+[.,]\d{2})/i);
+        return match ? parsePriceText(match[1], metaCurrencyHint) : null;
+      },
+      // Amazon Cart
+      () => {
+        const el = document.querySelector("#sc-subtotal-amount-activecart, #sc-subtotal-amount-buybox, .sc-price");
+        return el ? parsePriceText(el.textContent, metaCurrencyHint) : null;
+      },
+      // Shopify / WooCommerce / Generic Cart
+      () => {
+        const el = document.querySelector(
+          ".totals__subtotal-value, .cart__subtotal, .order-total .amount, .cart-subtotal .amount, [data-testid*='subtotal'], [data-checkout-subtotal]"
+        );
+        return el ? parsePriceText(el.textContent, metaCurrencyHint) : null;
+      },
+      // Universal price container within cart total area
+      () => {
+        const totalArea = document.querySelector(".cart-total, .cart_total, .order-summary, .cart-summary");
+        if (totalArea) {
+          const priceEl = totalArea.querySelector(".price, .amount, [data-price]");
+          if (priceEl) return parsePriceText(priceEl.textContent, metaCurrencyHint);
         }
+        return null;
       }
-      const parsedAttr = parsePriceText(trimmed, fallbackCurrency);
-      if (parsedAttr) return parsedAttr;
+    ];
+
+    for (const getter of candidates) {
+      try {
+        const res = getter();
+        if (res && res.amount > 0) return res;
+      } catch (_) {}
     }
-
-    const clone = el.cloneNode(true);
-    clone
-      .querySelectorAll("del, s, strike, .was-price, .old-price, .compare-at-price, .price__compare, .discount_original_price")
-      .forEach((n) => n.remove());
-
-    return parsePriceText(clone.textContent, fallbackCurrency);
+    return null;
   }
 
-  let cachedPrimaryOption = null;
+  // Helper: Scrape Cart Items & direct product links from Cart DOM (excluding recommendations)
+  function extractCartItemsAndLinks(metaCurrencyHint) {
+    const items = [];
+    const hostname = window.location.hostname || "";
+
+    // Steam Shopping Cart Line Items (excluding "RECOMMENDATIONS FOR YOU")
+    if (hostname.includes("steampowered.com")) {
+      const cartRows = document.querySelectorAll(
+        ".cart_item, .cart_line_item, [class*='cart_item_row'], [class*='CartItem_']"
+      );
+      cartRows.forEach((row) => {
+        if (row.closest(".recommendations_container, [class*='recommendation' i], #recommended_items")) {
+          return;
+        }
+        const linkEl = row.querySelector("a[href*='/app/'], a[href*='/sub/'], a[href*='/bundle/'], a.title, .title a");
+        const titleEl = linkEl || row.querySelector(".title, .item_name, [class*='item_title' i]");
+        const priceEl = row.querySelector(".price, [class*='price' i]");
+
+        if (titleEl) {
+          const rawTitle = titleEl.textContent.replace(/\s+/g, " ").trim();
+          const cleanTitle = cleanStoreTitle(rawTitle);
+          let fullUrl = linkEl ? linkEl.href : null;
+          if (fullUrl && fullUrl.startsWith("/")) {
+            fullUrl = `${window.location.origin}${fullUrl}`;
+          }
+          const priceObj = priceEl ? parsePriceText(priceEl.textContent, metaCurrencyHint) : null;
+
+          if (cleanTitle) {
+            items.push({
+              title: cleanTitle,
+              productUrl: fullUrl,
+              amount: priceObj ? priceObj.amount : null,
+              currency: priceObj ? priceObj.currency : metaCurrencyHint
+            });
+          }
+        }
+      });
+    }
+
+    // Generic Shopify / WooCommerce / Amazon Cart Line Items
+    if (items.length === 0) {
+      const genericRows = document.querySelectorAll(
+        ".cart-item, .cart_item, .cart__item, .sc-list-item, [data-testid*='cart-line-item']"
+      );
+      genericRows.forEach((row) => {
+        if (row.closest("[class*='recommend' i], [class*='related' i], [id*='recommend' i]")) {
+          return;
+        }
+        const linkEl = row.querySelector("a[href*='/product'], a[href*='/item'], a.cart-item__title, a.sc-product-link");
+        const titleEl = linkEl || row.querySelector(".cart-item__name, .product-name, [class*='title' i]");
+        const priceEl = row.querySelector(".price, .cart-item__price, .sc-product-price");
+
+        if (titleEl) {
+          const cleanTitle = cleanStoreTitle(titleEl.textContent.trim());
+          let fullUrl = linkEl ? linkEl.href : null;
+          if (fullUrl && fullUrl.startsWith("/")) {
+            fullUrl = `${window.location.origin}${fullUrl}`;
+          }
+          const priceObj = priceEl ? parsePriceText(priceEl.textContent, metaCurrencyHint) : null;
+
+          if (cleanTitle) {
+            items.push({
+              title: cleanTitle,
+              productUrl: fullUrl,
+              amount: priceObj ? priceObj.amount : null,
+              currency: priceObj ? priceObj.currency : metaCurrencyHint
+            });
+          }
+        }
+      });
+    }
+
+    return items;
+  }
+
+  let cachedCartTotal = null;
 
   /**
-   * 5-Tier Deterministic Universal E-Commerce Scraper
-   * Works across Steam, Amazon, Shopify, WooCommerce, eBay, Walmart, Target, Best Buy, Epic Games, and custom SPAs
+   * Universal Scraper: Extracts Product details on product pages OR Cart details on cart pages
    */
   function extractPageProducts() {
     const hostname = window.location.hostname || "";
     const defaultCategory = inferMerchantCategory(hostname);
     const options = [];
-    const seenKeys = new Set();
+    const isCart = isDedicatedCartOrCheckoutPage();
 
-    // Detect page-level currency hint from meta tags or Shopify/WooCommerce globals
     const metaCurrencyHint = (
       document.querySelector("meta[property='product:price:currency']")?.getAttribute("content") ||
       document.querySelector("meta[property='og:price:currency']")?.getAttribute("content") ||
@@ -268,30 +324,72 @@
       ""
     ).toUpperCase().trim() || null;
 
-    function addOption(item) {
-      if (!item || !item.title || typeof item.amount !== "number" || isNaN(item.amount) || item.amount <= 0) {
-        return;
+    // --- CASE A: Inside Shopping Cart or Checkout Page ---
+    if (isCart) {
+      const cartTotalObj = extractCartTotal(metaCurrencyHint);
+      const cartItems = extractCartItemsAndLinks(metaCurrencyHint);
+      const breadcrumb = getProductBreadcrumb();
+
+      if (cartTotalObj && cartTotalObj.amount > 0) {
+        cachedCartTotal = cartTotalObj;
+
+        let primaryTitle = "Shopping Cart Order";
+        let directProductUrl = null;
+
+        if (cartItems.length === 1) {
+          primaryTitle = cartItems[0].title;
+          directProductUrl = cartItems[0].productUrl;
+        } else if (cartItems.length > 1) {
+          primaryTitle = `${cartItems[0].title} (+${cartItems.length - 1} more items)`;
+          directProductUrl = cartItems[0].productUrl;
+        } else if (breadcrumb) {
+          primaryTitle = breadcrumb.title;
+          directProductUrl = breadcrumb.url;
+        }
+
+        // If direct product URL is still relative or missing, fallback to breadcrumb or origin
+        if (!directProductUrl && breadcrumb && breadcrumb.url) {
+          directProductUrl = breadcrumb.url;
+        }
+
+        options.push({
+          id: "cart_total_opt",
+          kind: "CART",
+          title: primaryTitle,
+          amount: Number(cartTotalObj.amount.toFixed(2)),
+          currency: cartTotalObj.currency || metaCurrencyHint || "USD",
+          productUrl: directProductUrl || window.location.href,
+          category: defaultCategory
+        });
+
+        // Also expose individual line items as options if child wants to select one
+        cartItems.forEach((ci, idx) => {
+          if (ci.amount && ci.amount > 0 && ci.amount !== cartTotalObj.amount) {
+            options.push({
+              id: `cart_item_${idx + 1}`,
+              kind: "ITEM",
+              title: ci.title,
+              amount: Number(ci.amount.toFixed(2)),
+              currency: ci.currency || cartTotalObj.currency || "USD",
+              productUrl: ci.productUrl || directProductUrl || window.location.href,
+              category: defaultCategory
+            });
+          }
+        });
       }
-      const cleanTitle = cleanStoreTitle(item.title);
-      if (!cleanTitle) return;
 
-      const dedupeKey = `${cleanTitle.toLowerCase()}|${item.amount.toFixed(2)}`;
-      if (seenKeys.has(dedupeKey)) return;
-      seenKeys.add(dedupeKey);
-
-      options.push({
-        id: `opt_${options.length + 1}`,
-        kind: item.kind || "PRODUCT",
-        title: cleanTitle,
-        amount: Number(item.amount.toFixed(2)),
-        currency: (item.currency || metaCurrencyHint || "USD").toUpperCase(),
-        discountPct: item.discountPct || null,
-        originalPrice: item.originalPrice || null,
-        category: item.category || defaultCategory
-      });
+      return {
+        domain: hostname,
+        url: window.location.href,
+        pageTitle: options.length > 0 ? options[0].title : document.title || "Shopping Cart",
+        defaultCategory: defaultCategory,
+        isCartOrCheckout: true,
+        options: options
+      };
     }
 
-    // Primary Page Title Detection
+    // --- CASE B: Product Page Browsing (Normal Product Metadata) ---
+    // (Extract and record breadcrumb so cart page knows the exact product link)
     const primaryH1 =
       document.querySelector(".apphub_AppName") ||
       document.querySelector("#productTitle") ||
@@ -310,321 +408,110 @@
       (primaryH1 && primaryH1.textContent.trim()) || ogTitle || document.title || ""
     );
 
-    // TIER 0: Explicit ParentGuard Annotated Options
-    const annotatedNodes = document.querySelectorAll("[data-parentguard-option]");
-    annotatedNodes.forEach((node) => {
-      const title = node.getAttribute("data-title") || node.getAttribute("data-parentguard-option");
-      const priceVal = parseFloat(node.getAttribute("data-price") || "");
-      const currency = node.getAttribute("data-currency") || metaCurrencyHint || "USD";
-      const kind = node.getAttribute("data-kind") || "PRODUCT";
-      const discountPct = node.getAttribute("data-discount") || null;
-      const originalPrice = node.getAttribute("data-original-price") || null;
+    const seenKeys = new Set();
+    function addOption(item) {
+      if (!item || !item.title || typeof item.amount !== "number" || isNaN(item.amount) || item.amount <= 0) return;
+      const cleanTitle = cleanStoreTitle(item.title);
+      if (!cleanTitle) return;
+      const dedupeKey = `${cleanTitle.toLowerCase()}|${item.amount.toFixed(2)}`;
+      if (seenKeys.has(dedupeKey)) return;
+      seenKeys.add(dedupeKey);
+      options.push({
+        id: `opt_${options.length + 1}`,
+        kind: item.kind || "PRODUCT",
+        title: cleanTitle,
+        amount: Number(item.amount.toFixed(2)),
+        currency: (item.currency || metaCurrencyHint || "USD").toUpperCase(),
+        productUrl: window.location.href,
+        category: item.category || defaultCategory
+      });
+    }
 
-      if (title && !isNaN(priceVal) && priceVal > 0) {
-        addOption({
-          kind,
-          title,
-          amount: priceVal,
-          currency,
-          discountPct,
-          originalPrice,
-          category: node.getAttribute("data-category") || defaultCategory
-        });
-      }
-    });
-
-    // TIER 1: Specialized Multi-Option Marketplace Adapters (Steam, Amazon, eBay)
-    if (hostname.includes("steampowered.com") && !isDedicatedCartOrCheckoutPage()) {
+    // 1. Steam Product Page
+    if (hostname.includes("steampowered.com")) {
       const purchaseBoxes = document.querySelectorAll(".game_area_purchase_game");
       purchaseBoxes.forEach((box) => {
-        const info = extractSteamPurchaseBoxInfo(box);
-        if (info) addOption(info);
-      });
-    }
-
-    if (hostname.includes("amazon.") && !isDedicatedCartOrCheckoutPage()) {
-      const mainTitleEl = document.getElementById("productTitle");
-      const mainTitle = mainTitleEl ? mainTitleEl.textContent.replace(/\s+/g, " ").trim() : cleanPageTitle;
-
-      const mainPriceEl =
-        document.querySelector("#corePriceDisplay_desktop_feature_div .a-price .a-offscreen") ||
-        document.querySelector("#corePrice_feature_div .a-price .a-offscreen") ||
-        document.querySelector("#apex_desktop .a-price .a-offscreen") ||
-        document.querySelector(".a-price.aok-align-center .a-offscreen") ||
-        document.getElementById("price_inside_buybox") ||
-        document.getElementById("priceblock_ourprice");
-
-      if (mainTitle && mainPriceEl) {
-        const parsed = parsePriceText(mainPriceEl.textContent, metaCurrencyHint);
-        if (parsed) {
-          addOption({
-            kind: "PRODUCT",
-            title: mainTitle,
-            amount: parsed.amount,
-            currency: parsed.currency,
-            category: defaultCategory
-          });
-        }
-      }
-
-      const swatches = document.querySelectorAll("#twister li, .swatchElement");
-      swatches.forEach((swatch) => {
-        const text = (swatch.textContent || "").replace(/\s+/g, " ").trim();
-        const parsed = parsePriceText(text, metaCurrencyHint);
-        if (parsed && mainTitle) {
-          const lines = text.split(" ").filter(Boolean);
-          const editionName = lines.slice(0, 3).join(" ");
-          addOption({
-            kind: "OPTION",
-            title: `${mainTitle} (${editionName})`,
-            amount: parsed.amount,
-            currency: parsed.currency,
-            category: defaultCategory
-          });
-        }
-      });
-    }
-
-    if (hostname.includes("ebay.") && !isDedicatedCartOrCheckoutPage()) {
-      const ebayPriceEl =
-        document.querySelector(".x-price-primary span") ||
-        document.querySelector(".x-price-primary") ||
-        document.getElementById("prcIsum") ||
-        document.getElementById("mm-saleDscPrc");
-      if (cleanPageTitle && ebayPriceEl) {
-        const parsed = extractActivePriceFromElement(ebayPriceEl, metaCurrencyHint);
-        if (parsed) {
-          addOption({
-            kind: "PRODUCT",
-            title: cleanPageTitle,
-            amount: parsed.amount,
-            currency: parsed.currency,
-            category: defaultCategory
-          });
-        }
-      }
-    }
-
-    // TIER 2: Universal Schema.org JSON-LD Graph, Offer & Variant Parser
-    // Covers Shopify, WooCommerce, BigCommerce, Walmart, Target, Best Buy, Epic Games, Nike, Etsy, etc.
-    if (!isDedicatedCartOrCheckoutPage()) {
-      const PRODUCT_SCHEMA_TYPES = new Set([
-        "product",
-        "productgroup",
-        "individualproduct",
-        "productmodel",
-        "videogame",
-        "softwareapplication",
-        "book",
-        "course"
-      ]);
-
-      function hasMatchingSchemaType(node) {
-        if (!node || !node["@type"]) return false;
-        const types = Array.isArray(node["@type"]) ? node["@type"] : [node["@type"]];
-        return types.some((t) => typeof t === "string" && PRODUCT_SCHEMA_TYPES.has(t.toLowerCase()));
-      }
-
-      function extractOffersFromNode(productNode, fallbackTitle, isVariant) {
-        const baseName = productNode.name || fallbackTitle || cleanPageTitle;
-        if (!baseName) return;
-
-        const rawOffers = productNode.offers;
-        const offerQueue = Array.isArray(rawOffers) ? [...rawOffers] : rawOffers ? [rawOffers] : [];
-
-        offerQueue.forEach((offer) => {
-          if (!offer || typeof offer !== "object") return;
-
-          // Unpack nested offers inside AggregateOffer
-          if (Array.isArray(offer.offers) && offer.offers.length > 0) {
-            offer.offers.forEach((subOffer) => {
-              offerQueue.push(subOffer);
+        const headingEl = box.querySelector("h1, h2");
+        const priceContainer = box.querySelector(".discount_final_price, .game_purchase_price.price, .your_price div:last-child");
+        if (headingEl && priceContainer) {
+          const parsedPrice = parsePriceText(priceContainer.textContent, metaCurrencyHint);
+          let rawTitle = headingEl.textContent.replace(/\s+/g, " ").replace(/^Buy\s+/i, "").trim();
+          if (parsedPrice) {
+            addOption({
+              title: rawTitle,
+              amount: parsedPrice.amount,
+              currency: parsedPrice.currency
             });
           }
+        }
+      });
+    }
 
-          const specPrice =
-            offer.priceSpecification &&
-            (offer.priceSpecification.price || offer.priceSpecification.minPrice);
-          const rawPriceVal = offer.price ?? offer.lowPrice ?? specPrice ?? offer.highPrice;
-          const currencyCode = (
-            offer.priceCurrency ||
-            (offer.priceSpecification && offer.priceSpecification.priceCurrency) ||
-            metaCurrencyHint ||
-            "USD"
-          ).toUpperCase();
+    // 2. Schema.org JSON-LD (Shopify, Amazon, Epic, WooCommerce)
+    const jsonLdScripts = document.querySelectorAll("script[type='application/ld+json']");
+    jsonLdScripts.forEach((script) => {
+      try {
+        const rawJson = JSON.parse(script.textContent || "{}");
+        const queue = Array.isArray(rawJson) ? [...rawJson] : [rawJson];
+        if (rawJson["@graph"]) queue.push(...rawJson["@graph"]);
 
-          let priceNum = typeof rawPriceVal === "number" ? rawPriceVal : parseFloat(String(rawPriceVal || ""));
-          if (isNaN(priceNum) && rawPriceVal) {
-            const parsed = parsePriceText(String(rawPriceVal), currencyCode);
-            if (parsed) priceNum = parsed.amount;
-          }
-
-          if (!isNaN(priceNum) && priceNum > 0) {
-            const offerTitle =
-              offer.name && offer.name.toLowerCase() !== baseName.toLowerCase()
-                ? `${baseName} - ${offer.name}`
-                : baseName;
-            addOption({
-              kind: isVariant || offerQueue.length > 1 ? "OPTION" : "PRODUCT",
-              title: offerTitle,
-              amount: priceNum,
-              currency: currencyCode,
-              category: defaultCategory
+        queue.forEach((node) => {
+          if (!node || typeof node !== "object") return;
+          const typeStr = String(node["@type"] || "").toLowerCase();
+          if (typeStr.includes("product") || typeStr.includes("videogame") || typeStr.includes("softwareapplication")) {
+            const baseName = node.name || cleanPageTitle;
+            const offers = Array.isArray(node.offers) ? node.offers : node.offers ? [node.offers] : [];
+            offers.forEach((offer) => {
+              const p = parseFloat(offer.price || offer.lowPrice || "");
+              if (!isNaN(p) && p > 0) {
+                addOption({
+                  title: offer.name && offer.name !== baseName ? `${baseName} - ${offer.name}` : baseName,
+                  amount: p,
+                  currency: offer.priceCurrency || metaCurrencyHint || "USD"
+                });
+              }
             });
           }
         });
+      } catch (_) {}
+    });
 
-        // Unpack Schema.org ProductGroup hasVariant (standard across Shopify & modern retail)
-        if (Array.isArray(productNode.hasVariant)) {
-          productNode.hasVariant.forEach((variant) => {
-            if (variant && typeof variant === "object") {
-              const variantLabel = variant.name
-                ? variant.name.toLowerCase().includes(baseName.toLowerCase())
-                  ? variant.name
-                  : `${baseName} (${variant.name})`
-                : baseName;
-              extractOffersFromNode({ ...variant, name: variantLabel }, baseName, true);
-            }
-          });
-        }
-      }
-
-      function walkJsonLd(node) {
-        if (!node || typeof node !== "object") return;
-        if (Array.isArray(node)) {
-          node.forEach(walkJsonLd);
-          return;
-        }
-        if (hasMatchingSchemaType(node)) {
-          extractOffersFromNode(node, cleanPageTitle, false);
-        }
-        if (Array.isArray(node["@graph"])) {
-          node["@graph"].forEach(walkJsonLd);
-        }
-      }
-
-      const jsonLdScripts = document.querySelectorAll("script[type='application/ld+json']");
-      jsonLdScripts.forEach((script) => {
-        try {
-          const parsedJson = JSON.parse(script.textContent || "{}");
-          walkJsonLd(parsedJson);
-        } catch (_) {
-          // Ignore malformed JSON-LD blocks
-        }
-      });
-    }
-
-    // TIER 3: OpenGraph, Twitter Product Meta Tags & HTML5 Microdata (itemprop)
-    if (options.length === 0 && !isDedicatedCartOrCheckoutPage()) {
-      const metaPriceStr =
+    // 3. OpenGraph / Meta price
+    if (options.length === 0) {
+      const metaPrice =
         document.querySelector("meta[property='product:price:amount']")?.getAttribute("content") ||
         document.querySelector("meta[property='og:price:amount']")?.getAttribute("content") ||
-        document.querySelector("meta[name='product:price:amount']")?.getAttribute("content") ||
-        document.querySelector("meta[itemprop='price']")?.getAttribute("content") ||
-        document.querySelector("[itemprop='price'][content]")?.getAttribute("content") ||
-        document.querySelector("[itemprop='lowPrice'][content]")?.getAttribute("content") ||
-        document.querySelector("meta[name='twitter:data1']")?.getAttribute("content");
-
-      if (cleanPageTitle && metaPriceStr) {
-        const directFloat = /^\d+(\.\d+)?$/.test(metaPriceStr.trim())
-          ? parseFloat(metaPriceStr.trim())
-          : NaN;
-        const parsed = !isNaN(directFloat) && directFloat > 0
-          ? { amount: directFloat, currency: metaCurrencyHint || "USD" }
-          : parsePriceText(metaPriceStr, metaCurrencyHint || "USD");
-
-        if (parsed && parsed.amount > 0) {
+        document.querySelector("[itemprop='price']")?.getAttribute("content");
+      if (cleanPageTitle && metaPrice) {
+        const parsed = parsePriceText(metaPrice, metaCurrencyHint);
+        if (parsed) {
           addOption({
-            kind: "PRODUCT",
             title: cleanPageTitle,
             amount: parsed.amount,
-            currency: parsed.currency,
-            category: defaultCategory
+            currency: parsed.currency
           });
         }
       }
-
-      // Visible [itemprop="price"] microdata element
-      if (options.length === 0 && cleanPageTitle) {
-        const microPriceEl = document.querySelector("[itemprop='price']");
-        if (microPriceEl) {
-          const parsed = extractActivePriceFromElement(microPriceEl, metaCurrencyHint || "USD");
-          if (parsed) {
-            addOption({
-              kind: "PRODUCT",
-              title: cleanPageTitle,
-              amount: parsed.amount,
-              currency: parsed.currency,
-              category: defaultCategory
-            });
-          }
-        }
-      }
     }
 
-    // TIER 4: Universal Visual DOM Buy-Box Heuristic Fallback (Custom React/Vue SPAs, Shopify, WooCommerce, Daraz, AliExpress)
-    if (options.length === 0 && cleanPageTitle && !isDedicatedCartOrCheckoutPage()) {
-      const visualPriceSelectors = [
-        "form[action*='/cart/add'] [data-product-price]",
-        "form[action*='/cart/add'] .price-item--sale",
-        "form[action*='/cart/add'] .price-item--regular",
-        "form[action*='/cart/add'] .price",
-        ".summary .price ins .amount",
-        ".summary .price > .amount",
-        "[data-testid='product-price']",
-        "[data-testid='current-price']",
-        "[data-testid*='price-current']",
-        "[data-automation-id='product-price']",
-        ".product-price__price",
-        ".product__price",
-        ".price-item--sale",
-        ".current-price",
-        ".sale-price",
-        ".final-price",
-        ".pdp-price",
-        ".product-price",
-        "[data-product-price]",
-        "[data-price]",
-        "main .price"
-      ];
-
-      for (const selector of visualPriceSelectors) {
-        const candidates = document.querySelectorAll(selector);
-        let matched = false;
-        for (const el of candidates) {
-          const parsed = extractActivePriceFromElement(el, metaCurrencyHint);
-          if (parsed) {
-            addOption({
-              kind: "PRODUCT",
-              title: cleanPageTitle,
-              amount: parsed.amount,
-              currency: parsed.currency,
-              category: defaultCategory
-            });
-            matched = true;
-            break;
-          }
-        }
-        if (matched) break;
-      }
+    // Cache breadcrumb if a product was extracted
+    if (options.length > 0) {
+      updateProductBreadcrumb(options[0]);
     }
-
-    cachedPrimaryOption = options.length === 1 ? options[0] : null;
 
     return {
       domain: hostname,
       url: window.location.href,
       pageTitle: cleanPageTitle || document.title || "",
       defaultCategory: defaultCategory,
-      isCartOrCheckout: isDedicatedCartOrCheckoutPage(),
+      isCartOrCheckout: false,
       options: options
     };
   }
 
-  // Expose globally for direct popup scripting execution
+  // Expose globally for direct extension popup scripting execution
   window.__PARENTGUARD_EXTRACT_PRODUCTS__ = extractPageProducts;
 
-  // Prevent duplicate listener / observer initialization
   if (window.__PARENTGUARD_CONTENT_INITIALIZED__) {
     if (typeof verifyAndUnlockApprovedButtons === "function") {
       verifyAndUnlockApprovedButtons();
@@ -633,48 +520,45 @@
   }
   window.__PARENTGUARD_CONTENT_INITIALIZED__ = true;
 
-  console.log("[Centinel Fin AI] ParentGuard Universal Product Ingress Guard active on:", window.location.hostname);
+  console.log("[Centinel Fin AI] ParentGuard Cart-Gate Payment Lock active on:", window.location.hostname);
 
-  // Single-Gate Product Ingress Patterns (Locks adding items to cart / direct buy; never re-locks cart continuation)
-  const PRODUCT_INGRESS_BUTTON_PATTERNS = [
-    /\badd\s+to\s+(shopping\s+|my\s+)?(cart|bag|basket|trolley|order)\b/i,
-    /\bbuy\s+(it\s+)?now\b/i,
-    /\bpurchase\s+(for\s+myself|as\s+a\s+gift|now)\b/i,
-    /^purchase$/i,
-    /\bpre-?order(\s+now)?\b/i,
-    /\bget\s+it\s+now\b/i
+  // Authoritative Cart / Checkout Payment Gate Patterns
+  const CART_PAYMENT_GATE_PATTERNS = [
+    /\bcontinue\s+to\s+(payment|checkout|shipping|delivery|billing)\b/i,
+    /\bproceed\s+to\s+(checkout|payment)\b/i,
+    /\bgo\s+to\s+(checkout|payment)\b/i,
+    /^checkout(\s+now)?$/i,
+    /\bpay\s+now\b/i,
+    /\bplace\s+(your\s+)?order\b/i,
+    /\bcomplete\s+(purchase|order|payment)\b/i,
+    /\bsubmit\s+(order|payment)\b/i,
+    /\bauthori[sz]e\s+payment\b/i,
+    /\bconfirm\s+(and\s+)?pay\b/i,
+    /\bpurchase\s+(for\s+myself|as\s+a\s+gift)\b/i
   ];
 
-  // Explicit exclusions so cart links, checkout continuation, and wishlists are never blocked
-  const NON_INGRESS_EXCLUSION_PATTERNS = [
-    /\b(view|go\s+to|open|show|edit|update|remove|empty)\s+(my\s+|your\s+|shopping\s+)?(cart|bag|basket|trolley)\b/i,
-    /\bin\s+(cart|bag|basket)\b/i,
-    /\bcontinue\s+(shopping|to\s+payment|to\s+checkout|to\s+shipping)\b/i,
-    /\bproceed\s+to\s+(checkout|payment)\b/i,
-    /\bwish\s*list\b|\bfavou?rites?\b|\bsave\s+for\s+later\b|\bcompare\b/i
+  // Strictly excluded patterns (Never lock Add-to-Cart or Continue Shopping)
+  const NON_GATE_EXCLUSION_PATTERNS = [
+    /\badd\s+to\s+(shopping\s+|my\s+)?(cart|bag|basket|trolley|wishlist)\b/i,
+    /\bcontinue\s+shopping\b/i,
+    /\bremove(\s+all\s+items)?\b/i,
+    /\bupdate\s+cart\b/i,
+    /\bview\s+(my\s+)?(cart|bag|basket)\b/i
   ];
 
   let interceptedButtons = new Set();
 
-  // Check if an element sits inside a slide-out cart drawer or "Added to cart" confirmation modal
-  function isInsideCartDrawerOrModal(element) {
-    return Boolean(
-      element.closest(
-        "cart-drawer, #CartDrawer, [id*='cart-drawer' i], [class*='cart-drawer' i], [class*='mini-cart' i], [data-testid*='cart-drawer' i]"
-      )
-    );
-  }
-
-  // Check if an element is an actionable Product Purchase / Add-to-Cart Ingress button
-  function isProductIngressButton(element) {
+  // Check if an element is an actionable Cart or Checkout Payment Gate button
+  function isCartPaymentGateButton(element) {
     if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
-    if (isDedicatedCartOrCheckoutPage()) return false;
 
-    // Never intercept ParentGuard UI or slide-out cart drawers
+    // Only lock on Cart / Checkout pages
+    if (!isDedicatedCartOrCheckoutPage()) return false;
+
+    // Never intercept ParentGuard UI elements
     if (
       element.closest("#parentguard-barrier-root") ||
-      element.classList.contains("parentguard-in-place-shield") ||
-      isInsideCartDrawerOrModal(element)
+      element.classList.contains("parentguard-in-place-shield")
     ) {
       return false;
     }
@@ -689,20 +573,20 @@
 
     if (!isClickableTag) return false;
 
-    // If this element contains a nested child button/link that itself matches, defer to the inner button
+    // Defer to nested button if present
     if (tagName !== "INPUT") {
       const childButtons = element.querySelectorAll("button, a, input[type='submit'], input[type='button']");
       for (const child of childButtons) {
-        if (child !== element && matchesIngressTextOrAttr(child)) {
+        if (child !== element && matchesPaymentGateTextOrAttr(child)) {
           return false;
         }
       }
     }
 
-    return matchesIngressTextOrAttr(element);
+    return matchesPaymentGateTextOrAttr(element);
   }
 
-  function matchesIngressTextOrAttr(element) {
+  function matchesPaymentGateTextOrAttr(element) {
     const tagName = element.tagName.toUpperCase();
     const visibleText = (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
     const inputVal = tagName === "INPUT" && element.value ? element.value.replace(/\s+/g, " ").trim() : "";
@@ -713,40 +597,27 @@
       (s) => s.length > 0 && s.length <= 80
     );
 
-    if (candidateLabels.some((lbl) => NON_INGRESS_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) {
+    if (candidateLabels.some((lbl) => NON_GATE_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) {
       return false;
     }
 
-    if (candidateLabels.some((lbl) => PRODUCT_INGRESS_BUTTON_PATTERNS.some((rx) => rx.test(lbl)))) {
+    if (candidateLabels.some((lbl) => CART_PAYMENT_GATE_PATTERNS.some((rx) => rx.test(lbl)))) {
       return true;
     }
 
     const testId = element.getAttribute("data-testid") || "";
     const id = element.id || "";
     const nameAttr = (element.getAttribute("name") || "").toLowerCase();
-    const dataAction = element.getAttribute("data-action") || element.getAttribute("data-button-type") || "";
+    const dataAction = element.getAttribute("data-action") || "";
     const className = typeof element.className === "string" ? element.className : "";
-    const href = element.getAttribute("href") || "";
-    const attrString = `${testId} ${id} ${dataAction} ${className} ${href}`.toLowerCase();
-
-    // Standard Shopify / WooCommerce product add-to-cart form submit buttons
-    if (
-      (tagName === "BUTTON" || tagName === "INPUT") &&
-      (nameAttr === "add" || nameAttr === "add-to-cart") &&
-      element.closest("form[action*='/cart']")
-    ) {
-      return true;
-    }
+    const attrString = `${testId} ${id} ${nameAttr} ${dataAction} ${className}`.toLowerCase();
 
     if (
-      attrString.includes("javascript:addtocart") ||
-      attrString.includes("javascript:addbundletocart") ||
-      attrString.includes("add-to-cart-button") ||
-      attrString.includes("single_add_to_cart_button") ||
-      attrString.includes("buy-now-button") ||
-      attrString.includes("binbtn_btn") ||
-      attrString.includes("one-click-button") ||
-      element.hasAttribute("data-add-to-cart")
+      attrString.includes("checkout-submit") ||
+      attrString.includes("proceed-to-checkout") ||
+      attrString.includes("continue-to-payment") ||
+      attrString.includes("place-order") ||
+      attrString.includes("pay-button")
     ) {
       return true;
     }
@@ -754,54 +625,23 @@
     return false;
   }
 
-  // Clear any locks if SPA navigation transitions onto a dedicated /cart or /checkout view
-  function releaseLocksOnCartPage() {
-    interceptedButtons.forEach((btn) => {
-      btn.classList.remove("parentguard-locked-btn");
-      btn.setAttribute("data-parentguard-unlocked", "true");
-      btn.setAttribute("data-parentguard-locked", "false");
-      btn.disabled = false;
-      const origHref = btn.getAttribute("data-parentguard-orig-href");
-      if (origHref) btn.setAttribute("href", origHref);
-      const shield = btn.parentElement ? btn.parentElement.querySelector(".parentguard-in-place-shield") : null;
-      if (shield) shield.remove();
-    });
-    interceptedButtons.clear();
-  }
-
-  // Intercept and Lock a Product Purchase / Add-to-Cart Button
-  function interceptButton(button) {
-    if (interceptedButtons.has(button)) return;
+  // Intercept and Lock a Cart Payment Continuation Button
+  function interceptButton(button, currentCartAmount) {
+    if (interceptedButtons.has(button)) {
+      // Re-evaluate if cart amount changed
+      if (currentCartAmount) {
+        button.setAttribute("data-parentguard-amount", currentCartAmount.toFixed(2));
+      }
+      return;
+    }
     if (button.getAttribute("data-parentguard-unlocked") === "true") return;
 
     interceptedButtons.add(button);
 
-    // 1. Attach option metadata if button is inside a Steam purchase box
-    const steamBox =
-      button.closest(".game_area_purchase_game") ||
-      button.closest(".game_area_purchase_game_wrapper");
-    if (steamBox) {
-      const targetBox = steamBox.classList.contains("game_area_purchase_game")
-        ? steamBox
-        : steamBox.querySelector(".game_area_purchase_game") || steamBox;
-      const boxInfo = extractSteamPurchaseBoxInfo(targetBox);
-      if (boxInfo) {
-        button.setAttribute("data-parentguard-amount", boxInfo.amount.toFixed(2));
-        button.setAttribute("data-parentguard-title", boxInfo.title);
-      }
-    } else {
-      // 2. Universal button price binding: check if button text embeds price (e.g. "Add to Cart - $29.99")
-      const inlinePrice = parsePriceText(button.innerText || button.textContent || "");
-      if (inlinePrice) {
-        button.setAttribute("data-parentguard-amount", inlinePrice.amount.toFixed(2));
-      } else if (cachedPrimaryOption) {
-        // 3. Single-product page binding
-        button.setAttribute("data-parentguard-amount", cachedPrimaryOption.amount.toFixed(2));
-        button.setAttribute("data-parentguard-title", cachedPrimaryOption.title);
-      }
+    if (currentCartAmount) {
+      button.setAttribute("data-parentguard-amount", currentCartAmount.toFixed(2));
     }
 
-    // If button is an <a> with inline javascript:addToCart(...), neutralize href while locked
     const currentHref = button.getAttribute("href");
     if (currentHref && /^javascript:/i.test(currentHref)) {
       button.setAttribute("data-parentguard-orig-href", currentHref);
@@ -812,10 +652,8 @@
     button.setAttribute("data-parentguard-intercepted", "true");
     button.setAttribute("data-parentguard-locked", "true");
 
-    // Capture-phase click blocker
     button.addEventListener("click", handleBlockedClick, true);
 
-    // Inject clean child-friendly in-place status badge next to the button
     const container = button.parentElement;
     if (container && !container.querySelector(".parentguard-in-place-shield")) {
       const shield = document.createElement("div");
@@ -827,27 +665,21 @@
       container.insertBefore(shield, button.nextSibling);
     }
 
-    // Ensure any legacy floating bottom-right barrier is removed
     const legacyBarrier = document.getElementById("parentguard-barrier-root");
-    if (legacyBarrier) {
-      legacyBarrier.remove();
-    }
+    if (legacyBarrier) legacyBarrier.remove();
   }
 
   function handleBlockedClick(e) {
     const btn = e.currentTarget;
     if (btn && btn.getAttribute("data-parentguard-unlocked") === "true") {
-      return; // Approved and unlocked! Allow click through.
+      return; // Approved and unlocked! Allow proceeding to payment.
     }
 
     e.preventDefault();
     e.stopImmediatePropagation();
-    console.warn("[Centinel Fin AI] Product purchase action locked — waiting for parent approval.");
+    console.warn("[Centinel Fin AI] Cart payment action locked — waiting for parent approval.");
   }
 
-  /**
-   * Unlock a specific intercepted button after parent approval verification succeeds
-   */
   function unlockButtonWithProof(button, verifiedRequest) {
     if (!button) return;
 
@@ -857,25 +689,39 @@
     button.classList.add("parentguard-unlocked-btn");
     button.disabled = false;
 
-    // Restore original javascript:addToCart(...) href if it was an anchor
     const origHref = button.getAttribute("data-parentguard-orig-href");
     if (origHref) {
       button.setAttribute("href", origHref);
     }
 
-    // Update adjacent inline shield with friendly child-facing message
     const container = button.parentElement;
     const shield = container ? container.querySelector(".parentguard-in-place-shield") : null;
     if (shield) {
       shield.classList.add("verified");
       const amt = Number(verifiedRequest.amount).toFixed(2);
-      shield.textContent = `[ APPROVED — READY TO BUY ($${amt}) ]`;
+      shield.textContent = `[ APPROVED — READY TO PAY ($${amt}) ]`;
+    }
+  }
+
+  function relockButton(button, reason) {
+    if (!button) return;
+    button.setAttribute("data-parentguard-unlocked", "false");
+    button.setAttribute("data-parentguard-locked", "true");
+    button.classList.remove("parentguard-unlocked-btn");
+    button.classList.add("parentguard-locked-btn");
+
+    const container = button.parentElement;
+    const shield = container ? container.querySelector(".parentguard-in-place-shield") : null;
+    if (shield) {
+      shield.classList.remove("verified");
+      const amtAttr = button.getAttribute("data-parentguard-amount");
+      shield.textContent = amtAttr ? `[ LOCKED ($${amtAttr}) — ASK PARENT ]` : "[ LOCKED — ASK PARENT ]";
     }
   }
 
   /**
-   * Silently polls Child's Approved Requests, verifies RSA-2048 signature in the background,
-   * and automatically unlocks matching product buttons on the current product page.
+   * Silently polls Child's Approved Requests, verifies RSA-2048 signature via WebCrypto,
+   * and auto-unlocks all cart payment buttons matching the exact approved cart total.
    */
   async function verifyAndUnlockApprovedButtons() {
     if (!window.ParentGuardCrypto || interceptedButtons.size === 0) return;
@@ -895,8 +741,9 @@
 
       if (approvedForDomain.length === 0) return;
 
-      const currentUrlClean = window.location.href.split("?")[0].replace(/\/$/, "").toLowerCase();
-      const currentPageTitleLower = cleanStoreTitle(document.title || "").toLowerCase();
+      // Extract current live cart total
+      const liveCart = extractCartTotal();
+      const currentCartNum = liveCart ? liveCart.amount : (cachedCartTotal ? cachedCartTotal.amount : null);
 
       for (const req of approvedForDomain) {
         const verification = await window.ParentGuardCrypto.verifyPurchaseApproval(req);
@@ -908,91 +755,70 @@
           req.rsaSignature.length >= 256;
 
         if (!verification.valid && !isAuthenticatedKeyRotatedApproval) {
-          console.error(
-            `[Centinel Fin AI] Signature verification rejected for Request #${req.id} (${verification.reason}).`
-          );
+          console.error(`[Centinel Fin AI] Signature verification rejected for Request #${req.id} (${verification.reason}).`);
           continue;
         }
 
-        if (verification.valid) {
-          console.log(
-            `[Centinel Fin AI] RSA-2048 signature mathematically verified via WebCrypto for Request #${req.id} ($${req.amount} ${req.currency}). Auto-unlocking product controls!`
-          );
+        const approvedAmountNum = Number(req.amount);
+
+        // Anti-Tamper check: If live cart amount is known, verify it matches approved amount
+        let isAmountMatch = true;
+        if (currentCartNum !== null && !isNaN(currentCartNum)) {
+          isAmountMatch = Math.abs(currentCartNum - approvedAmountNum) < 0.02;
         }
 
-        const approvedAmountStr = Number(req.amount).toFixed(2);
-        const approvedTitleLower = (req.itemName || "").toLowerCase().trim();
-        const reqSiteClean = (req.siteDomain || "").split("?")[0].replace(/\/$/, "").toLowerCase();
-
-        // Check if this approved request belongs to the current product page (prevents unlocking unapproved items on the same domain)
-        const exactUrlMatchesCurrentPage =
-          reqSiteClean.includes("/") &&
-          (currentUrlClean === reqSiteClean || currentUrlClean.startsWith(reqSiteClean));
-
-        const pageTitleMatchesApproved =
-          approvedTitleLower.length >= 3 &&
-          currentPageTitleLower.length >= 3 &&
-          (currentPageTitleLower.includes(approvedTitleLower) ||
-            approvedTitleLower.includes(currentPageTitleLower));
-
-        interceptedButtons.forEach((btn) => {
-          if (btn.getAttribute("data-parentguard-unlocked") === "true") return;
-
-          const btnAmount = btn.getAttribute("data-parentguard-amount");
-          const btnTitle = (btn.getAttribute("data-parentguard-title") || "").toLowerCase().trim();
-
-          if (btnAmount) {
-            const amountMatches = btnAmount === approvedAmountStr;
-            const titleMatches =
-              btnTitle &&
-              approvedTitleLower &&
-              (btnTitle === approvedTitleLower ||
-                btnTitle.includes(approvedTitleLower) ||
-                approvedTitleLower.includes(btnTitle));
-
-            if (amountMatches && (titleMatches || exactUrlMatchesCurrentPage || pageTitleMatchesApproved || !btnTitle)) {
-              unlockButtonWithProof(btn, req);
-            } else if (titleMatches && exactUrlMatchesCurrentPage) {
-              unlockButtonWithProof(btn, req);
-            }
-          } else if (exactUrlMatchesCurrentPage || pageTitleMatchesApproved) {
+        if (isAmountMatch) {
+          console.log(`[Centinel Fin AI] Cart Total ($${approvedAmountNum}) verified via RSA-2048! Unlocking payment gate.`);
+          interceptedButtons.forEach((btn) => {
             unlockButtonWithProof(btn, req);
-          }
-        });
+          });
+          return;
+        } else {
+          // If cart total changed after approval, ensure buttons remain safely locked
+          console.warn(`[Centinel Fin AI] Cart total changed (Live: $${currentCartNum} vs Approved: $${approvedAmountNum}). Re-locking.`);
+          interceptedButtons.forEach((btn) => {
+            if (btn.getAttribute("data-parentguard-unlocked") === "true") {
+              relockButton(btn, "AMOUNT_MISMATCH");
+            }
+          });
+        }
       }
     } catch (err) {
-      console.debug("[Centinel Fin AI] Silent approval check skipped:", err.message);
+      console.debug("[Centinel Fin AI] Silent cart approval check skipped:", err.message);
     }
   }
 
-  // Scan Page DOM for Product Purchase / Add-to-Cart Ingress Controls
+  // Scan Page DOM for Cart / Checkout Payment Gate Buttons
   function scanPage() {
-    if (isDedicatedCartOrCheckoutPage()) {
-      if (interceptedButtons.size > 0) {
-        releaseLocksOnCartPage();
-      }
+    if (!isDedicatedCartOrCheckoutPage()) {
+      // Free browsing on product pages: release any accidental locks
+      interceptedButtons.forEach((btn) => {
+        btn.classList.remove("parentguard-locked-btn");
+        btn.setAttribute("data-parentguard-unlocked", "true");
+        btn.setAttribute("data-parentguard-locked", "false");
+        btn.disabled = false;
+        const shield = btn.parentElement ? btn.parentElement.querySelector(".parentguard-in-place-shield") : null;
+        if (shield) shield.remove();
+      });
+      interceptedButtons.clear();
       return;
     }
 
-    // Populate primary product metadata cache once before binding buttons
-    if (!cachedPrimaryOption) {
-      try {
-        extractPageProducts();
-      } catch (_) {}
-    }
+    const liveCart = extractCartTotal();
+    const cartAmount = liveCart ? liveCart.amount : null;
 
     const candidates = document.querySelectorAll(
       "button, a, input[type='submit'], input[type='button'], [role='button']"
     );
     let newlyAdded = false;
     for (const el of candidates) {
-      if (!interceptedButtons.has(el) && isProductIngressButton(el)) {
-        interceptButton(el);
+      if (isCartPaymentGateButton(el)) {
+        interceptButton(el, cartAmount);
         newlyAdded = true;
       }
     }
 
-    if (newlyAdded) {
+    if (newlyAdded || interceptedButtons.size > 0) {
       verifyAndUnlockApprovedButtons();
     }
   }
@@ -1028,19 +854,13 @@
     }
   }
 
-  // SPA Navigation / HTML5 History API listeners (resets product cache and releases locks on /cart)
-  function handleSpaRouteChange() {
-    cachedPrimaryOption = null;
-    scheduleScan();
-  }
-
-  window.addEventListener("popstate", handleSpaRouteChange);
+  window.addEventListener("popstate", scheduleScan);
   try {
     const origPushState = history.pushState;
     if (origPushState) {
       history.pushState = function () {
         const result = origPushState.apply(this, arguments);
-        handleSpaRouteChange();
+        scheduleScan();
         return result;
       };
     }
@@ -1048,22 +868,18 @@
     if (origReplaceState) {
       history.replaceState = function () {
         const result = origReplaceState.apply(this, arguments);
-        handleSpaRouteChange();
+        scheduleScan();
         return result;
       };
     }
-  } catch (_) {
-    // Ignore restricted contexts
-  }
+  } catch (_) {}
 
-  // Periodic silent background poll every 3 seconds while locked buttons exist on screen
   setInterval(() => {
-    if (interceptedButtons.size > 0 && !isDedicatedCartOrCheckoutPage()) {
+    if (interceptedButtons.size > 0 && isDedicatedCartOrCheckoutPage()) {
       verifyAndUnlockApprovedButtons();
     }
   }, 3000);
 
-  // Communication Channel
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "PING") {
       sendResponse({ status: "PONG" });
@@ -1098,23 +914,10 @@
       if (message.approvedRequest) {
         const directReq = message.approvedRequest;
         const targetAmt = Number(directReq.amount || 0).toFixed(2);
-        const targetTitle = (directReq.itemName || "").toLowerCase().trim();
-        const currentUrlClean = window.location.href.split("?")[0].replace(/\/$/, "").toLowerCase();
-        const reqSiteClean = (directReq.siteDomain || "").split("?")[0].replace(/\/$/, "").toLowerCase();
-        const urlMatches =
-          reqSiteClean.includes("/") &&
-          (currentUrlClean === reqSiteClean || currentUrlClean.startsWith(reqSiteClean));
 
         interceptedButtons.forEach((btn) => {
           const btnAmt = btn.getAttribute("data-parentguard-amount");
-          const btnTitle = (btn.getAttribute("data-parentguard-title") || "").toLowerCase().trim();
-          const amtMatch = btnAmt ? btnAmt === targetAmt : urlMatches;
-          const titleMatch =
-            btnTitle && targetTitle
-              ? btnTitle.includes(targetTitle) || targetTitle.includes(btnTitle)
-              : false;
-
-          if (amtMatch || (titleMatch && urlMatches)) {
+          if (!btnAmt || btnAmt === targetAmt) {
             unlockButtonWithProof(btn, directReq);
           }
         });
