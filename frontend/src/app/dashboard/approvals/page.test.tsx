@@ -178,4 +178,46 @@ describe('ApprovalsPage Component', () => {
       expect(screen.getByText(/Only verified parents hold cryptographic supervisory authority/i)).toBeInTheDocument()
     })
   })
+
+  it('renders itemized cart manifest breakdown for multi-item shopping cart requests', async () => {
+    vi.mocked(ApiClient.getCurrentUser).mockResolvedValue({
+      id: 1,
+      authId: 'auth-parent-1',
+      email: 'parent.test@example.com',
+      displayName: 'Alex Parent',
+      role: 'PARENT',
+      createdAt: '2026-01-01T00:00:00Z',
+      familyId: 10,
+      familyName: 'Turner Family',
+    })
+
+    vi.mocked(ApiClient.getFamilyPurchaseRequests).mockResolvedValue([
+      {
+        id: 303,
+        familyId: 10,
+        childId: 5,
+        childName: 'Leo Turner',
+        siteDomain: 'store.steampowered.com',
+        itemName: '007 First Light ($19.99) + Sea of Thieves 2026 Edition ($8.39)',
+        amount: 28.38,
+        currency: 'USD',
+        category: 'GAMING',
+        note: 'Weekend sale cart',
+        status: 'PENDING',
+        createdAt: new Date().toISOString(),
+      },
+    ])
+
+    render(<ApprovalsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Shopping Cart Order \(2 Items\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/Itemized Cart Manifest/i)).toBeInTheDocument()
+      expect(screen.getByText('007 First Light')).toBeInTheDocument()
+      expect(screen.getByText('$19.99')).toBeInTheDocument()
+      expect(screen.getByText('Sea of Thieves 2026 Edition')).toBeInTheDocument()
+      expect(screen.getByText('$8.39')).toBeInTheDocument()
+      expect(screen.getByText('$28.38')).toBeInTheDocument()
+    })
+  })
 })

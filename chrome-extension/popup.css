@@ -312,15 +312,224 @@ body::-webkit-scrollbar-thumb {
   text-overflow: ellipsis;
 }
 
-/* Smart Detected Option & Bundle Selector Card */
-.option-selector-card {
-  background-color: #FEF9C3;
-  border: var(--border);
+/* Header Right Layout */
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+/* Shopping Cart Manifest Receipt Card */
+.cart-manifest-card {
+  background-color: #FEFCE8;
+  border: var(--border-thick);
   box-shadow: var(--shadow-sm);
-  padding: 9px;
-  margin-bottom: 10px;
-  max-width: 100%;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+.manifest-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.manifest-title {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+}
+
+.cart-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+.cart-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background-color: var(--surface);
+  border: 1.5px solid var(--ink);
+  padding: 6px 8px;
+  box-shadow: 1px 1px 0px var(--ink);
+}
+
+.cart-item-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cart-item-index {
+  background-color: var(--ink);
+  color: #FFFFFF;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 4px;
+  flex-shrink: 0;
+}
+
+.cart-item-name {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink);
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cart-item-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.cart-item-discount {
+  background-color: var(--lime);
+  border: 1px solid var(--ink);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 1px 4px;
+  color: var(--ink);
+}
+
+.cart-item-price {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.manifest-total-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 7px;
+  border-top: 2px dashed var(--ink);
+}
+
+.manifest-total-label {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+}
+
+.manifest-total-value {
+  background-color: var(--ink);
+  color: var(--lime);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 2px 8px;
+}
+
+/* Free Browsing Guidance Card */
+.browsing-mode-card {
+  background-color: var(--surface);
+  border: var(--border-thick);
+  box-shadow: var(--shadow);
+  padding: 14px 12px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.browsing-badge-row {
+  display: flex;
+  align-items: center;
+}
+
+.browsing-status-tag {
+  background-color: var(--lime);
+  border: 2px solid var(--ink);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 6px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+.browsing-status-tag.empty-cart {
+  background-color: var(--yellow);
+}
+
+.browsing-headline {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+}
+
+.browsing-subtext {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-dark);
+  line-height: 1.45;
+}
+
+.manual-fallback-link {
+  background: transparent;
+  border: none;
+  border-top: 1px dashed var(--gray-mid);
+  padding-top: 8px;
+  margin-top: 2px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 800;
+  color: #2563EB;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.manual-fallback-link:hover {
+  color: var(--ink);
+}
+
+/* Cart Tamper / Modification Warning Banner */
+.tamper-warning-card {
+  background-color: #FEF2F2;
+  border: 2px solid #991B1B;
+  box-shadow: 2px 2px 0px #991B1B;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tamper-warning-tag {
+  align-self: flex-start;
+  background-color: #991B1B;
+  color: #FFFFFF;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 1px 5px;
+  letter-spacing: 0.05em;
+}
+
+.tamper-warning-text {
+  font-size: 10px;
+  font-weight: 700;
+  color: #7F1D1D;
+  line-height: 1.35;
 }
 
 .label-row-between {

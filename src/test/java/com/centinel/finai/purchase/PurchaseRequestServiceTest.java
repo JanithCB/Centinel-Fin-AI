@@ -95,6 +95,47 @@ class PurchaseRequestServiceTest {
     }
 
     @Test
+    @DisplayName("Should generate distinct SHA-256 idempotency hashes when cart items differ at the exact same price")
+    void createRequest_differentCartItemsWithSamePrice_generatesDistinctIdempotencyHashes() {
+        when(currentUserResolver.getCurrentUserId()).thenReturn(2L);
+        User child = new User();
+        child.setId(2L);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(child));
+
+        Family family = new Family("Test Family");
+        family.setId(10L);
+        FamilyMember membership = new FamilyMember(family, child, UserRole.CHILD);
+        when(familyMemberRepository.findByUserId(2L)).thenReturn(Collections.singletonList(membership));
+
+        when(maskingService.maskUrl("https://store.steampowered.com/cart")).thenReturn("store.steampowered.com");
+        when(purchaseRequestRepository.findByChildIdAndIdempotencyHashAndStatus(eq(2L), anyString(), eq(PurchaseRequestStatus.PENDING)))
+                .thenReturn(Optional.empty());
+        when(purchaseRequestRepository.save(any(PurchaseRequest.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        CreatePurchaseRequestDTO cartA = new CreatePurchaseRequestDTO();
+        cartA.setSiteDomain("https://store.steampowered.com/cart");
+        cartA.setItemName("Educational Coding Guide");
+        cartA.setAmount(new BigDecimal("19.99"));
+        cartA.setCurrency("USD");
+
+        CreatePurchaseRequestDTO cartB = new CreatePurchaseRequestDTO();
+        cartB.setSiteDomain("https://store.steampowered.com/cart");
+        cartB.setItemName("007 First Light");
+        cartB.setAmount(new BigDecimal("19.99"));
+        cartB.setCurrency("USD");
+
+        purchaseRequestService.createRequest(cartA);
+        purchaseRequestService.createRequest(cartB);
+
+        ArgumentCaptor<PurchaseRequest> captor = ArgumentCaptor.forClass(PurchaseRequest.class);
+        verify(purchaseRequestRepository, times(2)).save(captor.capture());
+
+        String hashA = captor.getAllValues().get(0).getIdempotencyHash();
+        String hashB = captor.getAllValues().get(1).getIdempotencyHash();
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
     @DisplayName("Should detect duplicate pending request and return existing without saving duplicate")
     void createRequest_duplicatePendingRequest_returnsExistingWithoutSavingDuplicate() {
         when(currentUserResolver.getCurrentUserId()).thenReturn(2L);

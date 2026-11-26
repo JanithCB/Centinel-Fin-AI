@@ -74,7 +74,7 @@ public class PurchaseRequestService {
         Family family = memberships.get(0).getFamily();
 
         String maskedUrl = maskingService.maskUrl(dto.getSiteDomain());
-        String idempotencyHash = computeIdempotencyHash(child.getId(), maskedUrl, dto.getAmount(), dto.getCurrency());
+        String idempotencyHash = computeIdempotencyHash(child.getId(), maskedUrl, dto.getItemName(), dto.getAmount(), dto.getCurrency());
 
         Optional<PurchaseRequest> existingPending = purchaseRequestRepository
                 .findByChildIdAndIdempotencyHashAndStatus(child.getId(), idempotencyHash, PurchaseRequestStatus.PENDING);
@@ -193,13 +193,15 @@ public class PurchaseRequestService {
         return mapToDTO(saved);
     }
 
-    private String computeIdempotencyHash(Long childId, String domain, BigDecimal amount, String currency) {
+    private String computeIdempotencyHash(Long childId, String domain, String itemName, BigDecimal amount, String currency) {
         try {
             String normalizedAmount = amount != null ? amount.stripTrailingZeros().toPlainString() : "0";
             String normalizedCurrency = currency != null ? currency.trim().toUpperCase() : "USD";
-            String raw = String.format("%d:%s:%s:%s",
+            String normalizedItemName = itemName != null ? itemName.trim().toLowerCase().replaceAll("\\s+", " ") : "";
+            String raw = String.format("%d:%s:%s:%s:%s",
                     childId,
                     domain != null ? domain.trim().toLowerCase() : "",
+                    normalizedItemName,
                     normalizedAmount,
                     normalizedCurrency
             );

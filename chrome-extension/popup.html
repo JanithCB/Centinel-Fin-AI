@@ -13,7 +13,7 @@
       <div class="brand-badge">C</div>
       <div class="brand-text">
         <h1 class="brand-title">CENTINEL FIN AI</h1>
-        <span class="brand-sub">PARENTGUARD // EXTENSION</span>
+        <span class="brand-sub">PARENTGUARD // CART GATE</span>
       </div>
     </div>
     <div class="header-right">
@@ -32,7 +32,7 @@
         <span class="section-tag">AUTH</span>
         <span class="section-name">CHILD SESSION LOGIN</span>
       </div>
-      <p class="auth-hint">Sign in with your registered child account to submit purchase requests.</p>
+      <p class="auth-hint">Sign in with your registered child account to request cart checkout approvals.</p>
       <form id="loginForm" class="auth-form">
         <div class="form-group">
           <label for="loginEmail" class="form-label">EMAIL ADDRESS</label>
@@ -63,14 +63,14 @@
   <!-- Navigation Tabs (Only visible when logged in) -->
   <nav id="appNav" class="nav-tabs hidden">
     <button id="tabNewRequest" class="tab-btn active" data-tab="newRequestView">
-      NEW REQUEST
+      CART CHECKOUT
     </button>
     <button id="tabMyRequests" class="tab-btn" data-tab="myRequestsView">
       MY REQUESTS <span id="requestCountBadge" class="count-badge">0</span>
     </button>
   </nav>
 
-  <!-- Tab 1: New Purchase Request Form & Live Status Tracker -->
+  <!-- Tab 1: Shopping Cart Manifest & Live Approval Tracker -->
   <main id="newRequestView" class="tab-content hidden">
     <!-- Live Post-Submission Waiting / Approved Status Card -->
     <div id="liveApprovalTracker" class="live-tracker-card hidden">
@@ -92,76 +92,98 @@
 
       <h2 id="trackerHeadline" class="tracker-headline">WAITING FOR PARENT APPROVAL...</h2>
       <p id="trackerSubtext" class="tracker-subtext">
-        Your request has been sent. Keep your shopping cart open — Continue to Payment will unlock automatically as soon as your parent approves.
+        Your cart manifest has been sent. Keep your shopping cart open — Continue to Payment will unlock automatically once approved.
       </p>
 
       <div class="tracker-item-box">
         <div class="tracker-item-row">
-          <span id="trackerItemTitle" class="tracker-item-title">Selected Product</span>
+          <span id="trackerItemTitle" class="tracker-item-title">Shopping Cart Order</span>
           <span id="trackerItemAmount" class="tracker-item-price">$0.00</span>
         </div>
         <div class="tracker-item-meta">
           <span id="trackerItemDomain" class="tracker-item-domain">Online Store</span>
-          <span id="trackerAutoSyncTag" class="tracker-sync-tag">LIVE AUTO-UNLOCK ACTIVE</span>
+          <span id="trackerAutoSyncTag" class="tracker-sync-tag">4-LAYER CART GUARD</span>
         </div>
       </div>
 
       <button type="button" id="showFormAgainBtn" class="neo-btn neo-btn-secondary full-width">
-        [ CHOOSE A DIFFERENT PRODUCT / OPTION ]
+        [ VIEW / SUBMIT UPDATED CART ]
       </button>
     </div>
 
-    <!-- Collapsible Form Container -->
+    <!-- Collapsible Cart Form & Browsing Guidance Container -->
     <div id="requestFormContainer">
-      <!-- Active Tab Auto-Detection Card -->
+      <!-- Active Store Detection Card -->
       <div class="detection-card">
         <div class="card-header-sm">
-          <span class="tag-label">DETECTED MERCHANT</span>
-          <button id="refreshTabBtn" class="refresh-btn" title="Re-scan current page for products, variants, and prices">RE-DETECT</button>
+          <span class="tag-label" id="detectedModeLabel">DETECTED MERCHANT</span>
+          <button id="refreshTabBtn" class="refresh-btn" title="Re-scan current shopping cart items and total">RE-SCAN CART</button>
         </div>
         <div class="store-info-row">
           <span class="store-domain-pill" id="detectedDomainDisplay">Detecting active tab...</span>
-          <span class="options-count-pill hidden" id="optionsCountBadge">0 OPTIONS</span>
+          <span class="options-count-pill hidden" id="cartItemCountBadge">0 ITEMS</span>
         </div>
         <div class="store-url-row" id="detectedUrlDisplay">
           Reading current browser tab...
         </div>
       </div>
 
-      <!-- Purchase Request Form -->
+      <!-- Cart Tamper / Modification Warning Banner -->
+      <div id="cartTamperAlert" class="tamper-warning-card hidden">
+        <span class="tamper-warning-tag">[ CART MODIFIED ]</span>
+        <p id="cartTamperText" class="tamper-warning-text">
+          Your cart items or total changed since your last approval. Parent re-approval is required to proceed to payment.
+        </p>
+      </div>
+
+      <!-- Free Browsing Mode Card (Shown on non-cart product pages or empty carts) -->
+      <div id="browsingModeCard" class="browsing-mode-card hidden">
+        <div class="browsing-badge-row">
+          <span id="browsingModeTag" class="browsing-status-tag">[ FREE BROWSING UNLOCKED ]</span>
+        </div>
+        <h3 id="browsingModeHeadline" class="browsing-headline">ADD ITEMS TO YOUR CART FIRST</h3>
+        <p id="browsingModeSubtext" class="browsing-subtext">
+          Add to Cart buttons are unlocked across all product pages. Add the items you want to your shopping basket, then open your Shopping Cart page to request parent checkout approval.
+        </p>
+        <button type="button" id="manualCheckoutFallbackBtn" class="manual-fallback-link">
+          On a custom direct checkout page? Enter cart details manually &rarr;
+        </button>
+      </div>
+
+      <!-- Shopping Cart Manifest & Submission Form -->
       <form id="purchaseForm" class="request-form">
-        <!-- Smart Detected Product / Variant / Bundle Selector -->
-        <div id="productOptionGroup" class="form-group option-selector-card hidden">
-          <div class="label-row-between">
-            <label for="productOptionSelect" class="form-label mb-0">SELECT PRODUCT / EDITION OPTION *</label>
-            <span id="priceVerifiedTag" class="verified-price-tag">LIVE STORE PRICE</span>
+        <!-- Itemized Cart Receipt Card (Replaces Legacy Product Dropdown) -->
+        <div id="cartManifestCard" class="cart-manifest-card hidden">
+          <div class="manifest-header-row">
+            <span class="manifest-title">ITEMS IN YOUR CART</span>
+            <span class="verified-price-tag">LIVE CART MANIFEST</span>
           </div>
-          <select id="productOptionSelect" class="neo-select neo-select-highlight">
-            <!-- Options dynamically populated from store DOM -->
-          </select>
-          <div id="selectedOptionDiscountBar" class="discount-callout-bar hidden">
-            <span id="discountPctBadge" class="discount-pct-pill">-30%</span>
-            <span id="discountContextText" class="discount-context-text">Special Deal</span>
+          <div id="cartItemsList" class="cart-items-list">
+            <!-- Dynamically populated cart line items -->
+          </div>
+          <div class="manifest-total-bar">
+            <span class="manifest-total-label">VERIFIED CART TOTAL</span>
+            <span id="manifestTotalValue" class="manifest-total-value">$0.00 USD</span>
           </div>
         </div>
 
         <div class="form-group">
           <div class="label-row-between">
-            <label for="itemNameInput" class="form-label mb-0">ITEM / PRODUCT TITLE *</label>
-            <span id="titleLockStatus" class="locked-badge">[ VERIFIED ]</span>
+            <label for="itemNameInput" class="form-label mb-0">CART SUMMARY FOR PARENT *</label>
+            <span id="titleLockStatus" class="locked-badge">[ CART LOCKED ]</span>
           </div>
-          <input type="text" id="itemNameInput" class="neo-input neo-input-locked" placeholder="e.g. Wireless Headphones / Course / Game" required readonly>
+          <input type="text" id="itemNameInput" class="neo-input neo-input-locked" placeholder="Cart items summary" required readonly>
         </div>
 
         <div class="form-row-split">
           <div class="form-group flex-1">
             <div class="label-row-between">
-              <label for="amountInput" class="form-label mb-0">AMOUNT *</label>
-              <span id="amountLockStatus" class="locked-badge">[ STORE LOCKED ]</span>
+              <label for="amountInput" class="form-label mb-0">CART TOTAL *</label>
+              <span id="amountLockStatus" class="locked-badge">[ CART LOCKED ]</span>
             </div>
             <div class="amount-input-wrap">
               <span id="currencyPrefixSymbol" class="currency-prefix">$</span>
-              <input type="number" id="amountInput" class="neo-input amount-field neo-input-locked" placeholder="19.99" step="0.01" min="0.01" required readonly>
+              <input type="number" id="amountInput" class="neo-input amount-field neo-input-locked" placeholder="0.00" step="0.01" min="0.01" required readonly>
             </div>
           </div>
           <div class="form-group w-30">
@@ -195,14 +217,14 @@
         </div>
 
         <div class="form-group">
-          <label for="reasonInput" class="form-label">NOTE FOR PARENT (WHY DO YOU NEED THIS?) *</label>
-          <textarea id="reasonInput" class="neo-textarea" rows="2" placeholder="e.g. Needed for my school project / weekend activity." required></textarea>
+          <label for="reasonInput" class="form-label">NOTE FOR PARENT (WHY DO YOU NEED THESE ITEMS?) *</label>
+          <textarea id="reasonInput" class="neo-textarea" rows="2" placeholder="e.g. Weekend gaming deal / school supplies in my cart." required></textarea>
         </div>
 
         <div id="submissionAlert" class="alert-box hidden"></div>
 
         <button type="submit" id="submitRequestBtn" class="neo-btn neo-btn-primary full-width action-btn">
-          [ SEND TO PARENT FOR APPROVAL ]
+          [ SEND CART TO PARENT FOR APPROVAL ]
         </button>
       </form>
     </div>
@@ -211,7 +233,7 @@
   <!-- Tab 2: My Requests List View -->
   <section id="myRequestsView" class="tab-content hidden">
     <div class="list-controls-bar">
-      <span class="list-title">MY SUBMITTED REQUESTS</span>
+      <span class="list-title">MY SUBMITTED CART REQUESTS</span>
       <button id="refreshRequestsBtn" class="neo-btn-sm neo-btn-secondary">REFRESH</button>
     </div>
 
@@ -219,7 +241,7 @@
       <!-- Cards rendered dynamically by popup.js -->
       <div class="empty-state">
         <span class="empty-title">NO REQUESTS YET</span>
-        <span class="empty-sub">When you submit requests on any online store, they will appear here.</span>
+        <span class="empty-sub">When you submit a shopping cart for checkout approval, it will appear here.</span>
       </div>
     </div>
   </section>
@@ -228,7 +250,7 @@
   <footer class="app-footer">
     <div class="footer-row">
       <span class="footer-tag">PARENTGUARD</span>
-      <span class="footer-meta">PROTECTED FAMILY CHECKOUT</span>
+      <span class="footer-meta">RSA-2048 CART MANIFEST PROTECTION</span>
     </div>
   </footer>
 

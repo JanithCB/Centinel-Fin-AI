@@ -34,6 +34,23 @@ export default function PurchaseRequestCard({
   const formattedAmount = formatCurrencyAmount(request.amount, request.currency);
   const currencyCode = (request.currency || "USD").trim().toUpperCase();
 
+  // Parse multi-item Shopping Cart Manifest summaries (e.g. "007 First Light ($19.99) + Sea of Thieves ($8.39)")
+  const rawItemName = (request.itemName || "").trim();
+  const cartSegments = rawItemName.includes(" + ")
+    ? rawItemName
+        .split(/\s+\+\s+/)
+        .map((seg) => seg.trim())
+        .filter(Boolean)
+        .map((seg) => {
+          const priceMatch = seg.match(/^(.*?)\s*\(([$€£₹RsA-Z.\s]*\d+[.,]\d{2})\)\s*$/i);
+          if (priceMatch) {
+            return { title: priceMatch[1].trim(), price: priceMatch[2].trim() };
+          }
+          return { title: seg, price: null };
+        })
+    : [];
+  const isMultiItemCart = cartSegments.length > 1;
+
   return (
     <article className="p-5 bg-surface rounded-xl border-[3px] border-ink shadow-[4px_4px_0px_#151515] flex flex-col gap-4 transition-all">
       {/* Top Row: Child Info, Badges, and Cost Callout Box */}
@@ -84,10 +101,45 @@ export default function PurchaseRequestCard({
               )}
             </div>
 
-            {/* Item Name */}
-            <h3 className="font-headline-sm font-bold text-ink text-lg leading-snug break-words">
-              {request.itemName}
-            </h3>
+            {/* Item Name or Multi-Item Cart Manifest Breakdown */}
+            {isMultiItemCart ? (
+              <div className="flex flex-col gap-2 mt-0.5">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-headline-sm font-bold text-ink text-base sm:text-lg leading-snug">
+                    Shopping Cart Order ({cartSegments.length} Items)
+                  </h3>
+                </div>
+                <div className="bg-paper border-2 border-ink rounded-lg p-2.5 flex flex-col gap-1.5 shadow-[2px_2px_0px_#151515]">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-outline">
+                    Itemized Cart Manifest
+                  </span>
+                  {cartSegments.map((item, idx) => (
+                    <div
+                      key={`${idx}-${item.title}`}
+                      className="flex items-center justify-between gap-2 bg-surface border border-ink/40 rounded px-2.5 py-1.5"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="px-1.5 py-0.5 bg-ink text-surface font-mono text-[10px] font-bold rounded-sm shrink-0">
+                          {String(idx + 1).padStart(2, "0")}
+                        </span>
+                        <span className="font-body-sm font-bold text-xs sm:text-sm text-ink truncate">
+                          {item.title}
+                        </span>
+                      </div>
+                      {item.price && (
+                        <span className="font-mono font-bold text-xs text-ink bg-sun/60 border border-ink px-2 py-0.5 rounded shrink-0">
+                          {item.price}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <h3 className="font-headline-sm font-bold text-ink text-lg leading-snug break-words">
+                {request.itemName}
+              </h3>
+            )}
           </div>
         </div>
 

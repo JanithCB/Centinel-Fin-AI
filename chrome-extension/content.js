@@ -1,21 +1,25 @@
 /**
  * Centinel Fin AI – ParentGuard
- * Content Script: Cart-Gate Payment Lock, Smart Cart Item Scraper & WebCrypto RSA-2048 Auto-Unlock
+ * Content Script: Smart Cart Manifest Scraper, Cart-Gate Lock & 4-Layer Anti-Tamper Engine
  *
  * Responsibilities:
- * - Cart-Gate Payment Lock: Intercepts and locks ONLY the final payment / checkout buttons
- *   ("Continue to payment", "Proceed to Checkout", "Pay Now", "Place Order", etc.) on /cart and /checkout pages
- * - Free Browsing: "Add to Cart" and "Add to Bag" on product pages are 100% unlocked for normal shopping basket building
- * - Smart Cart Scraper: Automatically extracts cart item titles, direct product page URLs (<a href="...">), and live cart totals
- * - Breadcrumb Caching: Records product page visits in sessionStorage so cart requests can reference the exact product URL
- * - WebCrypto RSA-2048 Verification: Unlocks cart payment buttons when parent approves the exact cart total
- * - Anti-Tamper Re-Locking: If the child alters the cart after approval (changing the cart total), payment buttons immediately re-lock
+ * - Cart-Gate Payment Lock: Intercepts and locks ONLY checkout payment gates
+ *   ("Continue to payment", "Proceed to Checkout", "Pay Now", "Place Order") on /cart and /checkout pages
+ * - Free Browsing & Cross-Tab Mutation Broadcast: Leaves "Add to Cart" unlocked on product pages while
+ *   passively broadcasting cart additions across tabs so open /cart tabs cannot be exploited with stale DOMs
+ * - Structural & Universal Cart Manifest Scraper: Extracts all cart items (titles, final discounted prices,
+ *   discount badges, quantities, and direct product URLs) across React-based carts (Steam) and major stores
+ * - 4-Layer Anti-Tamper Engine:
+ *   1. Post-Approval Cart Stuffing Guard (RSA-2048 signed amount vs live cart total)
+ *   2. Equal-Price Item Swap / Bait-and-Switch Guard (Canonical Cart Item Manifest matching)
+ *   3. Multi-Tab Background Cart Injection Guard (chrome.storage.local cross-tab invalidation)
+ *   4. Click-Time Just-In-Time (JIT) Synchronous Gate + Closure-Private State (defeats DevTools attribute tampering)
  */
 
 (function () {
   "use strict";
 
-  // Helper: Parse a raw price text (e.g. "$8.39", "Estimated total $8.39", "€14,99", "£19.99") into { amount, currency, raw }
+  // Helper: Parse a raw price text (e.g. "$8.39", "Estimated total $28.38", "€14,99", "£19.99") into { amount, currency, raw }
   function parsePriceText(rawText, fallbackCurrency) {
     if (rawText === null || rawText === undefined) return null;
     const text = String(rawText).replace(/[\u00A0\u200B-\u200D\uFEFF]/g, " ").replace(/\s+/g, " ").trim();
@@ -78,6 +82,62 @@
     };
   }
 
+  // Helper: Parse the FINAL active price from a container that may also include a strikethrough original price
+  function extractActiveItemPrice(containerEl, metaCurrencyHint) {
+    if (!containerEl) return null;
+
+    // 1. Collect price-bearing leaf/inline elements that are NOT strikethrough / original prices
+    const candidates = [];
+    const subEls = containerEl.querySelectorAll("span, div, b, strong, p, ins, [class*='price' i]");
+
+    const isStrikethroughOrOriginal = (el) => {
+      if (!el) return false;
+      if (el.closest && el.closest("del, s, strike, [class*='original' i], [class*='strike' i], [class*='was-price' i], [class*='old-price' i]")) {
+        return true;
+      }
+      const cls = typeof el.className === "string" ? el.className.toLowerCase() : "";
+      if (cls.includes("original") || cls.includes("strike") || cls.includes("discount_original")) {
+        return true;
+      }
+      try {
+        if (typeof window.getComputedStyle === "function") {
+          const style = window.getComputedStyle(el);
+          const td = (style.textDecoration || style.textDecorationLine || "").toLowerCase();
+          if (td.includes("line-through")) return true;
+        }
+      } catch (_) {}
+      return false;
+    };
+
+    subEls.forEach((el) => {
+      if (isStrikethroughOrOriginal(el)) return;
+      // Prefer leaf-level price nodes (no nested element children with digits, or short direct text)
+      const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (!txt || txt.length > 32) return;
+      if (/^-\d{1,3}%$/.test(txt)) return; // Skip discount percentage pill
+
+      // Ensure none of its children has a strikethrough price mixed into txt
+      const hasStrikeChild = el.querySelector && el.querySelector("del, s, strike, [class*='original' i], [class*='strike' i]");
+      if (hasStrikeChild) return;
+
+      const parsed = parsePriceText(txt, metaCurrencyHint);
+      if (parsed && parsed.amount > 0) {
+        candidates.push(parsed);
+      }
+    });
+
+    if (candidates.length > 0) {
+      // On discounted cards (e.g. "$39.99" then "$19.99"), the final active price appears last (and is lowest when discounted)
+      const hasDiscountBadge = /-\d{1,2}%/.test(containerEl.textContent || "");
+      if (hasDiscountBadge && candidates.length > 1) {
+        return candidates.reduce((minP, curP) => (curP.amount < minP.amount ? curP : minP), candidates[candidates.length - 1]);
+      }
+      return candidates[candidates.length - 1];
+    }
+
+    return parsePriceText(containerEl.textContent, metaCurrencyHint);
+  }
+
   // Helper: Detect default merchant category from hostname
   function inferMerchantCategory(hostname) {
     const h = (hostname || "").toLowerCase();
@@ -127,7 +187,7 @@
     return "SHOPPING";
   }
 
-  // Helper: Clean common marketplace prefixes/suffixes from page titles
+  // Helper: Clean common marketplace prefixes/suffixes from page/item titles
   function cleanStoreTitle(rawTitle) {
     return (rawTitle || "")
       .replace(/\s+/g, " ")
@@ -141,6 +201,24 @@
       .replace(/\s*-\s*Best Buy$/i, "")
       .replace(/\s*-\s*Walmart\.com$/i, "")
       .replace(/\s*:\s*Target$/i, "")
+      .trim();
+  }
+
+  // Helper: Normalize an item title for anti-tamper manifest comparison
+  function normalizeManifestTitle(raw) {
+    return cleanStoreTitle(raw || "")
+      .replace(/\(\s*[$€£₹RsA-Z.\s]*\d+[.,]\d{2}\s*\)\s*$/i, "")
+      .replace(/\[\s*\d+\s*items?\s*\]\s*$/i, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+
+  // Helper: Clean hostname key for storage keys
+  function getCleanHostKey(hostname) {
+    return (hostname || window.location.hostname || "")
+      .replace(/^www\./i, "")
+      .toLowerCase()
       .trim();
   }
 
@@ -166,35 +244,63 @@
     if (pathname.includes("/gp/cart") || pathname.includes("/gp/buy") || search.includes("step=contact_information")) {
       return true;
     }
-    // Also treat pages with prominent cart container as cart pages if not an app/product page
     if (document.querySelector("#cart_item_list, .cart_totals_area, #shopping-cart-table, [data-checkout-subtotal]")) {
       return true;
     }
     return false;
   }
 
-  // Breadcrumb Cache: Record recently visited product page so cart can link directly to it
+  // Multi-Item Breadcrumb Ring Buffer: Stores up to 25 recently visited product pages on this domain
   function updateProductBreadcrumb(productInfo) {
     if (!productInfo || !productInfo.title || isDedicatedCartOrCheckoutPage()) return;
     try {
-      const data = {
+      const entry = {
         domain: window.location.hostname,
-        title: productInfo.title,
+        title: cleanStoreTitle(productInfo.title),
+        normTitle: normalizeManifestTitle(productInfo.title),
         url: window.location.href,
         amount: productInfo.amount,
         currency: productInfo.currency,
         timestamp: Date.now()
       };
-      sessionStorage.setItem("__parentguard_last_product__", JSON.stringify(data));
+      sessionStorage.setItem("__parentguard_last_product__", JSON.stringify(entry));
+
+      let history = [];
+      const rawHistory = sessionStorage.getItem("__parentguard_product_history__");
+      if (rawHistory) {
+        const parsed = JSON.parse(rawHistory);
+        if (Array.isArray(parsed)) history = parsed;
+      }
+      history = history.filter((h) => h && h.normTitle !== entry.normTitle && h.url !== entry.url);
+      history.unshift(entry);
+      if (history.length > 25) history = history.slice(0, 25);
+      sessionStorage.setItem("__parentguard_product_history__", JSON.stringify(history));
     } catch (_) {}
   }
 
+  function getProductBreadcrumbHistory() {
+    try {
+      const raw = sessionStorage.getItem("__parentguard_product_history__");
+      if (!raw) return [];
+      const list = JSON.parse(raw);
+      if (!Array.isArray(list)) return [];
+      const now = Date.now();
+      return list.filter(
+        (item) => item && item.domain === window.location.hostname && now - (item.timestamp || 0) < 1000 * 60 * 60 * 4
+      );
+    } catch (_) {
+      return [];
+    }
+  }
+
   function getProductBreadcrumb() {
+    const history = getProductBreadcrumbHistory();
+    if (history.length > 0) return history[0];
     try {
       const raw = sessionStorage.getItem("__parentguard_last_product__");
       if (!raw) return null;
       const data = JSON.parse(raw);
-      if (data && data.domain === window.location.hostname && Date.now() - data.timestamp < 1000 * 60 * 60 * 2) {
+      if (data && data.domain === window.location.hostname && Date.now() - data.timestamp < 1000 * 60 * 60 * 4) {
         return data;
       }
     } catch (_) {}
@@ -204,16 +310,17 @@
   // Helper: Scrape the Cart Total from the page DOM
   function extractCartTotal(metaCurrencyHint) {
     const candidates = [
-      // Steam Cart
+      // Steam Cart (Legacy & React Cart "Estimated total $28.38")
       () => {
         const estRow = document.querySelector(".cart_totals_area, .estimated_total_box, #cart_estimated_total");
-        if (estRow) return parsePriceText(estRow.textContent, metaCurrencyHint);
-        const match = (document.body ? document.body.innerText : "").match(/Estimated\s+total[\s\S]{0,50}?([$€£Rs₹A-Z\s]*\d+[.,]\d{2})/i);
+        if (estRow) return extractActiveItemPrice(estRow, metaCurrencyHint);
+        const bodyText = document.body ? (document.body.innerText || document.body.textContent || "") : "";
+        const match = bodyText.match(/Estimated\s+total[\s\S]{0,60}?([$€£₹RsA-Z\s]*\d{1,3}(?:[.,]\d{3})*[.,]\d{2})/i);
         return match ? parsePriceText(match[1], metaCurrencyHint) : null;
       },
       // Amazon Cart
       () => {
-        const el = document.querySelector("#sc-subtotal-amount-activecart, #sc-subtotal-amount-buybox, .sc-price");
+        const el = document.querySelector("#sc-subtotal-amount-activecart, #sc-subtotal-amount-buybox");
         return el ? parsePriceText(el.textContent, metaCurrencyHint) : null;
       },
       // Shopify / WooCommerce / Generic Cart
@@ -223,12 +330,12 @@
         );
         return el ? parsePriceText(el.textContent, metaCurrencyHint) : null;
       },
-      // Universal price container within cart total area
+      // Universal price container within cart summary area
       () => {
         const totalArea = document.querySelector(".cart-total, .cart_total, .order-summary, .cart-summary");
         if (totalArea) {
           const priceEl = totalArea.querySelector(".price, .amount, [data-price]");
-          if (priceEl) return parsePriceText(priceEl.textContent, metaCurrencyHint);
+          if (priceEl) return extractActiveItemPrice(priceEl, metaCurrencyHint);
         }
         return null;
       }
@@ -243,72 +350,206 @@
     return null;
   }
 
-  // Helper: Scrape Cart Items & direct product links from Cart DOM (excluding recommendations)
+  // Helper: Extract canonical Steam item key (e.g. "app/3768760") from a URL
+  function getSteamProductKey(href) {
+    if (!href) return null;
+    const m = String(href).match(/\/(app|sub|bundle)\/(\d+)/i);
+    return m ? `${m[1].toLowerCase()}/${m[2]}` : null;
+  }
+
+  // Helper: Check if node A appears before node B in DOM order
+  function isNodeBefore(nodeA, nodeB) {
+    if (!nodeA || !nodeB) return true;
+    if (typeof nodeA.compareDocumentPosition === "function") {
+      return Boolean(nodeA.compareDocumentPosition(nodeB) & 4); // Node.DOCUMENT_POSITION_FOLLOWING === 4
+    }
+    return true;
+  }
+
+  // Helper: Scrape ALL Cart Items, Individual Prices, Discounts & Direct Product Links from Cart DOM
   function extractCartItemsAndLinks(metaCurrencyHint) {
     const items = [];
-    const hostname = window.location.hostname || "";
+    const hostname = (window.location.hostname || "").toLowerCase();
+    const breadcrumbs = getProductBreadcrumbHistory();
 
-    // Steam Shopping Cart Line Items (excluding "RECOMMENDATIONS FOR YOU")
+    // --- 1. Steam Shopping Cart (Supports both React Obfuscated DOM & Legacy DOM) ---
     if (hostname.includes("steampowered.com")) {
-      const cartRows = document.querySelectorAll(
-        ".cart_item, .cart_line_item, [class*='cart_item_row'], [class*='CartItem_']"
-      );
-      cartRows.forEach((row) => {
-        if (row.closest(".recommendations_container, [class*='recommendation' i], #recommended_items")) {
+      // Find cutoff landmarks ("Remove all items" or "RECOMMENDATIONS FOR YOU") so recommended games are NEVER included
+      let cutoffElement = null;
+      const allHeadingsAndLinks = document.querySelectorAll("h1, h2, h3, h4, div, span, a, button");
+      for (const el of allHeadingsAndLinks) {
+        const directTxt = (el.textContent || "").replace(/\s+/g, " ").trim();
+        if (/^RECOMMENDATIONS\s+FOR\s+YOU$/i.test(directTxt) || /^Remove\s+all\s+items$/i.test(directTxt)) {
+          cutoffElement = el;
+          break;
+        }
+      }
+
+      // Discover all Steam product links (/app/, /sub/, /bundle/) inside the cart section above cutoff
+      const productAnchors = document.querySelectorAll("a[href*='/app/'], a[href*='/sub/'], a[href*='/bundle/']");
+      const processedCards = new Set();
+
+      productAnchors.forEach((anchor) => {
+        if (!anchor || !anchor.href) return;
+        if (
+          anchor.closest &&
+          anchor.closest(
+            "header, nav, footer, #global_header, .supernav_container, .recommendations_container, [class*='recommendation' i], #recommended_items"
+          )
+        ) {
           return;
         }
-        const linkEl = row.querySelector("a[href*='/app/'], a[href*='/sub/'], a[href*='/bundle/'], a.title, .title a");
-        const titleEl = linkEl || row.querySelector(".title, .item_name, [class*='item_title' i]");
-        const priceEl = row.querySelector(".price, [class*='price' i]");
+        if (cutoffElement && !isNodeBefore(anchor, cutoffElement)) {
+          return;
+        }
 
-        if (titleEl) {
-          const rawTitle = titleEl.textContent.replace(/\s+/g, " ").trim();
-          const cleanTitle = cleanStoreTitle(rawTitle);
-          let fullUrl = linkEl ? linkEl.href : null;
-          if (fullUrl && fullUrl.startsWith("/")) {
-            fullUrl = `${window.location.origin}${fullUrl}`;
-          }
-          const priceObj = priceEl ? parsePriceText(priceEl.textContent, metaCurrencyHint) : null;
+        const prodKey = getSteamProductKey(anchor.href);
+        if (!prodKey) return;
 
-          if (cleanTitle) {
-            items.push({
-              title: cleanTitle,
-              productUrl: fullUrl,
-              amount: priceObj ? priceObj.amount : null,
-              currency: priceObj ? priceObj.currency : metaCurrencyHint
-            });
+        // Walk up from the anchor to find the single Cart Item Card container
+        let cardEl = anchor.parentElement;
+        let cur = anchor.parentElement;
+        for (let depth = 0; depth < 7 && cur && cur !== document.body; depth++) {
+          const curTxt = (cur.textContent || "").replace(/\s+/g, " ").trim();
+          // Stop before container encompasses the whole cart ("Continue to payment", "Estimated total", "Your Shopping Cart")
+          if (
+            /Continue\s+to\s+payment/i.test(curTxt) ||
+            /Continue\s+Shopping/i.test(curTxt) ||
+            /Your\s+Shopping\s+Cart/i.test(curTxt) ||
+            /RECOMMENDATIONS\s+FOR\s+YOU/i.test(curTxt)
+          ) {
+            break;
           }
+
+          // Check if cur contains links to OTHER Steam apps — if so, cur is the list wrapper, stop!
+          const innerAppLinks = cur.querySelectorAll("a[href*='/app/'], a[href*='/sub/'], a[href*='/bundle/']");
+          let hasDifferentProduct = false;
+          for (const otherLink of innerAppLinks) {
+            const otherKey = getSteamProductKey(otherLink.href);
+            if (otherKey && otherKey !== prodKey) {
+              hasDifferentProduct = true;
+              break;
+            }
+          }
+          if (hasDifferentProduct) {
+            break;
+          }
+
+          cardEl = cur;
+          cur = cur.parentElement;
+        }
+
+        if (!cardEl || processedCards.has(cardEl)) return;
+        processedCards.add(cardEl);
+
+        // Extract Title inside cardEl
+        let itemTitle = "";
+        const cardLinks = cardEl.querySelectorAll("a[href*='/app/'], a[href*='/sub/'], a[href*='/bundle/'], a.title, .title a");
+        for (const lnk of cardLinks) {
+          const t = cleanStoreTitle((lnk.textContent || "").replace(/\s+/g, " ").trim());
+          if (t && t.length >= 2 && !/^(add|remove|view|install)$/i.test(t)) {
+            itemTitle = t;
+            break;
+          }
+        }
+
+        // Fallback if anchor wrapped only capsule <img> and title is in a sibling text container
+        if (!itemTitle) {
+          const textCandidates = cardEl.querySelectorAll("div, span, h2, h3, h4");
+          for (const node of textCandidates) {
+            if (node.children && node.children.length > 0) continue;
+            const rawT = (node.textContent || "").replace(/\s+/g, " ").trim();
+            if (
+              rawT.length >= 2 &&
+              rawT.length <= 100 &&
+              !/^(for my account|for a friend|is this a gift|add|remove|-\d+%|windows|mac|linux|steamos)$/i.test(rawT) &&
+              !/free\s+starter\s+pack/i.test(rawT) &&
+              !parsePriceText(rawT, metaCurrencyHint)
+            ) {
+              itemTitle = cleanStoreTitle(rawT);
+              break;
+            }
+          }
+        }
+
+        // Cross-check breadcrumb history for title or clean URL enrichment
+        let fullUrl = anchor.href;
+        if (fullUrl && fullUrl.startsWith("/")) {
+          fullUrl = `${window.location.origin}${fullUrl}`;
+        }
+        const matchedCrumb = breadcrumbs.find((b) => b.url && getSteamProductKey(b.url) === prodKey);
+        if (!itemTitle && matchedCrumb) {
+          itemTitle = matchedCrumb.title;
+        }
+        if (matchedCrumb && matchedCrumb.url) {
+          fullUrl = matchedCrumb.url;
+        }
+
+        // Extract active final price (ignoring strikethrough original prices like $39.99)
+        const priceObj = extractActiveItemPrice(cardEl, metaCurrencyHint);
+
+        // Extract optional discount percentage pill (e.g. "-50%", "-65%")
+        const discountMatch = (cardEl.textContent || "").match(/(-\d{1,2}%)/);
+        const discountPct = discountMatch ? discountMatch[1] : null;
+
+        if (itemTitle) {
+          items.push({
+            title: itemTitle,
+            productUrl: fullUrl,
+            amount: priceObj ? Number(priceObj.amount.toFixed(2)) : (matchedCrumb ? matchedCrumb.amount : null),
+            currency: priceObj ? priceObj.currency : (matchedCrumb ? matchedCrumb.currency : (metaCurrencyHint || "USD")),
+            discountPct: discountPct,
+            quantity: 1
+          });
         }
       });
     }
 
-    // Generic Shopify / WooCommerce / Amazon Cart Line Items
+    // --- 2. Universal E-Commerce Carts (Amazon, Shopify, WooCommerce, eBay, Walmart, Target) ---
     if (items.length === 0) {
       const genericRows = document.querySelectorAll(
-        ".cart-item, .cart_item, .cart__item, .sc-list-item, [data-testid*='cart-line-item']"
+        "#activeCartViewForm .sc-list-item:not([data-removed='true']), .cart-item, .cart_item, .cart__item, tr.woocommerce-cart-form__cart-item, [data-testid*='cart-item'], [data-testid*='cart-line-item'], [class*='CartItem' i]"
       );
       genericRows.forEach((row) => {
-        if (row.closest("[class*='recommend' i], [class*='related' i], [id*='recommend' i]")) {
+        if (row.closest && row.closest("[class*='recommend' i], [class*='related' i], [id*='recommend' i], [class*='upsell' i]")) {
           return;
         }
-        const linkEl = row.querySelector("a[href*='/product'], a[href*='/item'], a.cart-item__title, a.sc-product-link");
-        const titleEl = linkEl || row.querySelector(".cart-item__name, .product-name, [class*='title' i]");
-        const priceEl = row.querySelector(".price, .cart-item__price, .sc-product-price");
+        const linkEl = row.querySelector(
+          "a.sc-product-link, a.cart-item__name, a.cart-item__title, a[href*='/dp/'], a[href*='/product'], a[href*='/products/'], a[href*='/item']"
+        );
+        const titleEl =
+          row.querySelector(".sc-product-title, .a-truncate-cut, .cart-item__name, .product-name") ||
+          linkEl ||
+          row.querySelector("[class*='title' i], h2, h3, h4");
+
+        const priceContainer =
+          row.querySelector(".sc-product-price, .sc-item-price-block, .cart-item__price, .product-subtotal, .product-price") ||
+          row;
+
+        const qtyInput = row.querySelector("input[name*='updates'], input.qty, input[type='number'], select[name='quantity']");
+        let qty = 1;
+        if (qtyInput && qtyInput.value) {
+          const parsedQty = parseInt(qtyInput.value, 10);
+          if (!isNaN(parsedQty) && parsedQty > 0) qty = parsedQty;
+        }
 
         if (titleEl) {
-          const cleanTitle = cleanStoreTitle(titleEl.textContent.trim());
+          const cleanTitle = cleanStoreTitle((titleEl.textContent || "").replace(/\s+/g, " ").trim());
           let fullUrl = linkEl ? linkEl.href : null;
           if (fullUrl && fullUrl.startsWith("/")) {
             fullUrl = `${window.location.origin}${fullUrl}`;
           }
-          const priceObj = priceEl ? parsePriceText(priceEl.textContent, metaCurrencyHint) : null;
+          const priceObj = extractActiveItemPrice(priceContainer, metaCurrencyHint);
+          const discountMatch = (row.textContent || "").match(/(-\d{1,2}%)/);
 
           if (cleanTitle) {
             items.push({
               title: cleanTitle,
               productUrl: fullUrl,
-              amount: priceObj ? priceObj.amount : null,
-              currency: priceObj ? priceObj.currency : metaCurrencyHint
+              amount: priceObj ? Number(priceObj.amount.toFixed(2)) : null,
+              currency: priceObj ? priceObj.currency : (metaCurrencyHint || "USD"),
+              discountPct: discountMatch ? discountMatch[1] : null,
+              quantity: qty
             });
           }
         }
@@ -318,15 +559,180 @@
     return items;
   }
 
-  let cachedCartTotal = null;
+  // Build Canonical Cart Manifest for Popup Receipt & Anti-Tamper Verification
+  function buildCartManifest(cartItems, cartTotalObj, breadcrumb, metaCurrencyHint) {
+    let resolvedItems = Array.isArray(cartItems) ? [...cartItems] : [];
+
+    // Fallback to breadcrumb ONLY when cart DOM had zero extractable rows
+    if (resolvedItems.length === 0 && breadcrumb && cartTotalObj && cartTotalObj.amount > 0) {
+      resolvedItems.push({
+        title: breadcrumb.title,
+        productUrl: breadcrumb.url,
+        amount: Number(cartTotalObj.amount.toFixed(2)),
+        currency: cartTotalObj.currency || breadcrumb.currency || metaCurrencyHint || "USD",
+        discountPct: null,
+        quantity: 1
+      });
+    }
+
+    let totalAmount = cartTotalObj && cartTotalObj.amount > 0 ? Number(cartTotalObj.amount.toFixed(2)) : 0;
+    if (totalAmount <= 0 && resolvedItems.length > 0) {
+      const sum = resolvedItems.reduce((acc, it) => acc + (typeof it.amount === "number" ? it.amount * (it.quantity || 1) : 0), 0);
+      if (sum > 0) totalAmount = Number(sum.toFixed(2));
+    }
+
+    if (totalAmount <= 0) return null;
+
+    const currency =
+      (cartTotalObj && cartTotalObj.currency) ||
+      (resolvedItems[0] && resolvedItems[0].currency) ||
+      metaCurrencyHint ||
+      "USD";
+
+    const curSymbolMap = { USD: "$", EUR: "€", GBP: "£", CAD: "$", AUD: "$", JPY: "¥", INR: "₹", LKR: "Rs." };
+    const sym = curSymbolMap[currency] || `${currency} `;
+
+    // Build itemized summary string (fits cleanly inside VARCHAR(500) item_name column)
+    let summaryTitle = "Shopping Cart Order";
+    if (resolvedItems.length === 1) {
+      const single = resolvedItems[0];
+      const qtySuffix = single.quantity && single.quantity > 1 ? ` (x${single.quantity})` : "";
+      summaryTitle = `${single.title}${qtySuffix}`;
+    } else if (resolvedItems.length > 1) {
+      const parts = resolvedItems.map((it) => {
+        const qtyStr = it.quantity && it.quantity > 1 ? ` x${it.quantity}` : "";
+        const priceStr = typeof it.amount === "number" ? ` (${sym}${it.amount.toFixed(2)})` : "";
+        return `${it.title}${qtyStr}${priceStr}`;
+      });
+      const joined = parts.join(" + ");
+      if (joined.length <= 460) {
+        summaryTitle = joined;
+      } else {
+        // Truncate gracefully if cart has 10+ items while keeping item count explicit
+        let acc = parts[0];
+        let included = 1;
+        for (let i = 1; i < parts.length; i++) {
+          if ((acc + " + " + parts[i]).length > 420) break;
+          acc += " + " + parts[i];
+          included++;
+        }
+        const remaining = parts.length - included;
+        summaryTitle = remaining > 0 ? `${acc} + ${remaining} more items` : acc;
+      }
+    }
+
+    // Canonical sorted fingerprint of every item in the cart + total
+    const sortedTokens = resolvedItems
+      .map((it) => {
+        const normT = normalizeManifestTitle(it.title);
+        const qty = it.quantity || 1;
+        const amt = typeof it.amount === "number" ? it.amount.toFixed(2) : "na";
+        return `${normT}:q${qty}:${amt}`;
+      })
+      .sort();
+
+    const fingerprint = `${sortedTokens.join("|")}||total:${totalAmount.toFixed(2)}:${currency}`;
+
+    const directProductUrl =
+      resolvedItems.length === 1 && resolvedItems[0].productUrl
+        ? resolvedItems[0].productUrl
+        : window.location.href;
+
+    return {
+      itemCount: resolvedItems.reduce((sum, it) => sum + (it.quantity || 1), 0),
+      lineCount: resolvedItems.length,
+      totalAmount: totalAmount,
+      currency: currency,
+      summaryTitle: summaryTitle,
+      fingerprint: fingerprint,
+      primaryUrl: directProductUrl,
+      items: resolvedItems
+    };
+  }
 
   /**
-   * Universal Scraper: Extracts Product details on product pages OR Cart details on cart pages
+   * 4-Layer Anti-Tamper Check: Compares the Live Cart Manifest against an Approved Request
+   * Defeats:
+   * - Attack 1: Adding extra items after approval (Total Amount Mismatch)
+   * - Attack 2: Swapping an approved item for an unapproved item of the exact same price (Item Manifest Mismatch)
+   */
+  function verifyManifestAgainstApproval(liveManifest, approvedReq) {
+    if (!liveManifest || !approvedReq) {
+      return { match: false, reason: "MISSING_MANIFEST" };
+    }
+
+    const approvedAmount = Number(approvedReq.amount);
+    if (isNaN(approvedAmount) || Math.abs(liveManifest.totalAmount - approvedAmount) >= 0.02) {
+      return {
+        match: false,
+        reason: "AMOUNT_MISMATCH",
+        liveAmount: liveManifest.totalAmount,
+        approvedAmount: approvedAmount
+      };
+    }
+
+    if (
+      liveManifest.currency &&
+      approvedReq.currency &&
+      liveManifest.currency.toUpperCase() !== approvedReq.currency.toUpperCase()
+    ) {
+      return { match: false, reason: "CURRENCY_MISMATCH" };
+    }
+
+    // Parse approved item titles from approvedReq.itemName
+    const rawApprovedName = String(approvedReq.itemName || "").trim();
+    if (rawApprovedName && liveManifest.items && liveManifest.items.length > 0) {
+      const hasTruncatedTail = /\+\s*\d+\s+more\s+items$/i.test(rawApprovedName);
+      const cleanedTail = rawApprovedName.replace(/\s*\+\s*\d+\s+more\s+items$/i, "");
+      const approvedSegments = cleanedTail
+        .split(/\s+\+\s+/)
+        .map((seg) => normalizeManifestTitle(seg.replace(/\s+x\d+\b/i, "")))
+        .filter((s) => s.length > 0 && s !== "shopping cart order");
+
+      if (approvedSegments.length > 0) {
+        // Check 1: Item line count must match (unless summary had "+ N more items")
+        if (!hasTruncatedTail && liveManifest.items.length !== approvedSegments.length) {
+          return { match: false, reason: "ITEM_COUNT_MISMATCH" };
+        }
+
+        // Check 2: Every item in the live cart (up to approvedSegments) must match an approved item title
+        const remainingApproved = [...approvedSegments];
+        for (const liveItem of liveManifest.items) {
+          const liveNorm = normalizeManifestTitle(liveItem.title);
+          if (!liveNorm) continue;
+
+          const matchIdx = remainingApproved.findIndex(
+            (appTitle) =>
+              appTitle === liveNorm ||
+              (appTitle.length >= 5 && liveNorm.includes(appTitle)) ||
+              (liveNorm.length >= 5 && appTitle.includes(liveNorm))
+          );
+
+          if (matchIdx !== -1) {
+            remainingApproved.splice(matchIdx, 1);
+          } else if (!hasTruncatedTail) {
+            return {
+              match: false,
+              reason: "UNAPPROVED_ITEM_SWAP",
+              unapprovedItem: liveItem.title
+            };
+          }
+        }
+      }
+    }
+
+    return { match: true, reason: "VERIFIED" };
+  }
+
+  let cachedCartManifest = null;
+
+  /**
+   * Universal Scraper: Extracts Cart Manifest on /cart & /checkout pages,
+   * and records Product Breadcrumbs on normal product pages.
    */
   function extractPageProducts() {
     const hostname = window.location.hostname || "";
     const defaultCategory = inferMerchantCategory(hostname);
-    const options = [];
     const isCart = isDedicatedCartOrCheckoutPage();
 
     const metaCurrencyHint = (
@@ -341,67 +747,37 @@
       const cartTotalObj = extractCartTotal(metaCurrencyHint);
       const cartItems = extractCartItemsAndLinks(metaCurrencyHint);
       const breadcrumb = getProductBreadcrumb();
+      const manifest = buildCartManifest(cartItems, cartTotalObj, breadcrumb, metaCurrencyHint);
 
-      if (cartTotalObj && cartTotalObj.amount > 0) {
-        cachedCartTotal = cartTotalObj;
+      cachedCartManifest = manifest;
 
-        let primaryTitle = "Shopping Cart Order";
-        let directProductUrl = null;
-
-        if (cartItems.length === 1) {
-          primaryTitle = cartItems[0].title;
-          directProductUrl = cartItems[0].productUrl;
-        } else if (cartItems.length > 1) {
-          primaryTitle = `${cartItems[0].title} (+${cartItems.length - 1} more items)`;
-          directProductUrl = cartItems[0].productUrl;
-        } else if (breadcrumb) {
-          primaryTitle = breadcrumb.title;
-          directProductUrl = breadcrumb.url;
-        }
-
-        // If direct product URL is still relative or missing, fallback to breadcrumb or origin
-        if (!directProductUrl && breadcrumb && breadcrumb.url) {
-          directProductUrl = breadcrumb.url;
-        }
-
+      const options = [];
+      if (manifest) {
         options.push({
-          id: "cart_total_opt",
+          id: "cart_manifest_primary",
           kind: "CART",
-          title: primaryTitle,
-          amount: Number(cartTotalObj.amount.toFixed(2)),
-          currency: cartTotalObj.currency || metaCurrencyHint || "USD",
-          productUrl: directProductUrl || window.location.href,
-          category: defaultCategory
-        });
-
-        // Also expose individual line items as options if child wants to select one
-        cartItems.forEach((ci, idx) => {
-          if (ci.amount && ci.amount > 0 && ci.amount !== cartTotalObj.amount) {
-            options.push({
-              id: `cart_item_${idx + 1}`,
-              kind: "ITEM",
-              title: ci.title,
-              amount: Number(ci.amount.toFixed(2)),
-              currency: ci.currency || cartTotalObj.currency || "USD",
-              productUrl: ci.productUrl || directProductUrl || window.location.href,
-              category: defaultCategory
-            });
-          }
+          title: manifest.summaryTitle,
+          amount: manifest.totalAmount,
+          currency: manifest.currency,
+          productUrl: manifest.primaryUrl,
+          category: defaultCategory,
+          itemCount: manifest.itemCount,
+          fingerprint: manifest.fingerprint
         });
       }
 
       return {
         domain: hostname,
         url: window.location.href,
-        pageTitle: options.length > 0 ? options[0].title : document.title || "Shopping Cart",
+        pageTitle: manifest ? manifest.summaryTitle : document.title || "Shopping Cart",
         defaultCategory: defaultCategory,
         isCartOrCheckout: true,
+        cartManifest: manifest,
         options: options
       };
     }
 
-    // --- CASE B: Product Page Browsing (Normal Product Metadata) ---
-    // (Extract and record breadcrumb so cart page knows the exact product link)
+    // --- CASE B: Product Page Browsing (Free Browsing + Breadcrumb Recording) ---
     const primaryH1 =
       document.querySelector(".apphub_AppName") ||
       document.querySelector("#productTitle") ||
@@ -420,95 +796,31 @@
       (primaryH1 && primaryH1.textContent.trim()) || ogTitle || document.title || ""
     );
 
-    const seenKeys = new Set();
-    function addOption(item) {
-      if (!item || !item.title || typeof item.amount !== "number" || isNaN(item.amount) || item.amount <= 0) return;
-      const cleanTitle = cleanStoreTitle(item.title);
-      if (!cleanTitle) return;
-      const dedupeKey = `${cleanTitle.toLowerCase()}|${item.amount.toFixed(2)}`;
-      if (seenKeys.has(dedupeKey)) return;
-      seenKeys.add(dedupeKey);
-      options.push({
-        id: `opt_${options.length + 1}`,
-        kind: item.kind || "PRODUCT",
-        title: cleanTitle,
-        amount: Number(item.amount.toFixed(2)),
-        currency: (item.currency || metaCurrencyHint || "USD").toUpperCase(),
-        productUrl: window.location.href,
-        category: item.category || defaultCategory
-      });
-    }
+    let detectedPrice = null;
 
-    // 1. Steam Product Page
     if (hostname.includes("steampowered.com")) {
-      const purchaseBoxes = document.querySelectorAll(".game_area_purchase_game");
-      purchaseBoxes.forEach((box) => {
-        const headingEl = box.querySelector("h1, h2");
-        const priceContainer = box.querySelector(".discount_final_price, .game_purchase_price.price, .your_price div:last-child");
-        if (headingEl && priceContainer) {
-          const parsedPrice = parsePriceText(priceContainer.textContent, metaCurrencyHint);
-          let rawTitle = headingEl.textContent.replace(/\s+/g, " ").replace(/^Buy\s+/i, "").trim();
-          if (parsedPrice) {
-            addOption({
-              title: rawTitle,
-              amount: parsedPrice.amount,
-              currency: parsedPrice.currency
-            });
-          }
-        }
-      });
+      const firstBox = document.querySelector(".game_area_purchase_game");
+      if (firstBox) {
+        detectedPrice = extractActiveItemPrice(firstBox, metaCurrencyHint);
+      }
     }
 
-    // 2. Schema.org JSON-LD (Shopify, Amazon, Epic, WooCommerce)
-    const jsonLdScripts = document.querySelectorAll("script[type='application/ld+json']");
-    jsonLdScripts.forEach((script) => {
-      try {
-        const rawJson = JSON.parse(script.textContent || "{}");
-        const queue = Array.isArray(rawJson) ? [...rawJson] : [rawJson];
-        if (rawJson["@graph"]) queue.push(...rawJson["@graph"]);
-
-        queue.forEach((node) => {
-          if (!node || typeof node !== "object") return;
-          const typeStr = String(node["@type"] || "").toLowerCase();
-          if (typeStr.includes("product") || typeStr.includes("videogame") || typeStr.includes("softwareapplication")) {
-            const baseName = node.name || cleanPageTitle;
-            const offers = Array.isArray(node.offers) ? node.offers : node.offers ? [node.offers] : [];
-            offers.forEach((offer) => {
-              const p = parseFloat(offer.price || offer.lowPrice || "");
-              if (!isNaN(p) && p > 0) {
-                addOption({
-                  title: offer.name && offer.name !== baseName ? `${baseName} - ${offer.name}` : baseName,
-                  amount: p,
-                  currency: offer.priceCurrency || metaCurrencyHint || "USD"
-                });
-              }
-            });
-          }
-        });
-      } catch (_) {}
-    });
-
-    // 3. OpenGraph / Meta price
-    if (options.length === 0) {
+    if (!detectedPrice) {
       const metaPrice =
         document.querySelector("meta[property='product:price:amount']")?.getAttribute("content") ||
         document.querySelector("meta[property='og:price:amount']")?.getAttribute("content") ||
         document.querySelector("[itemprop='price']")?.getAttribute("content");
-      if (cleanPageTitle && metaPrice) {
-        const parsed = parsePriceText(metaPrice, metaCurrencyHint);
-        if (parsed) {
-          addOption({
-            title: cleanPageTitle,
-            amount: parsed.amount,
-            currency: parsed.currency
-          });
-        }
+      if (metaPrice) {
+        detectedPrice = parsePriceText(metaPrice, metaCurrencyHint);
       }
     }
 
-    // Cache breadcrumb if a product was extracted
-    if (options.length > 0) {
-      updateProductBreadcrumb(options[0]);
+    if (cleanPageTitle) {
+      updateProductBreadcrumb({
+        title: cleanPageTitle,
+        amount: detectedPrice ? detectedPrice.amount : null,
+        currency: detectedPrice ? detectedPrice.currency : (metaCurrencyHint || "USD")
+      });
     }
 
     return {
@@ -517,12 +829,20 @@
       pageTitle: cleanPageTitle || document.title || "",
       defaultCategory: defaultCategory,
       isCartOrCheckout: false,
-      options: options
+      cartManifest: null,
+      options: []
     };
   }
 
-  // Expose globally for direct extension popup scripting execution
+  // Expose pure helpers for extension scripting & unit testing
   window.__PARENTGUARD_EXTRACT_PRODUCTS__ = extractPageProducts;
+  window.__PARENTGUARD_CART_UTILS__ = {
+    parsePriceText,
+    extractActiveItemPrice,
+    buildCartManifest,
+    verifyManifestAgainstApproval,
+    normalizeManifestTitle
+  };
 
   if (window.__PARENTGUARD_CONTENT_INITIALIZED__) {
     if (typeof verifyAndUnlockApprovedButtons === "function") {
@@ -532,7 +852,7 @@
   }
   window.__PARENTGUARD_CONTENT_INITIALIZED__ = true;
 
-  console.log("[Centinel Fin AI] ParentGuard Cart-Gate Payment Lock active on:", window.location.hostname);
+  console.log("[Centinel Fin AI] ParentGuard Smart Cart-Gate & 4-Layer Anti-Tamper active on:", window.location.hostname);
 
   // Authoritative Cart / Checkout Payment Gate Patterns
   const CART_PAYMENT_GATE_PATTERNS = [
@@ -558,16 +878,94 @@
     /\bview\s+(my\s+)?(cart|bag|basket)\b/i
   ];
 
+  // Patterns that mutate cart state on product pages (passively observed for Cross-Tab Guard)
+  const ADD_TO_CART_MUTATION_PATTERNS = [
+    /\badd\s+to\s+(shopping\s+|my\s+)?(cart|bag|basket|trolley)\b/i
+  ];
+
+  // Closure-private security state (cannot be forged via DevTools DOM attribute editing)
   let interceptedButtons = new Set();
+  let lastVerifiedApprovedRequest = null;
+  let cartPageLoadedAt = Date.now();
+  let hasStaleCrossTabMutation = false;
+  const hostMutationStorageKey = `parentguard_cart_mut_${getCleanHostKey(window.location.hostname)}`;
+
+  // --- Layer 3: Cross-Tab Cart Mutation Broadcast & Listener ---
+  function broadcastCartMutation() {
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ [hostMutationStorageKey]: Date.now() });
+      }
+    } catch (_) {}
+  }
+
+  // Passively detect "Add to Cart" clicks on product pages (never blocks Add to Cart!)
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (isDedicatedCartOrCheckoutPage()) return;
+      const target = e.target && e.target.closest
+        ? e.target.closest("button, a, input[type='submit'], input[type='button'], [role='button']")
+        : null;
+      if (!target) return;
+      const txt = (target.innerText || target.textContent || target.value || target.getAttribute("aria-label") || "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const cls = typeof target.className === "string" ? target.className.toLowerCase() : "";
+      if (
+        ADD_TO_CART_MUTATION_PATTERNS.some((rx) => rx.test(txt)) ||
+        cls.includes("addtocart") ||
+        cls.includes("add-to-cart")
+      ) {
+        // Record breadcrumb before item enters cart and broadcast cross-tab cart mutation
+        try {
+          extractPageProducts();
+        } catch (_) {}
+        broadcastCartMutation();
+      }
+    },
+    true
+  );
+
+  // Listen in open /cart tabs for items added to cart in OTHER tabs
+  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "local" || !changes[hostMutationStorageKey]) return;
+      if (!isDedicatedCartOrCheckoutPage()) return;
+
+      const mutTime = changes[hostMutationStorageKey].newValue || 0;
+      if (mutTime > cartPageLoadedAt) {
+        hasStaleCrossTabMutation = true;
+        lastVerifiedApprovedRequest = null;
+        console.warn("[Centinel Fin AI] Cart modified in another tab! Revoking stale tab unlock.");
+        interceptedButtons.forEach((btn) => {
+          relockButton(btn, "CROSS_TAB_CART_MUTATION", null);
+        });
+        if (document.visibilityState === "visible") {
+          window.location.reload();
+        }
+      }
+    });
+  }
+
+  // If user switches back to a /cart tab that became stale while in background, refresh immediately
+  function refreshIfStaleCartTab() {
+    if (isDedicatedCartOrCheckoutPage() && hasStaleCrossTabMutation) {
+      window.location.reload();
+    }
+  }
+  window.addEventListener("focus", refreshIfStaleCartTab);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      refreshIfStaleCartTab();
+    }
+  });
 
   // Check if an element is an actionable Cart or Checkout Payment Gate button
   function isCartPaymentGateButton(element) {
     if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
-
-    // Only lock on Cart / Checkout pages
     if (!isDedicatedCartOrCheckoutPage()) return false;
 
-    // Never intercept ParentGuard UI elements
     if (
       element.closest("#parentguard-barrier-root") ||
       element.classList.contains("parentguard-in-place-shield")
@@ -585,7 +983,6 @@
 
     if (!isClickableTag) return false;
 
-    // Defer to nested button if present
     if (tagName !== "INPUT") {
       const childButtons = element.querySelectorAll("button, a, input[type='submit'], input[type='button']");
       for (const child of childButtons) {
@@ -637,16 +1034,37 @@
     return false;
   }
 
+  function formatShieldLockLabel(reason, liveAmt, approvedAmt) {
+    if (reason === "CROSS_TAB_CART_MUTATION") {
+      return "[ CART UPDATED IN ANOTHER TAB — REFRESHING ]";
+    }
+    if (reason === "UNAPPROVED_ITEM_SWAP" || reason === "ITEM_COUNT_MISMATCH") {
+      return liveAmt
+        ? `[ UNAPPROVED ITEM IN CART ($${Number(liveAmt).toFixed(2)}) — ASK PARENT ]`
+        : "[ UNAPPROVED ITEM IN CART — ASK PARENT ]";
+    }
+    if (reason === "AMOUNT_MISMATCH" && liveAmt && approvedAmt) {
+      return `[ CART CHANGED ($${Number(liveAmt).toFixed(2)} vs $${Number(approvedAmt).toFixed(2)}) — ASK PARENT ]`;
+    }
+    return liveAmt
+      ? `[ LOCKED ($${Number(liveAmt).toFixed(2)}) — ASK PARENT ]`
+      : "[ LOCKED — ASK PARENT ]";
+  }
+
   // Intercept and Lock a Cart Payment Continuation Button
   function interceptButton(button, currentCartAmount) {
     if (interceptedButtons.has(button)) {
-      // Re-evaluate if cart amount changed
       if (currentCartAmount) {
         button.setAttribute("data-parentguard-amount", currentCartAmount.toFixed(2));
+        if (button.getAttribute("data-parentguard-unlocked") !== "true") {
+          const shield = button.parentElement ? button.parentElement.querySelector(".parentguard-in-place-shield") : null;
+          if (shield && !shield.textContent.includes("UNAPPROVED") && !shield.textContent.includes("CHANGED")) {
+            shield.textContent = formatShieldLockLabel(null, currentCartAmount, null);
+          }
+        }
       }
       return;
     }
-    if (button.getAttribute("data-parentguard-unlocked") === "true") return;
 
     interceptedButtons.add(button);
 
@@ -663,6 +1081,7 @@
     button.classList.add("parentguard-locked-btn");
     button.setAttribute("data-parentguard-intercepted", "true");
     button.setAttribute("data-parentguard-locked", "true");
+    button.setAttribute("data-parentguard-unlocked", "false");
 
     button.addEventListener("click", handleBlockedClick, true);
 
@@ -670,10 +1089,7 @@
     if (container && !container.querySelector(".parentguard-in-place-shield")) {
       const shield = document.createElement("div");
       shield.className = "parentguard-in-place-shield";
-      const amtAttr = button.getAttribute("data-parentguard-amount");
-      shield.textContent = amtAttr
-        ? `[ LOCKED ($${amtAttr}) — ASK PARENT ]`
-        : "[ LOCKED — ASK PARENT ]";
+      shield.textContent = formatShieldLockLabel(null, currentCartAmount, null);
       container.insertBefore(shield, button.nextSibling);
     }
 
@@ -681,15 +1097,40 @@
     if (legacyBarrier) legacyBarrier.remove();
   }
 
+  /**
+   * Layer 4: Click-Time Just-In-Time (JIT) Synchronous Gate
+   * Re-verifies closure-private approval state AND live DOM cart manifest at the exact instant of click.
+   */
   function handleBlockedClick(e) {
     const btn = e.currentTarget;
-    if (btn && btn.getAttribute("data-parentguard-unlocked") === "true") {
-      return; // Approved and unlocked! Allow proceeding to payment.
+
+    if (hasStaleCrossTabMutation) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      window.location.reload();
+      return;
+    }
+
+    // Require BOTH DOM state AND closure-private cryptographic approval record
+    if (btn && btn.getAttribute("data-parentguard-unlocked") === "true" && lastVerifiedApprovedRequest) {
+      const liveExtraction = extractPageProducts();
+      const liveManifest = liveExtraction ? liveExtraction.cartManifest : null;
+      const check = verifyManifestAgainstApproval(liveManifest, lastVerifiedApprovedRequest);
+
+      if (check.match) {
+        return; // All 4 security layers passed! Allow proceeding to payment.
+      }
+
+      console.warn(`[Centinel Fin AI] JIT Click Gate blocked payment! Reason: ${check.reason}`);
+      lastVerifiedApprovedRequest = null;
+      interceptedButtons.forEach((b) => {
+        relockButton(b, check.reason, liveManifest ? liveManifest.totalAmount : null, check.approvedAmount);
+      });
     }
 
     e.preventDefault();
     e.stopImmediatePropagation();
-    console.warn("[Centinel Fin AI] Cart payment action locked — waiting for parent approval.");
+    console.warn("[Centinel Fin AI] Cart payment action locked — parent approval required for exact cart manifest.");
   }
 
   function unlockButtonWithProof(button, verifiedRequest) {
@@ -715,34 +1156,44 @@
     }
   }
 
-  function relockButton(button, reason) {
+  function relockButton(button, reason, liveAmountOverride, approvedAmountOverride) {
     if (!button) return;
     button.setAttribute("data-parentguard-unlocked", "false");
     button.setAttribute("data-parentguard-locked", "true");
     button.classList.remove("parentguard-unlocked-btn");
     button.classList.add("parentguard-locked-btn");
 
+    const currentHref = button.getAttribute("href");
+    if (currentHref && /^javascript:/i.test(currentHref) && currentHref !== "javascript:void(0);") {
+      button.setAttribute("data-parentguard-orig-href", currentHref);
+      button.setAttribute("href", "javascript:void(0);");
+    }
+
+    if (liveAmountOverride) {
+      button.setAttribute("data-parentguard-amount", Number(liveAmountOverride).toFixed(2));
+    }
+
     const container = button.parentElement;
     const shield = container ? container.querySelector(".parentguard-in-place-shield") : null;
     if (shield) {
       shield.classList.remove("verified");
-      const amtAttr = button.getAttribute("data-parentguard-amount");
-      shield.textContent = amtAttr ? `[ LOCKED ($${amtAttr}) — ASK PARENT ]` : "[ LOCKED — ASK PARENT ]";
+      const amt = liveAmountOverride || parseFloat(button.getAttribute("data-parentguard-amount") || "0") || null;
+      shield.textContent = formatShieldLockLabel(reason, amt, approvedAmountOverride);
     }
   }
 
   /**
    * Silently polls Child's Approved Requests, verifies RSA-2048 signature via WebCrypto,
-   * and auto-unlocks all cart payment buttons matching the exact approved cart total.
+   * and verifies the full Cart Item Manifest (total + item count + item titles) before unlocking.
    */
   async function verifyAndUnlockApprovedButtons() {
-    if (!window.ParentGuardCrypto || interceptedButtons.size === 0) return;
+    if (!window.ParentGuardCrypto || interceptedButtons.size === 0 || hasStaleCrossTabMutation) return;
 
     try {
       const res = await chrome.runtime.sendMessage({ type: "FETCH_MY_REQUESTS" });
       if (!res || !res.success || !Array.isArray(res.data)) return;
 
-      const currentHost = window.location.hostname.replace(/^www\./i, "").toLowerCase();
+      const currentHost = getCleanHostKey(window.location.hostname);
       const approvedForDomain = res.data
         .filter((req) => {
           if (req.status !== "APPROVED" || !req.rsaSignature) return false;
@@ -751,11 +1202,15 @@
         })
         .sort((a, b) => (b.id || 0) - (a.id || 0));
 
-      if (approvedForDomain.length === 0) return;
+      const liveExtraction = extractPageProducts();
+      const liveManifest = liveExtraction ? liveExtraction.cartManifest : cachedCartManifest;
 
-      // Extract current live cart total
-      const liveCart = extractCartTotal();
-      const currentCartNum = liveCart ? liveCart.amount : (cachedCartTotal ? cachedCartTotal.amount : null);
+      if (approvedForDomain.length === 0 || !liveManifest) {
+        lastVerifiedApprovedRequest = null;
+        return;
+      }
+
+      let mismatchDiagnostic = null;
 
       for (const req of approvedForDomain) {
         const verification = await window.ParentGuardCrypto.verifyPurchaseApproval(req);
@@ -771,30 +1226,28 @@
           continue;
         }
 
-        const approvedAmountNum = Number(req.amount);
-
-        // Anti-Tamper check: If live cart amount is known, verify it matches approved amount
-        let isAmountMatch = true;
-        if (currentCartNum !== null && !isNaN(currentCartNum)) {
-          isAmountMatch = Math.abs(currentCartNum - approvedAmountNum) < 0.02;
-        }
-
-        if (isAmountMatch) {
-          console.log(`[Centinel Fin AI] Cart Total ($${approvedAmountNum}) verified via RSA-2048! Unlocking payment gate.`);
+        const manifestCheck = verifyManifestAgainstApproval(liveManifest, req);
+        if (manifestCheck.match) {
+          lastVerifiedApprovedRequest = req;
+          console.log(
+            `[Centinel Fin AI] Cart Manifest ($${liveManifest.totalAmount.toFixed(2)}, ${liveManifest.lineCount} item(s)) verified via RSA-2048! Unlocking payment gate.`
+          );
           interceptedButtons.forEach((btn) => {
             unlockButtonWithProof(btn, req);
           });
           return;
-        } else {
-          // If cart total changed after approval, ensure buttons remain safely locked
-          console.warn(`[Centinel Fin AI] Cart total changed (Live: $${currentCartNum} vs Approved: $${approvedAmountNum}). Re-locking.`);
-          interceptedButtons.forEach((btn) => {
-            if (btn.getAttribute("data-parentguard-unlocked") === "true") {
-              relockButton(btn, "AMOUNT_MISMATCH");
-            }
-          });
+        } else if (!mismatchDiagnostic) {
+          mismatchDiagnostic = manifestCheck;
         }
       }
+
+      // No approved request matches the current live cart manifest -> immediately re-lock!
+      lastVerifiedApprovedRequest = null;
+      const reason = mismatchDiagnostic ? mismatchDiagnostic.reason : "MANIFEST_CHANGED";
+      const approvedAmt = mismatchDiagnostic ? mismatchDiagnostic.approvedAmount : null;
+      interceptedButtons.forEach((btn) => {
+        relockButton(btn, reason, liveManifest.totalAmount, approvedAmt);
+      });
     } catch (err) {
       console.debug("[Centinel Fin AI] Silent cart approval check skipped:", err.message);
     }
@@ -803,7 +1256,12 @@
   // Scan Page DOM for Cart / Checkout Payment Gate Buttons
   function scanPage() {
     if (!isDedicatedCartOrCheckoutPage()) {
-      // Free browsing on product pages: release any accidental locks
+      // Free browsing on product pages: record breadcrumb & ensure zero locks exist
+      try {
+        extractPageProducts();
+      } catch (_) {}
+
+      lastVerifiedApprovedRequest = null;
       interceptedButtons.forEach((btn) => {
         btn.classList.remove("parentguard-locked-btn");
         btn.setAttribute("data-parentguard-unlocked", "true");
@@ -816,8 +1274,9 @@
       return;
     }
 
-    const liveCart = extractCartTotal();
-    const cartAmount = liveCart ? liveCart.amount : null;
+    const liveExtraction = extractPageProducts();
+    const liveManifest = liveExtraction ? liveExtraction.cartManifest : null;
+    const cartAmount = liveManifest ? liveManifest.totalAmount : null;
 
     const candidates = document.querySelectorAll(
       "button, a, input[type='submit'], input[type='button'], [role='button']"
@@ -838,13 +1297,20 @@
   let scanTimeout = null;
   function scheduleScan() {
     if (scanTimeout) clearTimeout(scanTimeout);
-    scanTimeout = setTimeout(scanPage, 250);
+    scanTimeout = setTimeout(scanPage, 200);
   }
 
   const observer = new MutationObserver((mutations) => {
     let hasRelevantChanges = false;
     for (const mutation of mutations) {
-      if (mutation.addedNodes.length > 0) {
+      if (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0 || mutation.type === "characterData") {
+        // Ignore mutations inside our own ParentGuard shield labels to prevent feedback loops
+        const targetEl = mutation.target && mutation.target.nodeType === Node.ELEMENT_NODE
+          ? mutation.target
+          : mutation.target?.parentElement;
+        if (targetEl && targetEl.classList && targetEl.classList.contains("parentguard-in-place-shield")) {
+          continue;
+        }
         hasRelevantChanges = true;
         break;
       }
@@ -856,23 +1322,31 @@
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
+      cartPageLoadedAt = Date.now();
       scanPage();
-      observer.observe(document.body, { childList: true, subtree: true });
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     });
   } else {
+    cartPageLoadedAt = Date.now();
     scanPage();
     if (document.body) {
-      observer.observe(document.body, { childList: true, subtree: true });
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
   }
 
-  window.addEventListener("popstate", scheduleScan);
+  function handleSpaNavigation() {
+    cartPageLoadedAt = Date.now();
+    hasStaleCrossTabMutation = false;
+    scheduleScan();
+  }
+
+  window.addEventListener("popstate", handleSpaNavigation);
   try {
     const origPushState = history.pushState;
     if (origPushState) {
       history.pushState = function () {
         const result = origPushState.apply(this, arguments);
-        scheduleScan();
+        handleSpaNavigation();
         return result;
       };
     }
@@ -880,17 +1354,18 @@
     if (origReplaceState) {
       history.replaceState = function () {
         const result = origReplaceState.apply(this, arguments);
-        scheduleScan();
+        handleSpaNavigation();
         return result;
       };
     }
   } catch (_) {}
 
+  // Continuous 2-second cart integrity & approval poll
   setInterval(() => {
     if (interceptedButtons.size > 0 && isDedicatedCartOrCheckoutPage()) {
       verifyAndUnlockApprovedButtons();
     }
-  }, 3000);
+  }, 2000);
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "PING") {
@@ -923,18 +1398,7 @@
         if (legacy) legacy.remove();
       } catch (_) {}
 
-      if (message.approvedRequest) {
-        const directReq = message.approvedRequest;
-        const targetAmt = Number(directReq.amount || 0).toFixed(2);
-
-        interceptedButtons.forEach((btn) => {
-          const btnAmt = btn.getAttribute("data-parentguard-amount");
-          if (!btnAmt || btnAmt === targetAmt) {
-            unlockButtonWithProof(btn, directReq);
-          }
-        });
-      }
-
+      // Always run full manifest & RSA verification rather than blindly trusting amounts
       verifyAndUnlockApprovedButtons().then(() => {
         sendResponse({ success: true });
       });
