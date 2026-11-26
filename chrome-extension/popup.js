@@ -212,6 +212,14 @@ function startLivePolling() {
 
 // Event Listeners
 function setupEventListeners() {
+  const devReloadBtn = document.getElementById("devReloadBtn");
+  if (devReloadBtn) {
+    devReloadBtn.addEventListener("click", () => {
+      chrome.runtime.reload();
+      window.close();
+    });
+  }
+
   loginForm.addEventListener("submit", handleLogin);
   logoutBtn.addEventListener("click", handleLogout);
   refreshTabBtn.addEventListener("click", () => detectActiveTab(true));
