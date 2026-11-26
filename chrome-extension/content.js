@@ -148,14 +148,26 @@
   function isDedicatedCartOrCheckoutPage() {
     const pathname = (window.location.pathname || "").toLowerCase();
     const search = (window.location.search || "").toLowerCase();
+
+    // Explicit Product Page Guard: Product detail pages are NEVER cart/checkout pages
+    if (
+      /\/app\/\d+/i.test(pathname) ||
+      /\/dp\/[a-z0-9]+/i.test(pathname) ||
+      /\/gp\/product\//i.test(pathname) ||
+      /\/products?\//i.test(pathname) ||
+      /\/item\//i.test(pathname)
+    ) {
+      return false;
+    }
+
     if (/\/(cart|shopping-cart|viewcart|basket|bag|checkout|checkouts|onepagecheckout)(\/|$)/i.test(pathname)) {
       return true;
     }
     if (pathname.includes("/gp/cart") || pathname.includes("/gp/buy") || search.includes("step=contact_information")) {
       return true;
     }
-    // Also treat pages with prominent cart container as cart pages
-    if (document.querySelector(".cart_item, .cart-item, #cart_item_list, [data-testid*='cart-item']")) {
+    // Also treat pages with prominent cart container as cart pages if not an app/product page
+    if (document.querySelector("#cart_item_list, .cart_totals_area, #shopping-cart-table, [data-checkout-subtotal]")) {
       return true;
     }
     return false;
