@@ -91,22 +91,22 @@
 
       <h2 id="trackerHeadline" class="tracker-headline">WAITING FOR PARENT APPROVAL...</h2>
       <p id="trackerSubtext" class="tracker-subtext">
-        Your request has been sent. Keep this store tab open — the Add to Cart and Checkout buttons will unlock automatically as soon as your parent approves.
+        Your request has been sent. Keep this store tab open — the Add to Cart or Buy Now button will unlock automatically as soon as your parent approves.
       </p>
 
       <div class="tracker-item-box">
         <div class="tracker-item-row">
-          <span id="trackerItemTitle" class="tracker-item-title">Game Title</span>
+          <span id="trackerItemTitle" class="tracker-item-title">Selected Product</span>
           <span id="trackerItemAmount" class="tracker-item-price">$0.00</span>
         </div>
         <div class="tracker-item-meta">
-          <span id="trackerItemDomain" class="tracker-item-domain">store.steampowered.com</span>
+          <span id="trackerItemDomain" class="tracker-item-domain">Online Store</span>
           <span id="trackerAutoSyncTag" class="tracker-sync-tag">LIVE AUTO-UNLOCK ACTIVE</span>
         </div>
       </div>
 
       <button type="button" id="showFormAgainBtn" class="neo-btn neo-btn-secondary full-width">
-        [ CHOOSE A DIFFERENT OPTION / BUNDLE ]
+        [ CHOOSE A DIFFERENT PRODUCT / OPTION ]
       </button>
     </div>
 
@@ -116,7 +116,7 @@
       <div class="detection-card">
         <div class="card-header-sm">
           <span class="tag-label">DETECTED MERCHANT</span>
-          <button id="refreshTabBtn" class="refresh-btn" title="Re-scan current page for products and bundles">RE-DETECT</button>
+          <button id="refreshTabBtn" class="refresh-btn" title="Re-scan current page for products, variants, and prices">RE-DETECT</button>
         </div>
         <div class="store-info-row">
           <span class="store-domain-pill" id="detectedDomainDisplay">Detecting active tab...</span>
@@ -129,10 +129,10 @@
 
       <!-- Purchase Request Form -->
       <form id="purchaseForm" class="request-form">
-        <!-- Smart Detected Game / Bundle Selector -->
+        <!-- Smart Detected Product / Variant / Bundle Selector -->
         <div id="productOptionGroup" class="form-group option-selector-card hidden">
           <div class="label-row-between">
-            <label for="productOptionSelect" class="form-label mb-0">SELECT GAME / BUNDLE OPTION *</label>
+            <label for="productOptionSelect" class="form-label mb-0">SELECT PRODUCT / EDITION OPTION *</label>
             <span id="priceVerifiedTag" class="verified-price-tag">LIVE STORE PRICE</span>
           </div>
           <select id="productOptionSelect" class="neo-select neo-select-highlight">
@@ -140,7 +140,7 @@
           </select>
           <div id="selectedOptionDiscountBar" class="discount-callout-bar hidden">
             <span id="discountPctBadge" class="discount-pct-pill">-30%</span>
-            <span id="discountContextText" class="discount-context-text">Special Deal (Original: $12.98 USD)</span>
+            <span id="discountContextText" class="discount-context-text">Special Deal</span>
           </div>
         </div>
 
@@ -149,7 +149,7 @@
             <label for="itemNameInput" class="form-label mb-0">ITEM / PRODUCT TITLE *</label>
             <span id="titleLockStatus" class="locked-badge">[ VERIFIED ]</span>
           </div>
-          <input type="text" id="itemNameInput" class="neo-input neo-input-locked" placeholder="e.g. Roblox 1000 Robux Pack" required readonly>
+          <input type="text" id="itemNameInput" class="neo-input neo-input-locked" placeholder="e.g. Wireless Headphones / Course / Game" required readonly>
         </div>
 
         <div class="form-row-split">
@@ -174,6 +174,10 @@
               <option value="GBP">GBP (&pound;)</option>
               <option value="CAD">CAD ($)</option>
               <option value="AUD">AUD ($)</option>
+              <option value="LKR">LKR (Rs.)</option>
+              <option value="INR">INR (&#8377;)</option>
+              <option value="JPY">JPY (&yen;)</option>
+              <option value="SGD">SGD (S$)</option>
             </select>
           </div>
         </div>
@@ -181,9 +185,9 @@
         <div class="form-group">
           <label for="categorySelect" class="form-label">CATEGORY</label>
           <select id="categorySelect" class="neo-select">
-            <option value="GAMING" selected>GAMING</option>
+            <option value="SHOPPING" selected>SHOPPING / RETAIL</option>
+            <option value="GAMING">GAMING</option>
             <option value="ENTERTAINMENT">ENTERTAINMENT</option>
-            <option value="SHOPPING">SHOPPING / RETAIL</option>
             <option value="EDUCATION">EDUCATION / SOFTWARE</option>
             <option value="OTHER">OTHER</option>
           </select>
@@ -191,7 +195,7 @@
 
         <div class="form-group">
           <label for="reasonInput" class="form-label">NOTE FOR PARENT (WHY DO YOU NEED THIS?) *</label>
-          <textarea id="reasonInput" class="neo-textarea" rows="2" placeholder="e.g. Weekend gaming session with my friends from school." required></textarea>
+          <textarea id="reasonInput" class="neo-textarea" rows="2" placeholder="e.g. Needed for my school project / weekend activity." required></textarea>
         </div>
 
         <div id="submissionAlert" class="alert-box hidden"></div>
@@ -214,7 +218,7 @@
       <!-- Cards rendered dynamically by popup.js -->
       <div class="empty-state">
         <span class="empty-title">NO REQUESTS YET</span>
-        <span class="empty-sub">When you submit requests on game or store pages, they will appear here.</span>
+        <span class="empty-sub">When you submit requests on any online store, they will appear here.</span>
       </div>
     </div>
   </section>

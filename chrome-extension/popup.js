@@ -1,13 +1,13 @@
 /**
  * Centinel Fin AI – ParentGuard
- * Child Extension Popup Controller
+ * Child Extension Popup Controller (Universal E-Commerce Edition)
  *
  * Responsibilities:
  * - Authenticate child via Supabase Auth
- * - Auto-detect active browser tab (domain, URL, title)
- * - Extract all purchase options, editions, and bundles with live prices from the store DOM
- * - Auto-populate title, price, currency, category, and discount context
- * - Tamper-Proof Security: Locks amount & currency to the authoritative store values
+ * - Auto-detect active browser tab (domain, URL, title, category) on ANY e-commerce platform
+ * - Extract all purchase options, variants, editions, and bundles with live prices from the store DOM
+ * - Auto-populate and tamper-lock title, price, currency, category, and discount context
+ * - Recognize approved merchant items seamlessly on /cart and /checkout pages without requiring duplicate approval
  * - Submit purchase requests with SHA-256 idempotency hashes to Spring Boot
  * - Fetch and display submitted requests with live parent approval statuses
  */
@@ -24,20 +24,25 @@ const CURRENCY_SYMBOLS = {
   GBP: "\u00A3",
   CAD: "$",
   AUD: "$",
+  NZD: "$",
+  SGD: "S$",
   JPY: "\u00A5",
   INR: "\u20B9",
+  LKR: "Rs.",
+  MYR: "RM",
+  AED: "AED ",
   BRL: "R$",
-  NZD: "$",
   CHF: "CHF",
   PLN: "z\u0142",
   SEK: "kr"
 };
 
-// State
+// State (Platform-agnostic defaults — zero hardcoded store domains)
 let currentTabInfo = {
-  url: "https://store.steampowered.com",
-  domain: "store.steampowered.com",
+  url: "",
+  domain: "",
   title: "",
+  isCartOrCheckout: false,
   detectedOptions: []
 };
 let childSession = {
@@ -109,6 +114,71 @@ const submissionAlert = document.getElementById("submissionAlert");
 const requestsListContainer = document.getElementById("requestsListContainer");
 const refreshRequestsBtn = document.getElementById("refreshRequestsBtn");
 
+// Helper: Infer category from store hostname
+function inferCategoryFromHostname(hostname) {
+  const h = (hostname || "").toLowerCase();
+  if (
+    h.includes("steampowered") ||
+    h.includes("steamcommunity") ||
+    h.includes("roblox") ||
+    h.includes("epicgames") ||
+    h.includes("playstation") ||
+    h.includes("xbox") ||
+    h.includes("nintendo") ||
+    h.includes("gog.com") ||
+    h.includes("itch.io") ||
+    h.includes("ea.com") ||
+    h.includes("ubisoft") ||
+    h.includes("blizzard") ||
+    h.includes("humblebundle")
+  ) {
+    return "GAMING";
+  }
+  if (
+    h.includes("netflix") ||
+    h.includes("spotify") ||
+    h.includes("twitch") ||
+    h.includes("youtube") ||
+    h.includes("disney") ||
+    h.includes("hulu") ||
+    h.includes("crunchyroll") ||
+    h.includes("audible") ||
+    h.includes("ticketmaster")
+  ) {
+    return "ENTERTAINMENT";
+  }
+  if (
+    h.includes("udemy") ||
+    h.includes("coursera") ||
+    h.includes("edx") ||
+    h.includes("khanacademy") ||
+    h.includes("pluralsight") ||
+    h.includes("skillshare") ||
+    h.includes("brilliant") ||
+    h.includes("duolingo")
+  ) {
+    return "EDUCATION";
+  }
+  return "SHOPPING";
+}
+
+// Helper: Check if a URL is a dedicated Shopping Cart or Checkout page
+function isCartOrCheckoutUrl(urlString) {
+  if (!urlString) return false;
+  try {
+    const parsed = new URL(urlString);
+    const pathname = (parsed.pathname || "").toLowerCase();
+    const search = (parsed.search || "").toLowerCase();
+    if (/\/(cart|shopping-cart|viewcart|basket|bag|checkout|checkouts|onepagecheckout)(\/|$)/i.test(pathname)) {
+      return true;
+    }
+    if (pathname.includes("/gp/cart") || pathname.includes("/gp/buy") || search.includes("step=contact_information")) {
+      return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
 // Initialize on DOM load
 document.addEventListener("DOMContentLoaded", async () => {
   setupEventListeners();
@@ -156,17 +226,14 @@ function setupEventListeners() {
     });
   }
 
-  // Product / Bundle Option Dropdown Selection
   productOptionSelect.addEventListener("change", (e) => {
     applySelectedOption(e.target.value);
   });
 
-  // Update currency prefix symbol when currency dropdown changes
   currencySelect.addEventListener("change", () => {
     updateCurrencySymbol(currencySelect.value);
   });
 
-  // Navigation tab switching
   tabNewRequest.addEventListener("click", () => switchTab("newRequestView"));
   tabMyRequests.addEventListener("click", () => {
     switchTab("myRequestsView");
@@ -186,7 +253,7 @@ function showLiveApprovalTracker(req) {
   const cleanDomain = getCleanDomainLabel(req.siteDomain || currentTabInfo.domain);
 
   trackerRequestId.textContent = req.id ? `REQ #${req.id}` : "SENT JUST NOW";
-  trackerItemTitle.textContent = req.itemName || itemNameInput.value || "Selected Store Item";
+  trackerItemTitle.textContent = req.itemName || itemNameInput.value || "Selected Product";
   trackerItemAmount.textContent = formattedAmount;
   trackerItemDomain.textContent = cleanDomain;
 
@@ -201,12 +268,14 @@ function showLiveApprovalTracker(req) {
     trackerApprovedIcon.classList.remove("hidden");
     trackerDeniedIcon.classList.add("hidden");
     trackerHeadline.textContent = "APPROVED — YOU CAN BUY NOW!";
-    trackerSubtext.textContent =
-      "Your parent approved this purchase! The Add to Cart and Checkout buttons on this page are now unlocked and ready to use.";
-    trackerAutoSyncTag.textContent = "BUTTONS UNLOCKED";
+    trackerSubtext.textContent = currentTabInfo.isCartOrCheckout
+      ? "Your item on this store is already approved by your parent! Checkout is unlocked — you can complete your purchase."
+      : "Your parent approved this purchase! Add to Cart / Buy Now is unlocked on this page, and your cart checkout will stay unlocked.";
+    trackerAutoSyncTag.textContent = "READY FOR CHECKOUT";
 
-    // Directly unlock store buttons on the active tab and wipe any legacy floating popup
-    triggerDirectTabUnlock(req);
+    if (!currentTabInfo.isCartOrCheckout) {
+      triggerDirectTabUnlock(req);
+    }
   } else if (req.status === "DENIED") {
     liveApprovalTracker.classList.add("state-denied");
     trackerStatusBadge.classList.add("denied");
@@ -216,7 +285,7 @@ function showLiveApprovalTracker(req) {
     trackerDeniedIcon.classList.remove("hidden");
     trackerHeadline.textContent = "REQUEST NOT APPROVED";
     trackerSubtext.textContent =
-      "Your parent declined this request. You can talk with your parent or select a different option below.";
+      "Your parent declined this request. You can talk with your parent or select a different product below.";
     trackerAutoSyncTag.textContent = "STORE REMAINS LOCKED";
   } else {
     trackerStatusBadge.classList.add("pending");
@@ -226,7 +295,7 @@ function showLiveApprovalTracker(req) {
     trackerDeniedIcon.classList.add("hidden");
     trackerHeadline.textContent = "WAITING FOR PARENT APPROVAL...";
     trackerSubtext.textContent =
-      "Sent to your parent! Keep this page open — Add to Cart and Checkout will unlock automatically as soon as they approve.";
+      "Sent to your parent! Keep this page open — Add to Cart / Buy Now will unlock automatically as soon as they approve.";
     trackerAutoSyncTag.textContent = "CHECKING FOR APPROVAL...";
   }
 }
@@ -241,6 +310,7 @@ async function triggerDirectTabUnlock(approvedReq) {
   if (!approvedReq) return;
   const amtStr = Number(approvedReq.amount || 0).toFixed(2);
   const titleStr = approvedReq.itemName || "";
+  const reqSiteClean = (approvedReq.siteDomain || "").split("?")[0].replace(/\/$/, "").toLowerCase();
 
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -253,16 +323,20 @@ async function triggerDirectTabUnlock(approvedReq) {
       approvedRequest: approvedReq
     }).catch(() => {});
 
-    // 2. Direct DOM execution via chrome.scripting for instant, guaranteed unlocking
+    // 2. Direct DOM execution via chrome.scripting for instant unlocking on the matching product page
     if (chrome.scripting) {
       await chrome.scripting.executeScript({
         target: { tabId },
-        func: (amt, title) => {
-          // Immediately purge any legacy floating barrier
+        func: (amt, title, approvedUrl) => {
           const barrier = document.getElementById("parentguard-barrier-root");
           if (barrier) barrier.remove();
 
-          // Unlock all matching store buttons
+          const currentUrl = window.location.href.split("?")[0].replace(/\/$/, "").toLowerCase();
+          const urlMatches =
+            approvedUrl &&
+            approvedUrl.includes("/") &&
+            (currentUrl === approvedUrl || currentUrl.startsWith(approvedUrl));
+
           const lockedBtns = document.querySelectorAll(
             ".parentguard-locked-btn, [data-parentguard-locked='true'], [data-parentguard-intercepted='true']"
           );
@@ -271,10 +345,13 @@ async function triggerDirectTabUnlock(approvedReq) {
             const btnTitle = (btn.getAttribute("data-parentguard-title") || "").toLowerCase().trim();
             const targetTitle = (title || "").toLowerCase().trim();
 
-            const amtMatch = !btnAmt || btnAmt === amt;
-            const titleMatch = !btnTitle || !targetTitle || btnTitle.includes(targetTitle) || targetTitle.includes(btnTitle);
+            const amtMatch = btnAmt ? btnAmt === amt : urlMatches;
+            const titleMatch =
+              btnTitle && targetTitle
+                ? btnTitle.includes(targetTitle) || targetTitle.includes(btnTitle)
+                : false;
 
-            if (amtMatch || titleMatch) {
+            if (amtMatch || (titleMatch && urlMatches)) {
               btn.classList.remove("parentguard-locked-btn");
               btn.classList.add("parentguard-unlocked-btn");
               btn.setAttribute("data-parentguard-unlocked", "true");
@@ -295,7 +372,7 @@ async function triggerDirectTabUnlock(approvedReq) {
             }
           });
         },
-        args: [amtStr, titleStr]
+        args: [amtStr, titleStr, reqSiteClean]
       });
     }
   } catch (err) {
@@ -309,7 +386,6 @@ function updateCurrencySymbol(currencyCode) {
   }
 }
 
-// Tab Switching
 function switchTab(viewId) {
   if (viewId === "newRequestView") {
     tabNewRequest.classList.add("active");
@@ -325,7 +401,7 @@ function switchTab(viewId) {
 }
 
 /**
- * Query active tab and extract all product/bundle options + live prices from its DOM
+ * Query active tab and extract all product/variant/bundle options + live prices from its DOM
  */
 async function detectActiveTab(forceRescan = false) {
   try {
@@ -336,12 +412,15 @@ async function detectActiveTab(forceRescan = false) {
     const urlString = activeTab.url || "";
 
     if (!urlString.startsWith("http://") && !urlString.startsWith("https://")) {
-      currentTabInfo.url = "https://store.steampowered.com";
-      currentTabInfo.domain = "store.steampowered.com";
-      currentTabInfo.title = "Steam Store";
-      currentTabInfo.detectedOptions = [];
-      detectedDomainDisplay.textContent = "store.steampowered.com (SIMULATED)";
-      detectedUrlDisplay.textContent = "Active tab is not a web store. Manual entry active.";
+      currentTabInfo = {
+        url: "",
+        domain: "",
+        title: "",
+        isCartOrCheckout: false,
+        detectedOptions: []
+      };
+      detectedDomainDisplay.textContent = "NO STORE TAB ACTIVE";
+      detectedUrlDisplay.textContent = "Open any online store product page to auto-detect item & price.";
       optionsCountBadge.classList.add("hidden");
       productOptionGroup.classList.add("hidden");
       enableManualInputs();
@@ -351,22 +430,33 @@ async function detectActiveTab(forceRescan = false) {
     const parsedUrl = new URL(urlString);
     currentTabInfo.url = urlString;
     currentTabInfo.domain = parsedUrl.hostname;
+    currentTabInfo.isCartOrCheckout = isCartOrCheckoutUrl(urlString);
 
-    // Clean basic page title
     let cleanTitle = (activeTab.title || "")
       .replace(/^Save\s+\d+%\s+on\s+/i, "")
+      .replace(/^Amazon\.[a-z.]+\s*:\s*/i, "")
       .replace(/\s+on\s+Steam$/i, "")
       .replace(/\s+-\s+Steam$/i, "")
       .replace(/\s+\|\s+Roblox$/i, "")
       .replace(/\s*:\s*Amazon\.[a-z.]+.*$/i, "")
+      .replace(/\s*\|\s*eBay$/i, "")
+      .replace(/\s*-\s*Best Buy$/i, "")
+      .replace(/\s*-\s*Walmart\.com$/i, "")
+      .replace(/\s*:\s*Target$/i, "")
       .trim();
     currentTabInfo.title = cleanTitle;
 
+    categorySelect.value = inferCategoryFromHostname(parsedUrl.hostname);
     detectedDomainDisplay.textContent = currentTabInfo.domain;
-    detectedUrlDisplay.textContent = currentTabInfo.url;
+    detectedUrlDisplay.textContent = currentTabInfo.isCartOrCheckout
+      ? `${currentTabInfo.domain} (Shopping Cart / Checkout)`
+      : currentTabInfo.url;
 
-    // Request multi-option DOM scrape from the active tab
     const extraction = await scrapeProductsFromTab(activeTab.id);
+
+    if (extraction && typeof extraction.isCartOrCheckout === "boolean") {
+      currentTabInfo.isCartOrCheckout = extraction.isCartOrCheckout;
+    }
 
     if (extraction && Array.isArray(extraction.options) && extraction.options.length > 0) {
       currentTabInfo.detectedOptions = extraction.options;
@@ -384,20 +474,20 @@ async function detectActiveTab(forceRescan = false) {
         categorySelect.value = extraction.defaultCategory;
       }
 
-      if ((forceRescan || !itemNameInput.value.trim()) && currentTabInfo.title) {
+      if (!currentTabInfo.isCartOrCheckout && (forceRescan || !itemNameInput.value.trim()) && currentTabInfo.title) {
         itemNameInput.value = currentTabInfo.title;
       }
     }
   } catch (err) {
     console.error("[Centinel Fin AI] Failed to read active tab:", err);
-    detectedDomainDisplay.textContent = "store.steampowered.com";
-    detectedUrlDisplay.textContent = "https://store.steampowered.com";
+    detectedDomainDisplay.textContent = "MANUAL ENTRY MODE";
+    detectedUrlDisplay.textContent = "Enter store product details below.";
     enableManualInputs();
   }
 }
 
 /**
- * Communicates with content.js in the active tab to extract products/bundles.
+ * Communicates with content.js in the active tab to extract products/variants/bundles.
  */
 async function scrapeProductsFromTab(tabId) {
   if (!tabId) return null;
@@ -418,9 +508,7 @@ async function scrapeProductsFromTab(tabId) {
           target: { tabId: tabId },
           files: ["overlay.css"]
         });
-      } catch (_) {
-        // Ignore if CSS already inserted
-      }
+      } catch (_) {}
 
       await chrome.scripting.executeScript({
         target: { tabId: tabId },
@@ -449,8 +537,7 @@ async function scrapeProductsFromTab(tabId) {
 }
 
 /**
- * Populate the Smart Option / Bundle Selector Dropdown and auto-fill the first option.
- * Compacts dropdown labels to prevent browser layout blowout.
+ * Populate the Smart Option / Variant / Bundle Selector Dropdown and auto-fill the first option.
  */
 function renderProductOptionsDropdown(options) {
   const count = options.length;
@@ -468,27 +555,24 @@ function renderProductOptionsDropdown(options) {
     const priceStr = `${symbol}${opt.amount.toFixed(2)}`;
     const discountStr = opt.discountPct ? ` (${opt.discountPct})` : "";
 
-    // Keep option label compact so Chromium doesn't blow out the popup menu width
     const maxTitleLen = 22;
     const shortTitle = opt.title.length > maxTitleLen ? opt.title.substring(0, maxTitleLen - 2) + ".." : opt.title;
     optionEl.textContent = `[${opt.kind}] ${shortTitle} \u2014 ${priceStr}${discountStr}`;
     productOptionSelect.appendChild(optionEl);
   });
 
-  // Add manual custom option at the bottom
   const manualOptionEl = document.createElement("option");
   manualOptionEl.value = "MANUAL";
   manualOptionEl.textContent = "[MANUAL] Custom / Enter Title & Price...";
   productOptionSelect.appendChild(manualOptionEl);
 
-  // Auto-select the first detected game/bundle option
   productOptionSelect.value = "0";
   applySelectedOption("0");
 }
 
 /**
- * Auto-populate and lock Title, Amount, Currency, and Category
- * when the child chooses a game or bundle from the dropdown.
+ * Auto-populate and tamper-lock Title, Amount, Currency, and Category
+ * when the child chooses a product or variant from the dropdown.
  */
 function applySelectedOption(selectedValue) {
   if (selectedValue === "MANUAL") {
@@ -505,7 +589,6 @@ function applySelectedOption(selectedValue) {
 
   priceVerifiedTag.textContent = "LIVE STORE PRICE";
 
-  // Lock Item Title to detected product
   itemNameInput.value = opt.title;
   itemNameInput.readOnly = true;
   itemNameInput.classList.add("neo-input-locked");
@@ -514,7 +597,6 @@ function applySelectedOption(selectedValue) {
     titleLockStatus.className = "locked-badge";
   }
 
-  // Lock Amount to detected store price (tamper-proof!)
   amountInput.value = opt.amount.toFixed(2);
   amountInput.readOnly = true;
   amountInput.classList.add("neo-input-locked");
@@ -523,7 +605,6 @@ function applySelectedOption(selectedValue) {
     amountLockStatus.className = "locked-badge";
   }
 
-  // Detect and Lock Currency to detected store currency
   if (opt.currency) {
     const cur = opt.currency.toUpperCase();
     if (!currencySelect.querySelector(`option[value="${cur}"]`)) {
@@ -543,12 +624,10 @@ function applySelectedOption(selectedValue) {
     currencyLockStatus.className = "locked-badge";
   }
 
-  // Auto-fill category
   if (opt.category) {
     categorySelect.value = opt.category;
   }
 
-  // Show discount bar if the game or bundle is on sale
   if (opt.discountPct) {
     discountPctBadge.textContent = opt.discountPct;
     discountContextText.textContent = opt.originalPrice
@@ -662,7 +741,6 @@ async function handleLogin(e) {
   }
 }
 
-// Logout Handler
 async function handleLogout() {
   await chrome.storage.local.remove(["childToken", "childEmail"]);
   childSession.token = null;
@@ -670,7 +748,6 @@ async function handleLogout() {
   showLoggedOutState();
 }
 
-// Compute SHA-256 idempotency hash using Web Crypto API
 async function computeSha256(text) {
   const encoder = new TextEncoder();
   const data = encoder.encode(text);
@@ -711,14 +788,14 @@ async function handlePurchaseSubmit(e) {
   submitRequestBtn.textContent = "SUBMITTING TO PARENT...";
 
   try {
-    let siteTarget = currentTabInfo.domain || "store.steampowered.com";
+    let siteTarget = currentTabInfo.domain || "online-store";
     if (currentTabInfo.url && currentTabInfo.url.startsWith("http")) {
       try {
         const cleanUrlObj = new URL(currentTabInfo.url);
         const originAndPath = `${cleanUrlObj.origin}${cleanUrlObj.pathname}`;
         siteTarget = originAndPath.length <= 250 ? originAndPath : cleanUrlObj.hostname;
       } catch (_) {
-        siteTarget = currentTabInfo.domain || "store.steampowered.com";
+        siteTarget = currentTabInfo.domain || "online-store";
       }
     }
 
@@ -831,9 +908,12 @@ async function fetchMyRequests(manualRefresh = false) {
 function syncLiveTrackerWithRequests(requests) {
   if (!Array.isArray(requests) || requests.length === 0) return;
 
+  // Sort newest first so the most recent request takes priority
+  const sortedRequests = [...requests].sort((a, b) => (b.id || 0) - (a.id || 0));
+
   // 1. If we are already tracking a specific request ID, keep its live status updated
   if (activeTrackedRequestId) {
-    const tracked = requests.find((r) => r.id === activeTrackedRequestId);
+    const tracked = sortedRequests.find((r) => r.id === activeTrackedRequestId);
     if (tracked) {
       showLiveApprovalTracker(tracked);
       return;
@@ -842,11 +922,25 @@ function syncLiveTrackerWithRequests(requests) {
 
   if (userDismissedTrackerForForm) return;
 
-  // 2. Otherwise, check if the active store page already has a recent PENDING or APPROVED request
+  // 2. If the child is on a Shopping Cart / Checkout page, recognize their approved/pending item for this merchant domain
+  if (currentTabInfo.isCartOrCheckout && currentTabInfo.domain) {
+    const currentHostClean = currentTabInfo.domain.replace(/^www\./i, "").toLowerCase();
+    const matchingDomainReq = sortedRequests.find((r) => {
+      if (r.status !== "APPROVED" && r.status !== "PENDING") return false;
+      const reqHost = getCleanDomainLabel(r.siteDomain).replace(/^www\./i, "").toLowerCase();
+      return reqHost === currentHostClean || reqHost.includes(currentHostClean) || currentHostClean.includes(reqHost);
+    });
+    if (matchingDomainReq) {
+      showLiveApprovalTracker(matchingDomainReq);
+      return;
+    }
+  }
+
+  // 3. On a Product Page, check if this exact product URL or product title already has a PENDING or APPROVED request
   const currentUrlClean = (currentTabInfo.url || "").split("?")[0].replace(/\/$/, "").toLowerCase();
   const currentTitleClean = (itemNameInput.value || currentTabInfo.title || "").trim().toLowerCase();
 
-  const matchingForPage = requests.find((r) => {
+  const matchingForPage = sortedRequests.find((r) => {
     if (r.status !== "PENDING" && r.status !== "APPROVED") return false;
     const reqSiteClean = (r.siteDomain || "").split("?")[0].replace(/\/$/, "").toLowerCase();
     const reqTitleClean = (r.itemName || "").trim().toLowerCase();
@@ -872,14 +966,12 @@ function syncLiveTrackerWithRequests(requests) {
 
 // Helper: Extract clean domain from full URL or domain string
 function getCleanDomainLabel(siteDomainOrUrl) {
-  if (!siteDomainOrUrl) return "Merchant";
+  if (!siteDomainOrUrl) return "Online Store";
   try {
     if (siteDomainOrUrl.startsWith("http://") || siteDomainOrUrl.startsWith("https://")) {
       return new URL(siteDomainOrUrl).hostname;
     }
-  } catch (_) {
-    // Fallback
-  }
+  } catch (_) {}
   return siteDomainOrUrl;
 }
 
@@ -890,7 +982,7 @@ function renderRequestsList(requests) {
     requestsListContainer.innerHTML = `
       <div class="empty-state">
         <span class="empty-title">NO REQUESTS YET</span>
-        <span class="empty-sub">When you submit requests on game or store pages, they will appear here.</span>
+        <span class="empty-sub">When you submit requests on any online store, they will appear here.</span>
       </div>
     `;
     return;
@@ -899,7 +991,6 @@ function renderRequestsList(requests) {
   requestCountBadge.textContent = requests.length.toString();
   requestsListContainer.innerHTML = "";
 
-  // Sort descending by id
   requests.sort((a, b) => b.id - a.id);
 
   requests.forEach(req => {
@@ -926,7 +1017,7 @@ function renderRequestsList(requests) {
 
     card.innerHTML = `
       <div class="card-top-row">
-        <span class="card-item-title">${escapeHtml(req.itemName || "Item Request")}</span>
+        <span class="card-item-title">${escapeHtml(req.itemName || "Product Request")}</span>
         <span class="card-amount-badge">${escapeHtml(formattedAmount)}</span>
       </div>
       <div class="card-middle-row">
@@ -951,7 +1042,6 @@ function renderRequestsList(requests) {
     }
   });
 
-  // Notify active tab to run verification & unlock if an approved request matches
   chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
     if (tabs && tabs[0] && tabs[0].id) {
       chrome.tabs.sendMessage(tabs[0].id, { type: "VERIFY_AND_UNLOCK_TAB" }).catch(() => {});
@@ -959,7 +1049,6 @@ function renderRequestsList(requests) {
   }).catch(() => {});
 }
 
-// Helper: Alert Display
 function showAlert(message, type) {
   submissionAlert.textContent = message;
   submissionAlert.className = `alert-box alert-${type}`;
@@ -970,7 +1059,6 @@ function hideAlert() {
   submissionAlert.classList.add("hidden");
 }
 
-// Helper: Escape HTML
 function escapeHtml(str) {
   if (!str) return "";
   return str.replace(/&/g, "&amp;")
