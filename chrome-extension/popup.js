@@ -858,10 +858,30 @@ async function handlePurchaseSubmit(e) {
     if (siteTarget.startsWith("http")) {
       try {
         const cleanUrlObj = new URL(siteTarget);
-        const originAndPath = `${cleanUrlObj.origin}${cleanUrlObj.pathname}`;
-        siteTarget = originAndPath.length <= 250 ? originAndPath : cleanUrlObj.hostname;
+        // Never send a session-private /cart or /checkout path as the primary merchant link
+        if (isCartOrCheckoutUrl(siteTarget)) {
+          siteTarget = cleanUrlObj.origin;
+        } else {
+          const originAndPath = `${cleanUrlObj.origin}${cleanUrlObj.pathname.replace(/\/+$/, "")}`;
+          siteTarget = originAndPath.length <= 250 ? originAndPath : cleanUrlObj.hostname;
+        }
       } catch (_) {
         siteTarget = currentTabInfo.domain || "online-store";
+      }
+    }
+
+    // Attach direct public product URLs for each cart item so the Parent Dashboard can open every item individually
+    let enrichedNote = note;
+    if (
+      currentTabInfo.cartManifest &&
+      Array.isArray(currentTabInfo.cartManifest.items) &&
+      currentTabInfo.cartManifest.items.length > 0
+    ) {
+      const itemLinks = currentTabInfo.cartManifest.items
+        .map((it) => (it && it.productUrl && !isCartOrCheckoutUrl(it.productUrl) ? it.productUrl : ""))
+        .filter(Boolean);
+      if (itemLinks.length > 0) {
+        enrichedNote = `${note}\n[CART_LINKS]${itemLinks.join("|")}[/CART_LINKS]`;
       }
     }
 
@@ -874,7 +894,7 @@ async function handlePurchaseSubmit(e) {
       amount: amount,
       currency: currency,
       category: category,
-      note: note
+      note: enrichedNote
     };
 
     const response = await fetch(`${CONFIG.apiBaseUrl}/purchase-requests`, {
@@ -1102,6 +1122,7 @@ function renderRequestsList(requests) {
 
     const proofRowId = `crypto-proof-${req.id}`;
     const showCryptoRow = req.status === "APPROVED";
+    const cleanNoteText = req.note ? String(req.note).replace(/\s*\[CART_LINKS\][\s\S]*?\[\/CART_LINKS\]/gi, "").trim() : "";
 
     card.innerHTML = `
       <div class="card-top-row">
@@ -1113,7 +1134,7 @@ function renderRequestsList(requests) {
         <span class="card-status-badge ${statusClass}">[ ${statusText} ]</span>
       </div>
       ${showCryptoRow ? `<div id="${proofRowId}" class="crypto-proof-row verified"><span>RSA-2048 CART PROOF</span><span>[ VERIFYING... ]</span></div>` : ""}
-      ${req.note ? `<div class="card-note-row">"${escapeHtml(req.note)}"</div>` : ""}
+      ${cleanNoteText ? `<div class="card-note-row">"${escapeHtml(cleanNoteText)}"</div>` : ""}
     `;
 
     requestsListContainer.appendChild(card);

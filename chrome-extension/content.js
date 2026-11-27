@@ -222,6 +222,54 @@
       .trim();
   }
 
+  // Helper: Check if a URL path is a session-private cart or checkout route
+  function isCartOrCheckoutPath(urlOrPath) {
+    if (!urlOrPath) return false;
+    let pathname = String(urlOrPath).toLowerCase();
+    try {
+      if (pathname.startsWith("http://") || pathname.startsWith("https://")) {
+        pathname = new URL(pathname).pathname.toLowerCase();
+      }
+    } catch (_) {}
+    if (/\/(cart|shopping-cart|viewcart|basket|bag|checkout|checkouts|onepagecheckout)(\/|$)/i.test(pathname)) {
+      return true;
+    }
+    if (pathname.includes("/gp/cart") || pathname.includes("/gp/buy")) {
+      return true;
+    }
+    return false;
+  }
+
+  // Helper: Sanitize a product URL (strips noisy tracking query strings & rejects private /cart URLs)
+  function sanitizeProductUrl(rawUrl) {
+    if (!rawUrl) return null;
+    try {
+      const resolved = rawUrl.startsWith("/") ? `${window.location.origin}${rawUrl}` : rawUrl;
+      if (!resolved.startsWith("http://") && !resolved.startsWith("https://")) return null;
+      const parsed = new URL(resolved);
+      if (isCartOrCheckoutPath(parsed.pathname)) return null;
+      const cleanPath = parsed.pathname.replace(/\/+$/, "");
+      if (!cleanPath || cleanPath === "") return null;
+      return `${parsed.origin}${cleanPath}`;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Helper: Build a public store product search URL fallback when a cart DOM has no direct item link
+  function buildStoreProductSearchUrl(hostname, itemTitle) {
+    const h = (hostname || window.location.hostname || "").toLowerCase();
+    const encoded = encodeURIComponent((itemTitle || "").trim());
+    if (!encoded) return `https://${h}`;
+    if (h.includes("steampowered.com")) return `https://store.steampowered.com/search/?term=${encoded}`;
+    if (h.includes("amazon.")) return `https://${h}/s?k=${encoded}`;
+    if (h.includes("ebay.")) return `https://${h}/sch/i.html?_nkw=${encoded}`;
+    if (h.includes("walmart.com")) return `https://www.walmart.com/search?q=${encoded}`;
+    if (h.includes("target.com")) return `https://www.target.com/s?searchTerm=${encoded}`;
+    if (h.includes("epicgames.com")) return `https://store.epicgames.com/en-US/browse?q=${encoded}`;
+    return `https://${h}/search?q=${encoded}`;
+  }
+
   // Helper: Check if current page is a Shopping Cart or Checkout page
   function isDedicatedCartOrCheckoutPage() {
     const pathname = (window.location.pathname || "").toLowerCase();
@@ -238,10 +286,7 @@
       return false;
     }
 
-    if (/\/(cart|shopping-cart|viewcart|basket|bag|checkout|checkouts|onepagecheckout)(\/|$)/i.test(pathname)) {
-      return true;
-    }
-    if (pathname.includes("/gp/cart") || pathname.includes("/gp/buy") || search.includes("step=contact_information")) {
+    if (isCartOrCheckoutPath(pathname) || search.includes("step=contact_information")) {
       return true;
     }
     if (document.querySelector("#cart_item_list, .cart_totals_area, #shopping-cart-table, [data-checkout-subtotal]")) {
@@ -250,15 +295,34 @@
     return false;
   }
 
-  // Multi-Item Breadcrumb Ring Buffer: Stores up to 25 recently visited product pages on this domain
+  // Cross-Tab Product URL Vault (Synced via chrome.storage.local + sessionStorage)
+  let crossTabProductVault = [];
+
+  function hydrateCrossTabProductVault() {
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local && chrome.storage.local.get) {
+        chrome.storage.local.get(["parentguard_product_vault"], (res) => {
+          if (res && Array.isArray(res.parentguard_product_vault)) {
+            crossTabProductVault = res.parentguard_product_vault;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+  hydrateCrossTabProductVault();
+
+  // Multi-Item Breadcrumb Ring Buffer: Stores up to 40 recently visited product pages across tabs
   function updateProductBreadcrumb(productInfo) {
     if (!productInfo || !productInfo.title || isDedicatedCartOrCheckoutPage()) return;
+    const cleanUrl = sanitizeProductUrl(window.location.href);
+    if (!cleanUrl) return;
+
     try {
       const entry = {
-        domain: window.location.hostname,
+        domain: getCleanHostKey(window.location.hostname),
         title: cleanStoreTitle(productInfo.title),
         normTitle: normalizeManifestTitle(productInfo.title),
-        url: window.location.href,
+        url: cleanUrl,
         amount: productInfo.amount,
         currency: productInfo.currency,
         timestamp: Date.now()
@@ -273,24 +337,45 @@
       }
       history = history.filter((h) => h && h.normTitle !== entry.normTitle && h.url !== entry.url);
       history.unshift(entry);
-      if (history.length > 25) history = history.slice(0, 25);
+      if (history.length > 40) history = history.slice(0, 40);
       sessionStorage.setItem("__parentguard_product_history__", JSON.stringify(history));
+
+      // Also sync to chrome.storage.local so /cart opened in any tab can resolve product URLs
+      const mergedVault = [entry, ...crossTabProductVault.filter((h) => h && h.normTitle !== entry.normTitle && h.url !== entry.url)].slice(0, 40);
+      crossTabProductVault = mergedVault;
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ parentguard_product_vault: mergedVault });
+      }
     } catch (_) {}
   }
 
   function getProductBreadcrumbHistory() {
+    const currentDomain = getCleanHostKey(window.location.hostname);
+    const now = Date.now();
+    const maxAge = 1000 * 60 * 60 * 12; // 12 hours
+    const combined = [];
+    const seenUrls = new Set();
+
     try {
       const raw = sessionStorage.getItem("__parentguard_product_history__");
-      if (!raw) return [];
-      const list = JSON.parse(raw);
-      if (!Array.isArray(list)) return [];
-      const now = Date.now();
-      return list.filter(
-        (item) => item && item.domain === window.location.hostname && now - (item.timestamp || 0) < 1000 * 60 * 60 * 4
-      );
-    } catch (_) {
-      return [];
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) combined.push(...list);
+      }
+    } catch (_) {}
+
+    if (Array.isArray(crossTabProductVault)) {
+      combined.push(...crossTabProductVault);
     }
+
+    return combined.filter((item) => {
+      if (!item || !item.url || seenUrls.has(item.url)) return false;
+      const itemDom = getCleanHostKey(item.domain);
+      if (itemDom !== currentDomain) return false;
+      if (now - (item.timestamp || 0) >= maxAge) return false;
+      seenUrls.add(item.url);
+      return true;
+    });
   }
 
   function getProductBreadcrumb() {
@@ -473,16 +558,21 @@
         }
 
         // Cross-check breadcrumb history for title or clean URL enrichment
-        let fullUrl = anchor.href;
-        if (fullUrl && fullUrl.startsWith("/")) {
-          fullUrl = `${window.location.origin}${fullUrl}`;
-        }
-        const matchedCrumb = breadcrumbs.find((b) => b.url && getSteamProductKey(b.url) === prodKey);
+        let fullUrl = sanitizeProductUrl(anchor.href);
+        const normItemTitle = normalizeManifestTitle(itemTitle);
+        const matchedCrumb = breadcrumbs.find(
+          (b) =>
+            (b.url && getSteamProductKey(b.url) === prodKey) ||
+            (normItemTitle && b.normTitle && b.normTitle === normItemTitle)
+        );
         if (!itemTitle && matchedCrumb) {
           itemTitle = matchedCrumb.title;
         }
         if (matchedCrumb && matchedCrumb.url) {
-          fullUrl = matchedCrumb.url;
+          fullUrl = sanitizeProductUrl(matchedCrumb.url) || fullUrl;
+        }
+        if (!fullUrl && itemTitle) {
+          fullUrl = buildStoreProductSearchUrl(hostname, itemTitle);
         }
 
         // Extract active final price (ignoring strikethrough original prices like $39.99)
@@ -535,9 +625,20 @@
 
         if (titleEl) {
           const cleanTitle = cleanStoreTitle((titleEl.textContent || "").replace(/\s+/g, " ").trim());
-          let fullUrl = linkEl ? linkEl.href : null;
-          if (fullUrl && fullUrl.startsWith("/")) {
-            fullUrl = `${window.location.origin}${fullUrl}`;
+          const normTitle = normalizeManifestTitle(cleanTitle);
+          let fullUrl = linkEl ? sanitizeProductUrl(linkEl.href) : null;
+          if (!fullUrl && normTitle) {
+            const matchedCrumb = breadcrumbs.find(
+              (b) =>
+                b.normTitle === normTitle ||
+                (b.normTitle && normTitle.length >= 5 && (b.normTitle.includes(normTitle) || normTitle.includes(b.normTitle)))
+            );
+            if (matchedCrumb && matchedCrumb.url) {
+              fullUrl = sanitizeProductUrl(matchedCrumb.url);
+            }
+          }
+          if (!fullUrl && cleanTitle) {
+            fullUrl = buildStoreProductSearchUrl(hostname, cleanTitle);
           }
           const priceObj = extractActiveItemPrice(priceContainer, metaCurrencyHint);
           const discountMatch = (row.textContent || "").match(/(-\d{1,2}%)/);
@@ -633,10 +734,33 @@
 
     const fingerprint = `${sortedTokens.join("|")}||total:${totalAmount.toFixed(2)}:${currency}`;
 
-    const directProductUrl =
-      resolvedItems.length === 1 && resolvedItems[0].productUrl
-        ? resolvedItems[0].productUrl
-        : window.location.href;
+    // Resolve each item's public product URL (never a private /cart URL!)
+    const breadcrumbs = getProductBreadcrumbHistory();
+    resolvedItems = resolvedItems.map((it) => {
+      let cleanItemUrl = sanitizeProductUrl(it.productUrl);
+      if (!cleanItemUrl && it.title) {
+        const normT = normalizeManifestTitle(it.title);
+        const crumb = breadcrumbs.find(
+          (b) =>
+            b.normTitle === normT ||
+            (b.normTitle && normT.length >= 5 && (b.normTitle.includes(normT) || normT.includes(b.normTitle)))
+        );
+        if (crumb && crumb.url) {
+          cleanItemUrl = sanitizeProductUrl(crumb.url);
+        }
+      }
+      if (!cleanItemUrl && it.title) {
+        cleanItemUrl = buildStoreProductSearchUrl(window.location.hostname, it.title);
+      }
+      return {
+        ...it,
+        productUrl: cleanItemUrl
+      };
+    });
+
+    // Never send a session-private /cart URL as primaryUrl; use the primary item's product URL or clean store origin
+    const firstItemProductUrl = resolvedItems.find((it) => it.productUrl)?.productUrl;
+    const directProductUrl = firstItemProductUrl || window.location.origin;
 
     return {
       itemCount: resolvedItems.reduce((sum, it) => sum + (it.quantity || 1), 0),
@@ -646,6 +770,7 @@
       summaryTitle: summaryTitle,
       fingerprint: fingerprint,
       primaryUrl: directProductUrl,
+      itemUrls: resolvedItems.map((it) => it.productUrl).filter(Boolean),
       items: resolvedItems
     };
   }
@@ -841,7 +966,10 @@
     extractActiveItemPrice,
     buildCartManifest,
     verifyManifestAgainstApproval,
-    normalizeManifestTitle
+    normalizeManifestTitle,
+    sanitizeProductUrl,
+    buildStoreProductSearchUrl,
+    isCartOrCheckoutPath
   };
 
   if (window.__PARENTGUARD_CONTENT_INITIALIZED__) {
@@ -927,10 +1055,14 @@
     true
   );
 
-  // Listen in open /cart tabs for items added to cart in OTHER tabs
+  // Listen in open /cart tabs for items added to cart in OTHER tabs + keep product URL vault synced
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== "local" || !changes[hostMutationStorageKey]) return;
+      if (areaName !== "local") return;
+      if (changes.parentguard_product_vault && Array.isArray(changes.parentguard_product_vault.newValue)) {
+        crossTabProductVault = changes.parentguard_product_vault.newValue;
+      }
+      if (!changes[hostMutationStorageKey]) return;
       if (!isDedicatedCartOrCheckoutPage()) return;
 
       const mutTime = changes[hostMutationStorageKey].newValue || 0;

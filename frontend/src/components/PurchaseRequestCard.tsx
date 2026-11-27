@@ -6,6 +6,8 @@ import {
   formatCurrencyAmount,
   formatRelativeTime,
   getDisplayDomain,
+  parseNoteAndCartLinks,
+  resolveCartItemProductUrl,
 } from "@/lib/format-utils";
 
 interface PurchaseRequestCardProps {
@@ -27,12 +29,7 @@ export default function PurchaseRequestCard({
   const isApproved = request.status === "APPROVED";
   const isDenied = request.status === "DENIED";
 
-  const displayDomain = getDisplayDomain(request.siteDomain);
-  const merchantUrl = buildSafeMerchantUrl(request.siteDomain);
-  const childLabel = request.childName || `Child #${request.childId}`;
-  const childInitial = childLabel.charAt(0).toUpperCase();
-  const formattedAmount = formatCurrencyAmount(request.amount, request.currency);
-  const currencyCode = (request.currency || "USD").trim().toUpperCase();
+  const { cleanNote, cartLinks } = parseNoteAndCartLinks(request.note);
 
   // Parse multi-item Shopping Cart Manifest summaries (e.g. "007 First Light ($19.99) + Sea of Thieves ($8.39)")
   const rawItemName = (request.itemName || "").trim();
@@ -41,15 +38,34 @@ export default function PurchaseRequestCard({
         .split(/\s+\+\s+/)
         .map((seg) => seg.trim())
         .filter(Boolean)
-        .map((seg) => {
+        .map((seg, idx) => {
           const priceMatch = seg.match(/^(.*?)\s*\(([$€£₹RsA-Z.\s]*\d+[.,]\d{2})\)\s*$/i);
-          if (priceMatch) {
-            return { title: priceMatch[1].trim(), price: priceMatch[2].trim() };
-          }
-          return { title: seg, price: null };
+          const cleanTitle = priceMatch ? priceMatch[1].trim() : seg;
+          const itemPrice = priceMatch ? priceMatch[2].trim() : null;
+          const productUrl = resolveCartItemProductUrl(
+            cartLinks[idx],
+            cleanTitle,
+            request.siteDomain
+          );
+          return { title: cleanTitle, price: itemPrice, productUrl };
         })
     : [];
   const isMultiItemCart = cartSegments.length > 1;
+
+  const displayDomain = getDisplayDomain(request.siteDomain);
+  // For 1-item requests or bottom merchant strip, prefer the direct product URL (never a session-private /cart URL)
+  const primaryProductSource =
+    cartLinks[0] ||
+    (isMultiItemCart && cartSegments[0]?.productUrl ? cartSegments[0].productUrl : request.siteDomain);
+  const merchantUrl = buildSafeMerchantUrl(
+    primaryProductSource,
+    !isMultiItemCart ? rawItemName : undefined
+  );
+
+  const childLabel = request.childName || `Child #${request.childId}`;
+  const childInitial = childLabel.charAt(0).toUpperCase();
+  const formattedAmount = formatCurrencyAmount(request.amount, request.currency);
+  const currencyCode = (request.currency || "USD").trim().toUpperCase();
 
   return (
     <article className="p-5 bg-surface rounded-xl border-[3px] border-ink shadow-[4px_4px_0px_#151515] flex flex-col gap-4 transition-all">
@@ -110,9 +126,11 @@ export default function PurchaseRequestCard({
                   </h3>
                 </div>
                 <div className="bg-paper border-2 border-ink rounded-lg p-2.5 flex flex-col gap-1.5 shadow-[2px_2px_0px_#151515]">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-outline">
-                    Itemized Cart Manifest
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-outline">
+                      Itemized Cart Manifest &bull; Click any item to inspect product page
+                    </span>
+                  </div>
                   {cartSegments.map((item, idx) => (
                     <div
                       key={`${idx}-${item.title}`}
@@ -122,15 +140,33 @@ export default function PurchaseRequestCard({
                         <span className="px-1.5 py-0.5 bg-ink text-surface font-mono text-[10px] font-bold rounded-sm shrink-0">
                           {String(idx + 1).padStart(2, "0")}
                         </span>
-                        <span className="font-body-sm font-bold text-xs sm:text-sm text-ink truncate">
+                        <a
+                          href={item.productUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-body-sm font-bold text-xs sm:text-sm text-ink hover:text-primary hover:underline truncate"
+                          title={`Inspect ${item.title} on ${displayDomain}`}
+                        >
                           {item.title}
-                        </span>
+                        </a>
                       </div>
-                      {item.price && (
-                        <span className="font-mono font-bold text-xs text-ink bg-sun/60 border border-ink px-2 py-0.5 rounded shrink-0">
-                          {item.price}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <a
+                          href={item.productUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-0.5 bg-sky/70 hover:bg-sky text-ink font-mono text-[10px] font-bold uppercase border border-ink rounded inline-flex items-center gap-1 shadow-[1px_1px_0px_#151515] transition-all"
+                          title={`Open ${item.title} product page in new tab`}
+                        >
+                          <span>VIEW ITEM</span>
+                          <span className="material-symbols-outlined text-[11px]">open_in_new</span>
+                        </a>
+                        {item.price && (
+                          <span className="font-mono font-bold text-xs text-ink bg-sun/60 border border-ink px-2 py-0.5 rounded shrink-0">
+                            {item.price}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -166,7 +202,7 @@ export default function PurchaseRequestCard({
                 {displayDomain || request.siteDomain}
               </span>
               <span className="font-caption text-[10px] text-outline hidden sm:inline">
-                &bull; Verify site legitimacy before authorizing payment
+                &bull; Verify product legitimacy before authorizing payment
               </span>
             </div>
             <a
@@ -193,7 +229,7 @@ export default function PurchaseRequestCard({
       </div>
 
       {/* Child Justification Speech Bubble */}
-      {request.note ? (
+      {cleanNote ? (
         <div className="bg-surface-container/70 border-2 border-ink rounded-lg p-3 flex items-start gap-2.5">
           <span className="material-symbols-outlined text-base text-ink shrink-0 mt-0.5">
             chat_bubble
@@ -203,7 +239,7 @@ export default function PurchaseRequestCard({
               Child&apos;s Note
             </span>
             <p className="font-body-sm text-xs sm:text-sm text-ink italic break-words">
-              &quot;{request.note}&quot;
+              &quot;{cleanNote}&quot;
             </p>
           </div>
         </div>

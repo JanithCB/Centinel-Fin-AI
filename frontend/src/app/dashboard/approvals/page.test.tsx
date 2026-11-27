@@ -197,12 +197,12 @@ describe('ApprovalsPage Component', () => {
         familyId: 10,
         childId: 5,
         childName: 'Leo Turner',
-        siteDomain: 'store.steampowered.com',
+        siteDomain: 'https://store.steampowered.com/cart/',
         itemName: '007 First Light ($19.99) + Sea of Thieves 2026 Edition ($8.39)',
         amount: 28.38,
         currency: 'USD',
         category: 'GAMING',
-        note: 'Weekend sale cart',
+        note: 'Weekend sale cart\n[CART_LINKS]https://store.steampowered.com/app/3768760/007_First_Light|https://store.steampowered.com/app/1172620/Sea_of_Thieves[/CART_LINKS]',
         status: 'PENDING',
         createdAt: new Date().toISOString(),
       },
@@ -218,6 +218,14 @@ describe('ApprovalsPage Component', () => {
       expect(screen.getByText('Sea of Thieves 2026 Edition')).toBeInTheDocument()
       expect(screen.getByText('$8.39')).toBeInTheDocument()
       expect(screen.getByText('$28.38')).toBeInTheDocument()
+      // Verify [CART_LINKS] tag is stripped from displayed Child's Note
+      expect(screen.getByText(/"Weekend sale cart"/i)).toBeInTheDocument()
+      expect(screen.queryByText(/CART_LINKS/i)).not.toBeInTheDocument()
     })
+
+    const item1Link = screen.getByRole('link', { name: '007 First Light' })
+    const item2Link = screen.getByRole('link', { name: 'Sea of Thieves 2026 Edition' })
+    expect(item1Link).toHaveAttribute('href', 'https://store.steampowered.com/app/3768760/007_First_Light')
+    expect(item2Link).toHaveAttribute('href', 'https://store.steampowered.com/app/1172620/Sea_of_Thieves')
   })
 })
