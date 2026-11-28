@@ -405,6 +405,86 @@
     return null;
   }
 
+  // Helper: Scrape visible cart row titles & prices on /cart for two-source reconciliation & anti-tamper
+  function extractLiveCartItems(metaCurrencyHint) {
+    const items = [];
+    const seenTitles = new Set();
+    try {
+      const rowSelectors = [
+        ".cart_item",
+        "[class*='CartItem' i]",
+        ".sc-list-item",
+        ".cart-item",
+        ".cart__item",
+        ".cart__row",
+        ".woocommerce-cart-form__cart-item",
+        "[data-cart-item]"
+      ];
+      const rows = document.querySelectorAll(rowSelectors.join(", "));
+      for (const row of rows) {
+        if (row.closest && row.closest("[class*='recommend' i], [class*='upsell' i], [class*='related' i]")) {
+          continue;
+        }
+        const titleEl = row.querySelector(
+          ".cart_item_desc a, .sc-product-title, .sc-grid-item-product-title, .cart-item__name, .cart-item__title, .product-name a, a[href*='/app/'], a[href*='/product/'], a[href*='/products/'], a[href*='/dp/'], h3, h4"
+        );
+        const rawTitle = titleEl ? (titleEl.textContent || "").replace(/\s+/g, " ").trim() : "";
+        const cleaned = cleanStoreTitle(rawTitle);
+        if (!cleaned || cleaned.length < 2) continue;
+
+        const normKey = normalizeEditionTitle(cleaned);
+        if (seenTitles.has(normKey)) continue;
+        seenTitles.add(normKey);
+
+        const priceObj = extractActivePriceFromBox(row, metaCurrencyHint);
+        const linkHref = titleEl && titleEl.getAttribute ? titleEl.getAttribute("href") : null;
+        let resolvedUrl = null;
+        if (linkHref && !linkHref.startsWith("javascript:")) {
+          try {
+            resolvedUrl = getCanonicalProductUrl(new URL(linkHref, window.location.origin).href);
+          } catch (_) {}
+        }
+
+        items.push({
+          title: cleaned,
+          normTitle: normKey,
+          amount: priceObj ? priceObj.amount : null,
+          currency: priceObj ? priceObj.currency : (metaCurrencyHint || "USD"),
+          productUrl: resolvedUrl
+        });
+      }
+    } catch (_) {}
+    return items;
+  }
+
+  function detectEmptyCartState() {
+    try {
+      const bodyText = document.body ? (document.body.innerText || document.body.textContent || "") : "";
+      if (/\byour\s+(shopping\s+)?(cart|bag|basket)\s+is\s+(currently\s+)?empty\b/i.test(bodyText)) {
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function discoverStoreCartUrl() {
+    try {
+      const hostname = (window.location.hostname || "").toLowerCase();
+      const cartLink = document.querySelector(
+        "a[href*='/cart'], a[href*='/gp/cart'], a[href*='/basket'], a[href*='/bag']"
+      );
+      if (cartLink && cartLink.getAttribute) {
+        const href = cartLink.getAttribute("href");
+        if (href && !href.startsWith("javascript:")) {
+          return new URL(href, window.location.origin).href;
+        }
+      }
+      if (hostname.includes("amazon.")) return `${window.location.origin}/gp/cart/view.html`;
+      if (hostname.includes("steampowered.com")) return "https://store.steampowered.com/cart";
+    } catch (_) {}
+    return `${window.location.origin}/cart`;
+  }
+
   let interceptedButtons = new Set();
   let lastScrapedActivePrice = null;
   let lastScrapedOptionsCount = 0;
@@ -430,6 +510,8 @@
 
     if (isCart) {
       const cartTotalObj = extractCartTotal(metaCurrencyHint);
+      const liveCartItems = extractLiveCartItems(metaCurrencyHint);
+      const isCartEmptyDetected = detectEmptyCartState();
       return {
         domain: hostname,
         url: canonicalUrl,
@@ -438,6 +520,9 @@
         isCartOrCheckout: true,
         cartTotal: cartTotalObj ? Number(cartTotalObj.amount.toFixed(2)) : null,
         cartCurrency: cartTotalObj ? cartTotalObj.currency : (metaCurrencyHint || "USD"),
+        cartItems: liveCartItems,
+        isCartEmptyDetected: isCartEmptyDetected,
+        storeCartUrl: discoverStoreCartUrl(),
         options: []
       };
     }
@@ -747,30 +832,205 @@
       });
     }
 
-    return {
-      domain: hostname,
-      url: canonicalUrl,
-      pageTitle: cleanPageTitle || document.title || "",
-      defaultCategory: defaultCategory,
-      isCartOrCheckout: false,
-      activePrice: activePriceToBind,
-      options: options
-    };
+      return {
+        domain: hostname,
+        url: canonicalUrl,
+        pageTitle: cleanPageTitle || document.title || "",
+        defaultCategory: defaultCategory,
+        isCartOrCheckout: false,
+        storeCartUrl: discoverStoreCartUrl(),
+        activePrice: activePriceToBind,
+        options: options
+      };
   }
 
   window.__PARENTGUARD_EXTRACT_PRODUCTS__ = extractPageProducts;
 
-  // Patterns for Product-Page Ingress Buttons ("Add to Cart", "Buy Now", "Pre-Order")
-  const PRODUCT_INGRESS_PATTERNS = [
+  // Silent Add-to-Cart Capture Engine & Cart Ledger
+  const CART_LEDGER_STORAGE_KEY_PREFIX = "parentguard_cart_ledger";
+
+  async function getCartLedgerStorageKey() {
+    try {
+      const stored = await chrome.storage.local.get(["childEmail", "parentguard_session"]);
+      const email =
+        (stored && stored.childEmail) ||
+        (stored && stored.parentguard_session && stored.parentguard_session.email);
+      if (email) {
+        return `${CART_LEDGER_STORAGE_KEY_PREFIX}_${String(email).trim().toLowerCase()}`;
+      }
+    } catch (_) {}
+    return `${CART_LEDGER_STORAGE_KEY_PREFIX}_guest`;
+  }
+
+  function escapeHtmlText(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function showCaptureToast(title, amount, currency) {
+    try {
+      const existing = document.getElementById("parentguard-capture-toast");
+      if (existing) existing.remove();
+
+      const toast = document.createElement("div");
+      toast.id = "parentguard-capture-toast";
+      toast.className = "parentguard-capture-toast";
+      const sym = currency === "LKR" ? "Rs. " : (currency === "EUR" ? "\u20AC" : (currency === "GBP" ? "\u00A3" : "$"));
+      const amtStr = amount ? ` (${sym}${Number(amount).toFixed(2)})` : "";
+      const rawTitle = title || "Item";
+      const shortTitle = rawTitle.length > 34 ? rawTitle.substring(0, 32) + "..." : rawTitle;
+
+      toast.innerHTML = `
+        <div class="pg-toast-header">
+          <span class="pg-toast-badge">PARENTGUARD</span>
+          <span class="pg-toast-tag">CART CAPTURE</span>
+        </div>
+        <div class="pg-toast-body">
+          <span class="pg-toast-title">${escapeHtmlText(shortTitle)}${amtStr}</span>
+          <span class="pg-toast-sub">Saved product link for Cart Request</span>
+        </div>
+      `;
+
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        if (toast && toast.parentElement) {
+          toast.classList.add("fade-out");
+          setTimeout(() => toast.remove(), 350);
+        }
+      }, 2600);
+    } catch (_) {}
+  }
+
+  async function recordCartLedgerItem(item) {
+    if (!item || !item.domain) return;
+    try {
+      const storageKey = await getCartLedgerStorageKey();
+      const res = await chrome.storage.local.get([storageKey]);
+      let ledger = Array.isArray(res[storageKey]) ? res[storageKey] : [];
+
+      const cleanItemUrl = getCanonicalProductUrl(item.productUrl || window.location.href);
+      const cleanItemTitle = cleanStoreTitle(item.title || document.title || "Store Item");
+      const normItemTitle = normalizeEditionTitle(cleanItemTitle);
+
+      // Match existing entry only when BOTH the domain/URL AND normalized edition title match,
+      // so distinct editions/DLCs added on the same page are preserved individually.
+      const existingIdx = ledger.findIndex((i) => {
+        if (i.domain !== item.domain) return false;
+        const normExisting = normalizeEditionTitle(i.title || "");
+        const titleMatches = normExisting && normItemTitle && normExisting === normItemTitle;
+        const urlMatches =
+          i.productUrl &&
+          cleanItemUrl &&
+          i.productUrl.toLowerCase() === cleanItemUrl.toLowerCase();
+        return titleMatches && (urlMatches || !i.productUrl || !cleanItemUrl);
+      });
+
+      const entry = {
+        id: "cart_item_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+        title: cleanItemTitle,
+        amount: typeof item.amount === "number" && !isNaN(item.amount) ? Number(item.amount.toFixed(2)) : null,
+        currency: item.currency || "USD",
+        productUrl: cleanItemUrl,
+        domain: item.domain,
+        addedAt: Date.now()
+      };
+
+      if (existingIdx >= 0) {
+        ledger[existingIdx] = { ...ledger[existingIdx], ...entry, id: ledger[existingIdx].id };
+      } else {
+        ledger.push(entry);
+      }
+
+      const now = Date.now();
+      ledger = ledger.filter((i) => !i.addedAt || (now - i.addedAt < 48 * 3600 * 1000));
+
+      await chrome.storage.local.set({ [storageKey]: ledger });
+      showCaptureToast(entry.title, entry.amount, entry.currency);
+    } catch (e) {
+      console.warn("[ParentGuard] Failed to save cart ledger item:", e);
+    }
+  }
+
+  function handleSilentAddToCartCapture(e) {
+    if (isDedicatedCartOrCheckoutPage()) return;
+
+    const target = e.target;
+    if (!target) return;
+
+    const btn = target.closest
+      ? target.closest(
+          "button, a, input[type='button'], input[type='submit'], [role='button'], .btn_addtocart, [id*='add-to-cart' i], [class*='add-to-cart' i]"
+        )
+      : null;
+
+    if (!btn || !isAddToCartButton(btn)) return;
+
+    const container = btn.closest
+      ? btn.closest(".game_area_purchase_game, form, .product-form, [class*='product' i], main, article") || document.body
+      : document.body;
+
+    const pageExtraction = extractPageProducts();
+    const hostname = window.location.hostname || "";
+    const tldCurrency = inferTldCurrency(hostname);
+
+    let priceObj = extractActivePriceFromBox(container, tldCurrency);
+    if (!priceObj && pageExtraction && pageExtraction.activePrice) {
+      priceObj = { amount: pageExtraction.activePrice, currency: tldCurrency || "USD" };
+    } else if (!priceObj && pageExtraction && pageExtraction.options && pageExtraction.options.length > 0) {
+      priceObj = {
+        amount: pageExtraction.options[0].amount,
+        currency: pageExtraction.options[0].currency || tldCurrency || "USD"
+      };
+    }
+
+    let title = btn.getAttribute("data-parentguard-title");
+    if (!title && container) {
+      const containerH1 = container.querySelector(
+        "h1, h2, .game_area_purchase_game_dropdown_selection, [class*='title' i]"
+      );
+      if (containerH1) {
+        title = (containerH1.textContent || "").replace(/^Buy\s+/i, "").trim();
+      }
+    }
+    if (!title && pageExtraction && pageExtraction.pageTitle) {
+      title = pageExtraction.pageTitle;
+    }
+    if (!title) {
+      title = document.title || "Store Item";
+    }
+
+    const itemToRecord = {
+      title: cleanStoreTitle(title),
+      amount: priceObj ? priceObj.amount : null,
+      currency: priceObj ? priceObj.currency : (tldCurrency || "USD"),
+      productUrl: getCanonicalProductUrl(window.location.href),
+      domain: hostname
+    };
+
+    recordCartLedgerItem(itemToRecord);
+  }
+
+  document.addEventListener("click", handleSilentAddToCartCapture, true);
+
+  // Patterns for Add-to-Cart Buttons (Freely clickable; triggers Silent Cart Capture)
+  const ADD_TO_CART_PATTERNS = [
     /\badd\s+to\s+(shopping\s+|my\s+)?(cart|bag|basket|trolley)\b/i,
-    /\bbuy\s+(it\s+)?now\b/i,
-    /\bpre[-\s]?order(\s+now)?\b/i,
-    /\bpre[-\s]?purchase\b/i,
-    /\bpurchase(\s+now)?\b/i,
-    /\binstant\s+buy\b/i
+    /\bin\s*cart\b/i
   ];
 
-  // Patterns strictly excluded from Product-Page locking (Wishlists, Demos, Free items, Navigation)
+  // Patterns for Instant-Buy Buttons on Product Pages (Bypasses cart; locked until approved)
+  const INSTANT_BUY_PATTERNS = [
+    /\bbuy\s+(it\s+)?now\b/i,
+    /\binstant\s+buy\b/i,
+    /\b1[-\s]?click\s+buy\b/i,
+    /\b1[-\s]?click\s+checkout\b/i
+  ];
+
+  // Patterns strictly excluded from locking/capture (Wishlists, Demos, Free items, Navigation)
   const PRODUCT_EXCLUSION_PATTERNS = [
     /\bwishlist\b/i,
     /\bfollow\b/i,
@@ -794,7 +1054,8 @@
     /\bcontinue\s+to\s+(payment|checkout|shipping|delivery|billing)\b/i,
     /\bproceed\s+to\s+(checkout|payment)\b/i,
     /\bgo\s+to\s+(checkout|payment)\b/i,
-    /^checkout(\s+now)?$/i,
+    /\bcheck\s*out(\s+now)?\b/i,
+    /\bcheckout\b/i,
     /\bpay\s+now\b/i,
     /\bplace\s+(your\s+)?order\b/i,
     /\bcomplete\s+(purchase|order|payment)\b/i,
@@ -802,76 +1063,97 @@
     /\bpurchase\s+(for\s+myself|as\s+a\s+gift)\b/i
   ];
 
-  function isProductIngressButton(element) {
+  function extractButtonSignals(element) {
+    if (!element || element.nodeType !== Node.ELEMENT_NODE) return null;
+    const tagName = element.tagName.toUpperCase();
+    const role = (element.getAttribute ? element.getAttribute("role") : "") || "";
+    const isClickableTag =
+      tagName === "BUTTON" ||
+      tagName === "A" ||
+      tagName === "INPUT" ||
+      role.toLowerCase() === "button";
+    if (!isClickableTag) return null;
+
+    const visibleText = (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
+    const rawVal = element.value || (element.getAttribute ? element.getAttribute("value") : "");
+    const inputVal = tagName === "INPUT" && rawVal ? String(rawVal).replace(/\s+/g, " ").trim() : "";
+    const ariaLabel = (element.getAttribute ? element.getAttribute("aria-label") : "") || "";
+    const titleAttr = (element.getAttribute ? element.getAttribute("title") : "") || "";
+
+    const labels = [visibleText, inputVal, ariaLabel, titleAttr]
+      .map((s) => String(s).trim())
+      .filter((s) => s.length > 0 && s.length <= 70);
+
+    return {
+      labels,
+      id: (element.id || (element.getAttribute ? element.getAttribute("id") : "") || "").toLowerCase(),
+      nameAttr: String((element.getAttribute ? element.getAttribute("name") : "") || "").toLowerCase(),
+      className: typeof element.className === "string" ? element.className.toLowerCase() : "",
+      href: String((element.getAttribute ? element.getAttribute("href") : "") || "").toLowerCase()
+    };
+  }
+
+  function isAddToCartButton(element) {
     if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
     if (isDedicatedCartOrCheckoutPage()) return false;
 
     if (
       element.closest &&
-      (element.closest("#parentguard-barrier-root, header, nav, footer, #global_header, .demo_above_purchase") ||
-        element.classList.contains("parentguard-in-place-shield"))
+      element.closest("#parentguard-barrier-root, header, nav, footer, #global_header, .demo_above_purchase")
     ) {
       return false;
     }
 
-    const tagName = element.tagName.toUpperCase();
-    const role = (element.getAttribute("role") || "").toLowerCase();
-    const isClickableTag =
-      tagName === "BUTTON" ||
-      tagName === "A" ||
-      tagName === "INPUT" ||
-      role === "button";
+    const sig = extractButtonSignals(element);
+    if (!sig) return false;
 
-    if (!isClickableTag) return false;
-
-    if (tagName !== "INPUT") {
-      const childButtons = element.querySelectorAll("button, a, input[type='submit'], input[type='button']");
-      for (const child of childButtons) {
-        if (child !== element && matchesProductIngressTextOrAttr(child)) {
-          return false;
-        }
-      }
+    if (sig.labels.some((lbl) => PRODUCT_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) {
+      return false;
     }
 
-    return matchesProductIngressTextOrAttr(element);
+    if (sig.labels.some((lbl) => ADD_TO_CART_PATTERNS.some((rx) => rx.test(lbl)))) {
+      return true;
+    }
+
+    return (
+      sig.id === "add-to-cart-button" ||
+      sig.nameAttr === "submit.add-to-cart" ||
+      sig.nameAttr === "add" ||
+      sig.className.includes("btn_addtocart") ||
+      sig.className.includes("add-to-cart") ||
+      sig.className.includes("add_to_cart") ||
+      sig.className.includes("addtocart") ||
+      sig.href.includes("javascript:addtocart") ||
+      sig.href.includes("javascript:addbundletocart")
+    );
+  }
+
+  function isInstantBuyButton(element) {
+    if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
+    if (isDedicatedCartOrCheckoutPage()) return false;
+
+    const sig = extractButtonSignals(element);
+    if (!sig) return false;
+
+    if (sig.labels.some((lbl) => PRODUCT_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) {
+      return false;
+    }
+
+    if (sig.labels.some((lbl) => INSTANT_BUY_PATTERNS.some((rx) => rx.test(lbl)))) {
+      return true;
+    }
+
+    return sig.id === "buy-now-button";
+  }
+
+  // Product-Page Ingress Button: Only lock Instant-Buy buttons that bypass the cart!
+  // Normal "Add to Cart" is NOT locked, allowing child to build their cart freely.
+  function isProductIngressButton(element) {
+    return isInstantBuyButton(element);
   }
 
   function matchesProductIngressTextOrAttr(element) {
-    const tagName = element.tagName.toUpperCase();
-    const visibleText = (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
-    const inputVal = tagName === "INPUT" && element.value ? element.value.replace(/\s+/g, " ").trim() : "";
-    const ariaLabel = (element.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim();
-    const titleAttr = (element.getAttribute("title") || "").replace(/\s+/g, " ").trim();
-
-    const candidateLabels = [visibleText, inputVal, ariaLabel, titleAttr].filter(
-      (s) => s.length > 0 && s.length <= 70
-    );
-
-    if (candidateLabels.some((lbl) => PRODUCT_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) {
-      return false;
-    }
-
-    if (candidateLabels.some((lbl) => PRODUCT_INGRESS_PATTERNS.some((rx) => rx.test(lbl)))) {
-      return true;
-    }
-
-    const id = (element.id || "").toLowerCase();
-    const nameAttr = (element.getAttribute("name") || "").toLowerCase();
-    const className = typeof element.className === "string" ? element.className.toLowerCase() : "";
-    const href = (element.getAttribute("href") || "").toLowerCase();
-
-    if (
-      id === "add-to-cart-button" ||
-      id === "buy-now-button" ||
-      nameAttr === "submit.add-to-cart" ||
-      className.includes("btn_addtocart") ||
-      href.includes("javascript:addtocart") ||
-      href.includes("javascript:addbundletocart")
-    ) {
-      return true;
-    }
-
-    return false;
+    return isInstantBuyButton(element);
   }
 
   function isCartPaymentGateButton(element) {
@@ -880,26 +1162,28 @@
 
     if (
       element.closest &&
-      (element.closest("#parentguard-barrier-root") || element.classList.contains("parentguard-in-place-shield"))
+      (element.closest("#parentguard-barrier-root, header nav") || element.classList.contains("parentguard-in-place-shield"))
     ) {
       return false;
     }
 
-    const tagName = element.tagName.toUpperCase();
-    const role = (element.getAttribute("role") || "").toLowerCase();
-    const isClickableTag =
-      tagName === "BUTTON" ||
-      tagName === "A" ||
-      tagName === "INPUT" ||
-      role === "button";
+    const sig = extractButtonSignals(element);
+    if (!sig) return false;
 
-    if (!isClickableTag) return false;
+    if (sig.labels.some((lbl) => PRODUCT_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) {
+      return false;
+    }
 
-    const visibleText = (element.innerText || element.textContent || element.value || "").replace(/\s+/g, " ").trim();
-    if (!visibleText || visibleText.length > 70) return false;
-    if (PRODUCT_EXCLUSION_PATTERNS.some((rx) => rx.test(visibleText))) return false;
+    if (sig.labels.some((lbl) => CART_PAYMENT_GATE_PATTERNS.some((rx) => rx.test(lbl)))) {
+      return true;
+    }
 
-    return CART_PAYMENT_GATE_PATTERNS.some((rx) => rx.test(visibleText));
+    return (
+      sig.nameAttr === "proceedtoretailcheckout" ||
+      sig.nameAttr === "checkout" ||
+      sig.id === "checkout" ||
+      sig.className.includes("checkout-button")
+    );
   }
 
   // Helper: Check if a URL string contains a specific product path beyond just the domain root
@@ -1044,14 +1328,20 @@
     parsePriceText,
     inferTldCurrency,
     extractActivePriceFromBox,
+    extractLiveCartItems,
     cleanStoreTitle,
     normalizeEditionTitle,
     isCartOrCheckoutPath,
     getCanonicalProductUrl,
     parseComboApprovalSubItems,
     doesProductButtonMatchApproval,
+    doesLiveCartMatchApproval,
     isProductIngressButton,
-    isRecentActiveApproval
+    isAddToCartButton,
+    isInstantBuyButton,
+    isCartPaymentGateButton,
+    isRecentActiveApproval,
+    getCartLedgerStorageKey
   };
 
   if (window.__PARENTGUARD_CONTENT_INITIALIZED__) {
@@ -1135,6 +1425,33 @@
     if (legacyBarrier) legacyBarrier.remove();
   }
 
+  function doesCartTitleMatchApproved(liveTitle, approvedTitle) {
+    const a = normalizeEditionTitle(liveTitle || "");
+    const b = normalizeEditionTitle(approvedTitle || "");
+    if (!a || !b) return false;
+    if (a === b || a.includes(b) || b.includes(a)) return true;
+
+    const wordsA = a.split(" ").filter((w) => w.length >= 3);
+    const wordsB = b.split(" ").filter((w) => w.length >= 3);
+    if (wordsA.length === 0 || wordsB.length === 0) return false;
+    const overlap = wordsA.filter((w) => wordsB.includes(w));
+    return overlap.length >= Math.min(2, Math.min(wordsA.length, wordsB.length));
+  }
+
+  function doesLiveCartMatchApproval(liveCartItems, approvedReq) {
+    if (!approvedReq || approvedReq.status !== "APPROVED") return false;
+    if (!Array.isArray(liveCartItems) || liveCartItems.length === 0) return true;
+
+    const subItems = parseComboApprovalSubItems(approvedReq);
+    const approvedTitles = subItems.length > 1
+      ? subItems.map((s) => s.title)
+      : [cleanStoreTitle(approvedReq.itemName || "")];
+
+    return liveCartItems.every((cartItem) =>
+      approvedTitles.some((appTitle) => doesCartTitleMatchApproved(cartItem.title, appTitle))
+    );
+  }
+
   // Click-Time Just-In-Time (JIT) Gate
   function handleBlockedClick(e) {
     const btn = e.currentTarget;
@@ -1153,20 +1470,23 @@
         }
         relockButton(btn);
       } else {
-        // On /cart page, verify cart total is positively read and within the most recent active approval
+        // On /cart page, verify cart total AND live cart items match an active approval
         const cartTotalObj = extractCartTotal();
+        const liveCartItems = extractLiveCartItems();
         const latestApproval = verifiedDomainApprovals[0];
         const approvedCeiling = latestApproval ? Number(latestApproval.amount) || 0 : 0;
-        if (cartTotalObj && cartTotalObj.amount > 0 && cartTotalObj.amount <= approvedCeiling + 0.02) {
-          return; // Positively verified within active approved ceiling!
+        const itemsMatch = doesLiveCartMatchApproval(liveCartItems, latestApproval);
+        if (cartTotalObj && cartTotalObj.amount > 0 && cartTotalObj.amount <= approvedCeiling + 0.02 && itemsMatch) {
+          return; // Positively verified within active approved ceiling and items!
         }
         const liveAmt = cartTotalObj ? cartTotalObj.amount : 0;
-        relockButton(
-          btn,
-          liveAmt > 0 && approvedCeiling > 0
-            ? `[ CART ($${liveAmt.toFixed(2)}) EXCEEDS APPROVED ($${approvedCeiling.toFixed(2)}) — REMOVE EXTRA ITEMS ]`
-            : "[ LOCKED — REQUEST APPROVAL ON PRODUCT PAGE ]"
-        );
+        let lockMsg = "[ LOCKED — OPEN PARENTGUARD EXTENSION TO REQUEST CART ]";
+        if (!itemsMatch && latestApproval) {
+          lockMsg = "[ UNAPPROVED ITEM IN CART — REQUEST APPROVAL ]";
+        } else if (liveAmt > 0 && approvedCeiling > 0) {
+          lockMsg = `[ CART ($${liveAmt.toFixed(2)}) EXCEEDS APPROVED ($${approvedCeiling.toFixed(2)}) — REMOVE EXTRA ITEMS ]`;
+        }
+        relockButton(btn, lockMsg);
       }
     }
 
@@ -1271,24 +1591,28 @@
 
       verifiedDomainApprovals = cryptoVerified;
 
-      // --- CASE 1: On /cart or /checkout page -> Fail-Closed Smart Cart Safety Limit ---
+      // --- CASE 1: On /cart or /checkout page -> Fail-Closed Smart Cart Safety Limit + Item Integrity ---
       if (isDedicatedCartOrCheckoutPage()) {
         const cartTotalObj = extractCartTotal();
         const liveCartTotal = cartTotalObj ? cartTotalObj.amount : 0;
+        const liveCartItems = extractLiveCartItems();
         // Use the most recent active approval (Fixes P0-2: never sum all lifetime historical approvals)
         const latestActiveApproval = cryptoVerified[0] || null;
         const approvedCeiling = latestActiveApproval ? Number(latestActiveApproval.amount) || 0 : 0;
+        const itemsMatch = doesLiveCartMatchApproval(liveCartItems, latestActiveApproval);
 
-        // Fail-Closed: Only release cart lock when liveCartTotal is positively read (> 0) and within approvedCeiling
-        if (approvedCeiling > 0 && liveCartTotal > 0 && liveCartTotal <= approvedCeiling + 0.02) {
+        // Fail-Closed: Only release cart lock when liveCartTotal is positively read (> 0), within approvedCeiling, and items match
+        if (approvedCeiling > 0 && liveCartTotal > 0 && liveCartTotal <= approvedCeiling + 0.02 && itemsMatch) {
           releaseAllLocksOnPage();
           return;
         }
 
-        const label =
-          approvedCeiling > 0 && liveCartTotal > approvedCeiling + 0.02
-            ? `[ CART ($${liveCartTotal.toFixed(2)}) EXCEEDS APPROVED ($${approvedCeiling.toFixed(2)}) — REMOVE EXTRA ITEMS ]`
-            : formatProductLockLabel(liveCartTotal > 0 ? liveCartTotal.toFixed(2) : null);
+        let label = formatProductLockLabel(liveCartTotal > 0 ? liveCartTotal.toFixed(2) : null);
+        if (approvedCeiling > 0 && !itemsMatch) {
+          label = "[ UNAPPROVED ITEM IN CART — REQUEST APPROVAL ]";
+        } else if (approvedCeiling > 0 && liveCartTotal > approvedCeiling + 0.02) {
+          label = `[ CART ($${liveCartTotal.toFixed(2)}) EXCEEDS APPROVED ($${approvedCeiling.toFixed(2)}) — REMOVE EXTRA ITEMS ]`;
+        }
 
         const gateCandidates = document.querySelectorAll(
           "button, a, input[type='submit'], input[type='button'], [role='button']"
