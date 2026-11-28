@@ -8,7 +8,7 @@
  * - Relays API requests to Spring Boot backend (http://localhost:8080) to avoid HTTPS->HTTP mixed-content blocks on external stores
  */
 
-const EXTENSION_BUILD_ID = "pg-universal-v3.0";
+const EXTENSION_BUILD_ID = "pg-universal-v3.1";
 
 const DEFAULT_CONFIG = {
   apiBaseUrl: "http://localhost:8080",

@@ -1068,14 +1068,14 @@
     const target = e.target;
     if (!target || !target.closest) return;
 
-    // Support native buttons, links, inputs, AND custom React/Vue div/span buttons across any web app
+    // Support native buttons, links, inputs, AND custom React/Vue div/span Add-to-Cart buttons across any web app
     const btn = target.closest(
-      "button, a, input[type='button'], input[type='submit'], [role='button'], .btn_addtocart, [id*='add-to-cart' i], [class*='add-to-cart' i], [class*='addtocart' i], [class*='buy-now' i], [class*='pdp-button' i]"
+      "button, a, input[type='button'], input[type='submit'], [role='button'], .btn_addtocart, [id*='add-to-cart' i], [class*='add-to-cart' i], [class*='addtocart' i], [class*='pdp-button' i]"
     );
 
     if (!btn) return;
     if (isInsideSlideOutCartDrawer(btn)) return;
-    if (!isAddToCartButton(btn) && !isProductBuyNowCaptureTrigger(btn)) return;
+    if (!isAddToCartButton(btn)) return;
 
     captureCurrentProductFromElement(btn);
   }
@@ -1100,12 +1100,12 @@
     /^\+\s*cart$/i
   ];
 
-  // Patterns for Buy-Now / Pre-Order Buttons on Product Pages (Also unblocked on product pages; triggers Silent Cart Capture before checkout gate!)
+  // Patterns for Direct Instant-Buy / Pay-Now Buttons on Product Pages (Bypasses cart; LOCKED until approved)
   const INSTANT_BUY_PATTERNS = [
     /\bbuy\s+(it\s+)?now\b/i,
-    /\binstant\s+buy\b/i,
-    /\border\s+now\b/i,
-    /\bpre[-\s]?order(\s+now)?\b/i
+    /\bpay\s+now\b/i,
+    /\binstant\s+(buy|checkout|purchase)\b/i,
+    /\b1[-\s]?click\s+(buy|checkout|pay)\b/i
   ];
 
   // Patterns strictly excluded from locking/capture (Wishlists, Demos, Free items, Navigation)
@@ -1237,17 +1237,61 @@
     );
   }
 
-  // On Product Pages, neither Add-to-Cart NOR Buy-Now is locked (both silently capture the product URL & price!).
-  // Only Checkout buttons inside open Slide-Out Cart Drawers or Dedicated Cart/Checkout pages are locked.
-  function isInstantBuyButton() {
-    return false;
+  // Direct Instant-Buy / Pay-Now buttons on Product Pages (Buy Now, Pay Now, 1-Click Buy):
+  // These skip the cart and MUST be LOCKED on product pages, while "Add to Cart" remains 100% UNLOCKED!
+  function isInstantBuyButton(element) {
+    if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
+    if (isDedicatedCartOrCheckoutPage()) return false;
+
+    if (
+      element.closest &&
+      (element.closest("#parentguard-barrier-root, header, nav, footer, #global_header, .demo_above_purchase") ||
+        (element.classList && element.classList.contains("parentguard-in-place-shield")))
+    ) {
+      return false;
+    }
+
+    // Never lock a wrapper container that holds inner <button>/<a>/<input> elements (e.g. a row wrapping both Buy Now and Add to Cart)
+    const tagName = (element.tagName || "").toUpperCase();
+    if (tagName !== "INPUT" && typeof element.querySelectorAll === "function") {
+      const innerButtons = element.querySelectorAll("button, a, input[type='submit'], input[type='button']");
+      if (innerButtons && innerButtons.length > 0) {
+        for (const child of innerButtons) {
+          if (child !== element) return false;
+        }
+      }
+    }
+
+    const sig = extractButtonSignals(element, false);
+    if (!sig) return false;
+
+    if (sig.labels.some((lbl) => PRODUCT_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) {
+      return false;
+    }
+
+    // Never lock if any label or ID indicates Add to Cart / Bag / Basket
+    if (
+      sig.labels.some((lbl) => ADD_TO_CART_PATTERNS.some((rx) => rx.test(lbl))) ||
+      sig.id === "add-to-cart-button" ||
+      sig.nameAttr === "submit.add-to-cart" ||
+      sig.nameAttr === "add" ||
+      sig.nameAttr === "add-to-cart"
+    ) {
+      return false;
+    }
+
+    if (sig.labels.some((lbl) => INSTANT_BUY_PATTERNS.some((rx) => rx.test(lbl)))) {
+      return true;
+    }
+
+    return sig.id === "buy-now-button";
   }
 
   function isProductIngressButton(element) {
     if (isInsideSlideOutCartDrawer(element)) {
       return matchesCheckoutGateSignals(element);
     }
-    return false;
+    return isInstantBuyButton(element);
   }
 
   function matchesProductIngressTextOrAttr(element) {
@@ -1709,8 +1753,8 @@
 
       verifiedDomainApprovals = cryptoVerified;
 
-      // --- CASE 1: On /cart, /checkout, or Slide-Out Cart Drawer -> Fail-Closed Smart Cart Safety Limit + Item Integrity ---
-      if (isDedicatedCartOrCheckoutPage() || interceptedButtons.size > 0) {
+      // --- CASE 1: On /cart or /checkout page -> Fail-Closed Smart Cart Safety Limit + Item Integrity ---
+      if (isDedicatedCartOrCheckoutPage()) {
         const cartTotalObj = extractCartTotal();
         const liveCartTotal = cartTotalObj ? cartTotalObj.amount : 0;
         const liveCartItems = extractLiveCartItems();
@@ -1741,17 +1785,30 @@
         }
         return;
       }
+
+      // --- CASE 2: On Product Pages -> Lock Instant-Buy ("Buy Now" / "Pay Now") & Slide-Out Cart Drawers until approved ---
+      if (interceptedButtons.size === 0) return;
+
+      interceptedButtons.forEach((btn) => {
+        const matchingApproval = cryptoVerified.find((req) =>
+          doesProductButtonMatchApproval(btn, req, window.location.href, document.title)
+        );
+        if (matchingApproval) {
+          unlockButtonWithProof(btn, matchingApproval);
+        } else if (btn.getAttribute("data-parentguard-unlocked") === "true") {
+          relockButton(btn);
+        }
+      });
     } catch (_) {}
   }
 
-  function releaseStaleProductPageLocks() {
-    const lockedEls = document.querySelectorAll(
-      ".parentguard-locked-btn, [data-parentguard-locked='true'], [data-parentguard-intercepted='true']"
-    );
-    for (const button of lockedEls) {
-      if (isInsideSlideOutCartDrawer(button) && matchesCheckoutGateSignals(button)) {
-        continue;
-      }
+  function releaseStaleLockOnAddToCart(button) {
+    if (!button) return;
+    if (
+      button.classList.contains("parentguard-locked-btn") ||
+      button.getAttribute("data-parentguard-locked") === "true" ||
+      button.getAttribute("data-parentguard-intercepted") === "true"
+    ) {
       button.classList.remove("parentguard-locked-btn");
       button.removeAttribute("data-parentguard-locked");
       button.removeAttribute("data-parentguard-intercepted");
@@ -1769,12 +1826,6 @@
       }
       interceptedButtons.delete(button);
     }
-    const staleShields = document.querySelectorAll(".parentguard-in-place-shield");
-    for (const shield of staleShields) {
-      if (!isInsideSlideOutCartDrawer(shield)) {
-        shield.remove();
-      }
-    }
   }
 
   function scanPage() {
@@ -1790,17 +1841,26 @@
       return;
     }
 
-    // On product pages: keep ALL Add-to-Cart & Buy-Now buttons 100% unlocked,
-    // and only gate Checkout buttons inside open Slide-Out Cart Drawers.
-    releaseStaleProductPageLocks();
+    const defaultAmountToBind =
+      extraction && extraction.activePrice
+        ? extraction.activePrice
+        : (extraction && Array.isArray(extraction.options) && extraction.options.length === 1
+            ? extraction.options[0].amount
+            : null);
 
-    const drawerCandidates = document.querySelectorAll(
+    const candidates = document.querySelectorAll(
       "button, a, input[type='submit'], input[type='button'], [role='button']"
     );
     let newlyAdded = false;
-    for (const el of drawerCandidates) {
-      if (isInsideSlideOutCartDrawer(el) && matchesCheckoutGateSignals(el)) {
-        interceptButton(el, null);
+    for (const el of candidates) {
+      if (isAddToCartButton(el)) {
+        // Never lock Add to Cart; clean any stale lock attributes
+        releaseStaleLockOnAddToCart(el);
+        continue;
+      }
+      if (isProductIngressButton(el)) {
+        // Lock Instant-Buy ("Buy Now" / "Pay Now") on product pages & Checkout inside Slide-Out Cart Drawers
+        interceptButton(el, defaultAmountToBind);
         newlyAdded = true;
       }
     }

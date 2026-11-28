@@ -256,7 +256,7 @@ function inferCategoryFromHostname(hostname) {
   return "SHOPPING";
 }
 
-const EXTENSION_BUILD_ID = "pg-universal-v3.0";
+const EXTENSION_BUILD_ID = "pg-universal-v3.1";
 
 function getRootStoreDomain(hostnameOrUrl) {
   let host = String(hostnameOrUrl || "").toLowerCase().trim();
