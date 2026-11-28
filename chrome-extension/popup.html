@@ -130,21 +130,59 @@
         </div>
       </div>
 
-      <!-- Shopping Cart Guidance Card (Shown when popup is opened on /cart instead of a Product Page) -->
-      <div id="cartPageGuidanceCard" class="cart-guidance-card hidden">
-        <span class="cart-guidance-badge">[ SHOPPING CART PAGE ]</span>
-        <h3 class="cart-guidance-title">OPEN THE PRODUCT PAGE TO ASK YOUR PARENT</h3>
-        <p class="cart-guidance-text">
-          So your parent can see the real product link and details, save or request items from their product page—or open your SAVED tab to send a combo request.
-        </p>
-        <div class="dual-action-stack">
-          <button type="button" id="goToSavedFromCartBtn" class="neo-btn neo-btn-secondary full-width">
-            [ OPEN MY SAVED COMBO CART ]
-          </button>
-          <button type="button" id="goToHistoryFromCartBtn" class="neo-btn full-width">
-            [ CHECK SENT REQUESTS ]
-          </button>
+      <!-- Active Shopping Cart Request Card (Shown when popup is opened on /cart) -->
+      <div id="activeCartRequestCard" class="active-cart-card hidden">
+        <div class="cart-manifest-header">
+          <span class="tag-label">[ STORE CART MANIFEST ]</span>
+          <span id="activeCartItemCountTag" class="cart-count-pill">0 ITEMS</span>
         </div>
+
+        <div id="activeCartEmptyNotice" class="empty-state py-8 hidden">
+          <span class="empty-title">NO ITEMS CAPTURED YET</span>
+          <span class="empty-sub">Click "Add to Cart" on store products, or open your SAVED tab to send a combo request.</span>
+        </div>
+
+        <div id="activeCartItemsList" class="active-cart-items-list">
+          <!-- Dynamically populated from cart ledger -->
+        </div>
+
+        <div class="active-cart-total-bar">
+          <span class="cart-total-label">COMBINED CART TOTAL</span>
+          <span id="activeCartTotalAmount" class="cart-total-val">$0.00 USD</span>
+        </div>
+
+        <div class="form-group mb-8px">
+          <label for="cartCategorySelect" class="form-label mb-0">CATEGORY</label>
+          <select id="cartCategorySelect" class="neo-select">
+            <option value="SHOPPING" selected>SHOPPING / RETAIL</option>
+            <option value="GAMING">GAMING</option>
+            <option value="ENTERTAINMENT">ENTERTAINMENT</option>
+            <option value="EDUCATION">EDUCATION / LEARNING</option>
+            <option value="OTHER">OTHER</option>
+          </select>
+        </div>
+
+        <div class="form-group mb-8px">
+          <label for="cartRequestNote" class="form-label mb-0">NOTE FOR PARENT (WHY DO YOU WANT THESE?) *</label>
+          <textarea id="cartRequestNote" class="neo-textarea" rows="2" placeholder="e.g. Can you approve my cart? Needed for school and weekend gaming." required></textarea>
+        </div>
+
+        <div id="cartRequestAlert" class="alert-box hidden"></div>
+
+        <button type="button" id="submitActiveCartBtn" class="neo-btn neo-btn-primary full-width">
+          [ ASK PARENT TO APPROVE CART ]
+        </button>
+      </div>
+
+      <!-- Active Cart Ledger Banner on Product Pages -->
+      <div id="activeCartLedgerBanner" class="cart-ledger-banner hidden">
+        <div class="cart-ledger-info">
+          <span class="cart-ledger-tag">STORE CART</span>
+          <span id="activeCartLedgerCountText" class="cart-ledger-text">0 items captured</span>
+        </div>
+        <button type="button" id="goToStoreCartBtn" class="neo-btn-sm neo-btn-secondary">
+          [ OPEN CART ]
+        </button>
       </div>
 
       <!-- Purchase Request Form -->
@@ -222,7 +260,7 @@
 
         <div class="dual-action-stack">
           <button type="button" id="saveForLaterBtn" class="neo-btn neo-btn-secondary full-width">
-            [ + ADD TO SAVED CART ]
+            [ + SAVE FOR LATER ]
           </button>
           <button type="submit" id="submitRequestBtn" class="neo-btn neo-btn-primary full-width">
             [ ASK PARENT FOR THIS ITEM ]
@@ -245,7 +283,7 @@
     <div id="savedItemsListContainer" class="requests-list saved-combo-list">
       <div class="empty-state">
         <span class="empty-title">YOUR SAVED CART IS EMPTY</span>
-        <span class="empty-sub">Click "+ ADD TO SAVED CART" on any product page to collect items here. You can visit them later or send them all together as one combo request to your parent!</span>
+        <span class="empty-sub">Click "+ SAVE FOR LATER" on any product page to bookmark items for later or send them together as one combo request to your parent!</span>
       </div>
     </div>
 

@@ -143,9 +143,19 @@ const detectedUrlDisplay = document.getElementById("detectedUrlDisplay");
 const optionsCountBadge = document.getElementById("optionsCountBadge");
 const refreshTabBtn = document.getElementById("refreshTabBtn");
 
-const cartPageGuidanceCard = document.getElementById("cartPageGuidanceCard");
-const goToSavedFromCartBtn = document.getElementById("goToSavedFromCartBtn");
-const goToHistoryFromCartBtn = document.getElementById("goToHistoryFromCartBtn");
+const activeCartRequestCard = document.getElementById("activeCartRequestCard");
+const activeCartItemCountTag = document.getElementById("activeCartItemCountTag");
+const activeCartEmptyNotice = document.getElementById("activeCartEmptyNotice");
+const activeCartItemsList = document.getElementById("activeCartItemsList");
+const activeCartTotalAmount = document.getElementById("activeCartTotalAmount");
+const cartCategorySelect = document.getElementById("cartCategorySelect");
+const cartRequestNote = document.getElementById("cartRequestNote");
+const cartRequestAlert = document.getElementById("cartRequestAlert");
+const submitActiveCartBtn = document.getElementById("submitActiveCartBtn");
+
+const activeCartLedgerBanner = document.getElementById("activeCartLedgerBanner");
+const activeCartLedgerCountText = document.getElementById("activeCartLedgerCountText");
+const goToStoreCartBtn = document.getElementById("goToStoreCartBtn");
 
 const productOptionGroup = document.getElementById("productOptionGroup");
 const productOptionSelect = document.getElementById("productOptionSelect");
@@ -297,6 +307,58 @@ function getCanonicalProductUrl(urlString) {
   }
 }
 
+const CART_LEDGER_STORAGE_KEY_PREFIX = "parentguard_cart_ledger";
+
+function getCartLedgerStorageKey() {
+  const emailScope = (childSession.email || "guest").trim().toLowerCase();
+  return `${CART_LEDGER_STORAGE_KEY_PREFIX}_${emailScope}`;
+}
+
+async function loadCartLedger() {
+  try {
+    const key = getCartLedgerStorageKey();
+    const guestKey = `${CART_LEDGER_STORAGE_KEY_PREFIX}_guest`;
+    const res = await chrome.storage.local.get([key, guestKey]);
+    let items = Array.isArray(res[key]) ? res[key] : [];
+
+    // Migrate any recent (< 30 min) guest-captured Add-to-Cart items if user just signed in
+    if (key !== guestKey && Array.isArray(res[guestKey]) && res[guestKey].length > 0) {
+      const now = Date.now();
+      const recentGuest = res[guestKey].filter((g) => !g.addedAt || now - g.addedAt < 30 * 60 * 1000);
+      if (recentGuest.length > 0) {
+        const merged = [...items];
+        recentGuest.forEach((g) => {
+          const exists = merged.some(
+            (m) => m.domain === g.domain && (m.title || "").toLowerCase() === (g.title || "").toLowerCase()
+          );
+          if (!exists) merged.push(g);
+        });
+        items = merged;
+        await chrome.storage.local.set({ [key]: items });
+      }
+      await chrome.storage.local.remove([guestKey]);
+    }
+    return items;
+  } catch (_) {
+    return [];
+  }
+}
+
+async function saveCartLedger(items) {
+  try {
+    const key = getCartLedgerStorageKey();
+    await chrome.storage.local.set({ [key]: items });
+  } catch (_) {}
+}
+
+async function removeCartLedgerItem(id) {
+  try {
+    const all = await loadCartLedger();
+    const filtered = all.filter((i) => i.id !== id);
+    await saveCartLedger(filtered);
+  } catch (_) {}
+}
+
 function getSavedItemsStorageKey() {
   const emailScope = (childSession.email || "guest").trim().toLowerCase();
   return `${SAVED_ITEMS_KEY_PREFIX}_${emailScope}`;
@@ -350,20 +412,13 @@ function setupEventListeners() {
   if (submitComboRequestBtn) {
     submitComboRequestBtn.addEventListener("click", handleComboPurchaseSubmit);
   }
+  if (submitActiveCartBtn) {
+    submitActiveCartBtn.addEventListener("click", handleActiveCartSubmit);
+  }
+  if (goToStoreCartBtn) {
+    goToStoreCartBtn.addEventListener("click", handleGoToStoreCart);
+  }
   refreshRequestsBtn.addEventListener("click", () => fetchMyRequests(true));
-
-  if (goToSavedFromCartBtn) {
-    goToSavedFromCartBtn.addEventListener("click", () => {
-      switchTab("savedItemsView");
-      renderSavedProductsList();
-    });
-  }
-  if (goToHistoryFromCartBtn) {
-    goToHistoryFromCartBtn.addEventListener("click", () => {
-      switchTab("myRequestsView");
-      fetchMyRequests();
-    });
-  }
 
   if (showFormAgainBtn) {
     showFormAgainBtn.addEventListener("click", () => {
@@ -428,9 +483,16 @@ function showLiveApprovalTracker(req) {
     trackerLoaderAnim.classList.add("hidden");
     trackerApprovedIcon.classList.remove("hidden");
     trackerDeniedIcon.classList.add("hidden");
-    trackerHeadline.textContent = "APPROVED — YOU CAN ADD TO CART!";
-    trackerSubtext.textContent =
-      "Your parent approved this request! Add to Cart is now unlocked on the approved product page(s).";
+
+    if (currentTabInfo.isCartOrCheckout || String(req.siteDomain || "").includes("/cart")) {
+      trackerHeadline.textContent = "APPROVED — CHECKOUT IS UNLOCKED!";
+      trackerSubtext.textContent =
+        "Your parent approved your cart! You can now click Continue to Payment / Checkout on the store cart page.";
+    } else {
+      trackerHeadline.textContent = "APPROVED — READY TO CHECKOUT!";
+      trackerSubtext.textContent =
+        "Your parent approved this request! Add this item to your cart or proceed to checkout on the approved product.";
+    }
     trackerAutoSyncTag.textContent = "READY TO BUY";
 
     triggerDirectTabUnlock();
@@ -453,7 +515,9 @@ function showLiveApprovalTracker(req) {
     trackerDeniedIcon.classList.add("hidden");
     trackerHeadline.textContent = "WAITING FOR PARENT APPROVAL...";
     trackerSubtext.textContent =
-      "Sent to your parent! Keep your store tab open — Add to Cart will unlock automatically as soon as they approve.";
+      currentTabInfo.isCartOrCheckout
+        ? "Sent to your parent! Keep this store cart tab open — Checkout will unlock automatically as soon as they approve."
+        : "Sent to your parent! This tracker updates live as soon as your parent responds.";
     trackerAutoSyncTag.textContent = "WAITING FOR RESPONSE";
   }
 }
@@ -505,7 +569,8 @@ async function detectActiveTab(forceRescan = false) {
       detectedUrlDisplay.textContent = "Visit any online store product page to auto-detect item & price.";
       optionsCountBadge.classList.add("hidden");
       productOptionGroup.classList.add("hidden");
-      if (cartPageGuidanceCard) cartPageGuidanceCard.classList.add("hidden");
+      if (activeCartRequestCard) activeCartRequestCard.classList.add("hidden");
+      if (activeCartLedgerBanner) activeCartLedgerBanner.classList.add("hidden");
       purchaseForm.classList.remove("hidden");
       enableManualInputs();
       return;
@@ -551,23 +616,29 @@ async function detectActiveTab(forceRescan = false) {
     if (extraction && typeof extraction.isCartOrCheckout === "boolean") {
       currentTabInfo.isCartOrCheckout = extraction.isCartOrCheckout;
     }
+    if (extraction && extraction.storeCartUrl) {
+      currentTabInfo.storeCartUrl = extraction.storeCartUrl;
+    }
 
     if (currentTabInfo.isCartOrCheckout) {
       currentTabInfo.selectedProductUrl = null;
       currentTabInfo.detectedOptions = [];
       detectedModeLabel.textContent = "SHOPPING CART PAGE";
-      detectedUrlDisplay.textContent = `${currentTabInfo.domain} (Open a product page to save or request)`;
+      detectedUrlDisplay.textContent = currentTabInfo.url || currentTabInfo.domain;
       optionsCountBadge.classList.add("hidden");
       productOptionGroup.classList.add("hidden");
       purchaseForm.classList.add("hidden");
-      if (cartPageGuidanceCard) cartPageGuidanceCard.classList.remove("hidden");
+      const liveTotal = extraction && typeof extraction.cartTotal === "number" ? extraction.cartTotal : null;
+      const liveCur = extraction && extraction.cartCurrency ? extraction.cartCurrency : "USD";
+      await renderActiveCartView(currentTabInfo.domain, liveTotal, liveCur, extraction);
       return;
     }
 
-    if (cartPageGuidanceCard) cartPageGuidanceCard.classList.add("hidden");
+    if (activeCartRequestCard) activeCartRequestCard.classList.add("hidden");
     purchaseForm.classList.remove("hidden");
     detectedModeLabel.textContent = "ACTIVE STORE PAGE";
     detectedUrlDisplay.textContent = canonicalUrl;
+    await updateActiveCartBannerOnProductPage(currentTabInfo.domain);
 
     if (extraction && Array.isArray(extraction.options) && extraction.options.length > 0) {
       currentTabInfo.detectedOptions = extraction.options;
@@ -765,6 +836,341 @@ function enableManualInputs() {
 }
 
 // ============================================================================
+// ACTIVE STORE CART MANIFEST & LEDGER (Silent Add-to-Cart Capture on Product Pages)
+// ============================================================================
+
+let currentActiveCartItems = [];
+let currentActiveCartTotal = 0;
+let currentActiveCartCurrency = "USD";
+
+function doCartTitlesMatch(titleA, titleB) {
+  const norm = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .replace(/['"\u2018\u2019\u201C\u201D]/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const a = norm(titleA);
+  const b = norm(titleB);
+  if (!a || !b) return false;
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+  const wordsA = a.split(" ").filter((w) => w.length >= 3);
+  const wordsB = b.split(" ").filter((w) => w.length >= 3);
+  if (wordsA.length === 0 || wordsB.length === 0) return false;
+  const overlap = wordsA.filter((w) => wordsB.includes(w));
+  return overlap.length >= Math.min(2, Math.min(wordsA.length, wordsB.length));
+}
+
+async function renderActiveCartView(domain, liveCartTotal, liveCurrency, extraction) {
+  const allLedger = await loadCartLedger();
+  const cleanDomain = getCleanDomainLabel(domain).toLowerCase();
+  const isSameDomain = (d) => {
+    const cleanD = getCleanDomainLabel(d || "").toLowerCase();
+    return Boolean(cleanD && cleanDomain && (cleanD.includes(cleanDomain) || cleanDomain.includes(cleanD)));
+  };
+
+  let domainItems = allLedger.filter((i) => isSameDomain(i.domain));
+  const liveRows = extraction && Array.isArray(extraction.cartItems) ? extraction.cartItems : [];
+  const isExplicitEmpty = Boolean(extraction && extraction.isCartEmptyDetected);
+
+  // Two-Source Cart Reconciliation:
+  // 1) If store DOM explicitly reports empty cart or liveCartTotal === 0, prune stale domain ledger entries.
+  // 2) If store DOM exposes live row titles, prune ledger entries removed from the cart and merge uncaptured live rows.
+  if (isExplicitEmpty || (typeof liveCartTotal === "number" && liveCartTotal === 0)) {
+    if (domainItems.length > 0) {
+      await saveCartLedger(allLedger.filter((i) => !isSameDomain(i.domain)));
+    }
+    domainItems = [];
+  } else if (liveRows.length > 0) {
+    const matchedLedger = domainItems.filter((ledgerItem) =>
+      liveRows.some((row) => doCartTitlesMatch(row.title, ledgerItem.title))
+    );
+    const uncapturedLiveRows = liveRows
+      .filter((row) => !matchedLedger.some((m) => doCartTitlesMatch(row.title, m.title)))
+      .map((row, i) => ({
+        id: "live_row_" + Date.now() + "_" + i,
+        title: row.title,
+        amount: row.amount,
+        currency: row.currency || liveCurrency || "USD",
+        productUrl: row.productUrl || null,
+        domain: domain,
+        addedAt: Date.now()
+      }));
+
+    const reconciled = [...matchedLedger, ...uncapturedLiveRows];
+    if (reconciled.length !== domainItems.length) {
+      const otherDomains = allLedger.filter((i) => !isSameDomain(i.domain));
+      await saveCartLedger([...otherDomains, ...reconciled]);
+    }
+    domainItems = reconciled;
+  }
+
+  currentActiveCartItems = domainItems;
+
+  if (activeCartRequestCard) activeCartRequestCard.classList.remove("hidden");
+  if (purchaseForm) purchaseForm.classList.add("hidden");
+  if (activeCartLedgerBanner) activeCartLedgerBanner.classList.add("hidden");
+
+  if (domainItems.length === 0) {
+    if (activeCartEmptyNotice) activeCartEmptyNotice.classList.remove("hidden");
+    if (activeCartItemsList) activeCartItemsList.innerHTML = "";
+    if (activeCartItemCountTag) activeCartItemCountTag.textContent = "0 ITEMS";
+    if (activeCartTotalAmount) activeCartTotalAmount.textContent = "$0.00 USD";
+    if (submitActiveCartBtn) {
+      submitActiveCartBtn.disabled = true;
+      submitActiveCartBtn.style.opacity = "0.5";
+    }
+    return;
+  }
+
+  if (activeCartEmptyNotice) activeCartEmptyNotice.classList.add("hidden");
+  if (submitActiveCartBtn) {
+    submitActiveCartBtn.disabled = false;
+    submitActiveCartBtn.style.opacity = "1";
+  }
+
+  if (activeCartItemCountTag) {
+    activeCartItemCountTag.textContent = `${domainItems.length} ${domainItems.length === 1 ? "ITEM" : "ITEMS"}`;
+  }
+
+  let sum = 0;
+  const cur = liveCurrency || domainItems[0].currency || "USD";
+  currentActiveCartCurrency = cur;
+  domainItems.forEach((i) => {
+    if (typeof i.amount === "number" && !isNaN(i.amount)) {
+      sum += i.amount;
+    }
+  });
+
+  const finalTotal = typeof liveCartTotal === "number" && liveCartTotal > 0 ? liveCartTotal : sum;
+  currentActiveCartTotal = finalTotal;
+
+  const sym = CURRENCY_SYMBOLS[cur] || (cur + " ");
+  if (activeCartTotalAmount) {
+    activeCartTotalAmount.textContent = `${sym}${finalTotal.toFixed(2)} ${cur}`;
+  }
+
+  if (cartCategorySelect) {
+    cartCategorySelect.value = inferCategoryFromHostname(domain);
+  }
+
+  if (activeCartItemsList) {
+    activeCartItemsList.innerHTML = "";
+    domainItems.forEach((item, idx) => {
+      const row = document.createElement("div");
+      row.className = "active-cart-item-row";
+
+      const info = document.createElement("div");
+      info.className = "active-cart-item-info";
+
+      const titleEl = document.createElement("span");
+      titleEl.className = "active-cart-item-title";
+      titleEl.textContent = `${idx + 1}. ${item.title}`;
+
+      const metaEl = document.createElement("div");
+      metaEl.className = "active-cart-item-meta";
+
+      if (item.productUrl) {
+        const linkEl = document.createElement("a");
+        linkEl.className = "active-cart-item-link";
+        linkEl.textContent = "VIEW PRODUCT PAGE \u2197";
+        linkEl.href = item.productUrl;
+        linkEl.target = "_blank";
+        metaEl.appendChild(linkEl);
+      }
+
+      info.appendChild(titleEl);
+      info.appendChild(metaEl);
+
+      const priceEl = document.createElement("span");
+      priceEl.className = "active-cart-item-price";
+      const pSym = CURRENCY_SYMBOLS[item.currency] || "$";
+      priceEl.textContent = item.amount ? `${pSym}${Number(item.amount).toFixed(2)}` : "--";
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "active-cart-remove-btn";
+      delBtn.textContent = "[ \u2715 ]";
+      delBtn.title = "Remove item from cart list";
+      delBtn.addEventListener("click", async () => {
+        await removeCartLedgerItem(item.id);
+        await renderActiveCartView(domain, liveCartTotal, liveCurrency, extraction);
+      });
+
+      row.appendChild(info);
+      row.appendChild(priceEl);
+      row.appendChild(delBtn);
+      activeCartItemsList.appendChild(row);
+    });
+  }
+}
+
+async function updateActiveCartBannerOnProductPage(domain) {
+  const allLedger = await loadCartLedger();
+  const cleanDomain = getCleanDomainLabel(domain).toLowerCase();
+  const domainItems = allLedger.filter((i) => {
+    const d = getCleanDomainLabel(i.domain || "").toLowerCase();
+    return d.includes(cleanDomain) || cleanDomain.includes(d);
+  });
+
+  if (domainItems.length > 0 && activeCartLedgerBanner) {
+    let sum = 0;
+    const cur = domainItems[0].currency || "USD";
+    domainItems.forEach((i) => {
+      if (typeof i.amount === "number" && !isNaN(i.amount)) sum += i.amount;
+    });
+    const sym = CURRENCY_SYMBOLS[cur] || "$";
+    if (activeCartLedgerCountText) {
+      activeCartLedgerCountText.textContent = `${domainItems.length} ${domainItems.length === 1 ? "item" : "items"} captured in store cart (${sym}${sum.toFixed(2)})`;
+    }
+    activeCartLedgerBanner.classList.remove("hidden");
+  } else if (activeCartLedgerBanner) {
+    activeCartLedgerBanner.classList.add("hidden");
+  }
+}
+
+async function handleGoToStoreCart() {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs && tabs[0] && tabs[0].id) {
+      let cartUrl = currentTabInfo.storeCartUrl || `https://${currentTabInfo.domain}/cart`;
+      if (!currentTabInfo.storeCartUrl) {
+        if (currentTabInfo.domain.includes("steampowered.com")) {
+          cartUrl = "https://store.steampowered.com/cart";
+        } else if (currentTabInfo.domain.includes("amazon.")) {
+          cartUrl = `https://${currentTabInfo.domain}/gp/cart/view.html`;
+        }
+      }
+      chrome.tabs.update(tabs[0].id, { url: cartUrl });
+      window.close();
+    }
+  } catch (_) {}
+}
+
+function showActiveCartAlert(msg, type = "error") {
+  if (!cartRequestAlert) return;
+  cartRequestAlert.textContent = msg;
+  cartRequestAlert.className = `alert-box alert-${type}`;
+  cartRequestAlert.classList.remove("hidden");
+}
+
+async function handleActiveCartSubmit() {
+  if (cartRequestAlert) cartRequestAlert.classList.add("hidden");
+
+  if (!childSession.token) {
+    showActiveCartAlert("Please sign in to send a cart request to your parent.", "error");
+    return;
+  }
+
+  if (!currentActiveCartItems || currentActiveCartItems.length === 0) {
+    showActiveCartAlert("Your cart list has no items captured. Please visit product pages and click Add to Cart first.", "error");
+    return;
+  }
+
+  const note = (cartRequestNote ? cartRequestNote.value : "").trim();
+  if (!note) {
+    showActiveCartAlert("Please enter a short note for your parent explaining why you want to buy these items.", "error");
+    if (cartRequestNote) cartRequestNote.focus();
+    return;
+  }
+
+  submitActiveCartBtn.disabled = true;
+  submitActiveCartBtn.textContent = "SENDING CART TO PARENT...";
+
+  try {
+    const comboTitle =
+      currentActiveCartItems.length === 1
+        ? currentActiveCartItems[0].title
+        : currentActiveCartItems
+            .map((item) => {
+              const sym = CURRENCY_SYMBOLS[item.currency] || "$";
+              const amtStr = typeof item.amount === "number" ? ` (${sym}${item.amount.toFixed(2)})` : "";
+              return `${item.title}${amtStr}`;
+            })
+            .join(" + ");
+
+    const links = currentActiveCartItems.map((i) => i.productUrl).filter(Boolean);
+    const enrichedNote = links.length > 0
+      ? `${note}\n[CART_LINKS]${links.join("|")}[/CART_LINKS]`
+      : note;
+
+    let primarySiteTarget = currentTabInfo.url || currentTabInfo.domain || "online-store";
+    if (primarySiteTarget.length > 250) {
+      try {
+        primarySiteTarget = new URL(primarySiteTarget).origin;
+      } catch (_) {
+        primarySiteTarget = currentTabInfo.domain;
+      }
+    }
+
+    const category = (cartCategorySelect ? cartCategorySelect.value : null) || inferCategoryFromHostname(currentTabInfo.domain);
+    const totalAmount = currentActiveCartTotal > 0
+      ? currentActiveCartTotal
+      : currentActiveCartItems.reduce((acc, i) => acc + (i.amount || 0), 0);
+
+    const idempotencyRaw = `${childSession.email || "child"}:${primarySiteTarget}:${comboTitle.toLowerCase()}:${Number(totalAmount).toFixed(2)}:${currentActiveCartCurrency}`;
+    const idempotencyKey = await computeSha256(idempotencyRaw);
+
+    const payload = {
+      siteDomain: primarySiteTarget,
+      itemName: comboTitle,
+      amount: Number(Number(totalAmount).toFixed(2)),
+      currency: currentActiveCartCurrency,
+      category: category,
+      note: enrichedNote
+    };
+
+    const response = await fetch(`${CONFIG.apiBaseUrl}/purchase-requests`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${childSession.token}`,
+        "X-Idempotency-Key": idempotencyKey
+      },
+      body: JSON.stringify(payload)
+    });
+
+    let result = {};
+    const rawText = await response.text();
+    if (rawText) {
+      try {
+        result = JSON.parse(rawText);
+      } catch (_) {
+        result = { message: rawText };
+      }
+    }
+
+    if (response.status === 201 || response.status === 200 || response.status === 409) {
+      if (cartRequestNote) cartRequestNote.value = "";
+      userDismissedTrackerForForm = false;
+      const submittedReq = (result && result.id) ? result : {
+        id: result.id || null,
+        itemName: comboTitle,
+        amount: payload.amount,
+        currency: payload.currency,
+        siteDomain: primarySiteTarget,
+        status: "PENDING"
+      };
+      showLiveApprovalTracker(submittedReq);
+      fetchMyRequests();
+    } else if (response.status === 401 || response.status === 403) {
+      showActiveCartAlert(result.message || "Your session has expired. Please sign in again.", "error");
+      if (response.status === 401) {
+        handleLogout();
+      }
+    } else {
+      showActiveCartAlert(result.message || "Could not send cart request right now. Please try again.", "error");
+    }
+  } catch (err) {
+    console.error("[Centinel Fin AI] Active cart submit error:", err);
+    showActiveCartAlert("Unable to reach ParentGuard service. Please try again in a moment.", "error");
+  } finally {
+    submitActiveCartBtn.disabled = false;
+    submitActiveCartBtn.textContent = "[ ASK PARENT TO APPROVE CART ]";
+  }
+}
+
+// ============================================================================
 // SMART SAVED COMBO CART (Save Product URLs & Combine Multiple Items into One Parent Request)
 // ============================================================================
 
@@ -866,7 +1272,7 @@ async function handleSaveForLater() {
   }
 
   if (!amountStr) {
-    showAlert("Could not auto-detect the price on this page. Please enter the product price in the PRICE box above, then click Add to Saved Cart.", "error");
+    showAlert("Could not auto-detect the price on this page. Please enter the product price in the PRICE box above, then click Save for Later.", "error");
     amountInput.focus();
     return;
   }
@@ -1209,7 +1615,7 @@ function renderSavedProductsList() {
     savedItemsListContainer.innerHTML = `
       <div class="empty-state">
         <span class="empty-title">YOUR SAVED CART IS EMPTY</span>
-        <span class="empty-sub">Click "+ ADD TO SAVED CART" on any product page to collect items here. You can visit them later or send them all together as one combo request to your parent!</span>
+        <span class="empty-sub">Click "+ SAVE FOR LATER" on any product page to bookmark items for later or send them together as one combo request to your parent!</span>
       </div>
     `;
     updateSavedComboCheckoutSummary();
@@ -1536,7 +1942,7 @@ async function fetchMyRequests(manualRefresh = false) {
 }
 
 function syncLiveTrackerWithRequests(requests) {
-  if (!Array.isArray(requests) || requests.length === 0 || currentTabInfo.isCartOrCheckout) return;
+  if (!Array.isArray(requests) || requests.length === 0) return;
 
   const sortedRequests = [...requests].sort((a, b) => (b.id || 0) - (a.id || 0));
 
@@ -1549,6 +1955,25 @@ function syncLiveTrackerWithRequests(requests) {
   }
 
   if (userDismissedTrackerForForm) return;
+
+  // On /cart pages, sync live status with any active PENDING or recent APPROVED request for this store & total
+  if (currentTabInfo.isCartOrCheckout) {
+    const cleanCartDomain = getCleanDomainLabel(currentTabInfo.domain || "").toLowerCase();
+    const matchingCartReq = sortedRequests.find((r) => {
+      if (r.status !== "PENDING" && r.status !== "APPROVED") return false;
+      const reqDomain = getCleanDomainLabel(r.siteDomain || "").toLowerCase();
+      const domainMatches = cleanCartDomain && reqDomain && (reqDomain.includes(cleanCartDomain) || cleanCartDomain.includes(reqDomain));
+      if (!domainMatches) return false;
+      if (currentActiveCartTotal > 0) {
+        return Math.abs(Number(r.amount) - currentActiveCartTotal) < 0.05;
+      }
+      return String(r.siteDomain || "").toLowerCase().includes("/cart");
+    });
+    if (matchingCartReq) {
+      showLiveApprovalTracker(matchingCartReq);
+    }
+    return;
+  }
 
   const currentUrlClean = getCanonicalProductUrl(currentTabInfo.url || "").toLowerCase();
   const currentTitleClean = (itemNameInput.value || currentTabInfo.title || "").trim().toLowerCase();
