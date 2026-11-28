@@ -1,14 +1,13 @@
 /**
  * Centinel Fin AI – ParentGuard
- * Child Extension Popup Controller (Smart Cart Manifest & 4-Layer Anti-Tamper Edition)
+ * Child Extension Popup Controller (Product-Page Lock & Smart Saved Combo Cart)
  *
  * Responsibilities:
  * - Authenticate child via Supabase Auth
- * - Align exclusively with Shopping Cart / Checkout pages (zero product dropdowns)
- * - Render live itemized Shopping Cart Manifest receipt (all items, discounts, quantities, and verified cart total)
- * - Detect post-approval cart tampering (added items or equal-price item swaps) and require fresh approval
- * - Submit cart requests with SHA-256 manifest idempotency hashes to Spring Boot
- * - Verify parent RSA-2048 signatures and coordinate live cart auto-unlock
+ * - Auto-detect active product page (canonical product URL preserving variant/item IDs, editions, live prices, .lk LKR support)
+ * - Allow child to save products into the SAVED COMBO CART tab and either visit them later, request a single item,
+ *   or combine multiple saved items into ONE Combo Request with all itemized prices and direct product URLs
+ * - Track live parent approval status and unlock approved single or combo items on their respective product pages
  */
 
 const CONFIG = {
@@ -16,6 +15,52 @@ const CONFIG = {
   supabaseAuthUrl: "https://bllntgtyksncfahhdxga.supabase.co/auth/v1/token?grant_type=password",
   supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsbG50Z3R5a3NuY2ZhaGhkeGdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0ODY4NjIsImV4cCI6MjEwMzA2Mjg2Mn0.OdpZ7VfSTgbIfAyzPfFnhv_JOY5rrT9CqVuMXhLTpM0"
 };
+
+const SAVED_ITEMS_KEY_PREFIX = "parentguard_saved_items";
+
+// Tracking query parameters to strip while preserving product/variant IDs (?item=, ?variant=, ?id=, ?sku=)
+const TRACKING_QUERY_PARAMS = new Set([
+  "snr",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "utm_id",
+  "fbclid",
+  "gclid",
+  "dclid",
+  "msclkid",
+  "twclid",
+  "ref",
+  "ref_",
+  "pf_rd_p",
+  "pf_rd_r",
+  "pf_rd_s",
+  "pf_rd_t",
+  "pf_rd_i",
+  "pf_rd_m",
+  "pd_rd_w",
+  "pd_rd_wg",
+  "pd_rd_r",
+  "pd_rd_i",
+  "psc",
+  "qid",
+  "sr",
+  "keywords",
+  "crid",
+  "sprefix",
+  "dib",
+  "dib_tag",
+  "_trkparms",
+  "_trksid",
+  "hash",
+  "mkcid",
+  "mkrid",
+  "campid",
+  "toolid",
+  "customid"
+]);
 
 const CURRENCY_SYMBOLS = {
   USD: "$",
@@ -42,16 +87,18 @@ let currentTabInfo = {
   domain: "",
   title: "",
   isCartOrCheckout: false,
-  cartManifest: null,
-  selectedProductUrl: null
+  detectedOptions: [],
+  selectedProductUrl: null,
+  selectedDiscountPct: null,
+  selectedOriginalPrice: null
 };
 let childSession = {
   token: null,
   email: null
 };
+let savedProductsList = [];
 let activeTrackedRequestId = null;
 let userDismissedTrackerForForm = false;
-let manualFallbackActive = false;
 let livePollInterval = null;
 
 // DOM Elements
@@ -67,9 +114,12 @@ const loginErrorMsg = document.getElementById("loginErrorMsg");
 
 const appNav = document.getElementById("appNav");
 const tabNewRequest = document.getElementById("tabNewRequest");
+const tabSavedItems = document.getElementById("tabSavedItems");
 const tabMyRequests = document.getElementById("tabMyRequests");
+const savedCountBadge = document.getElementById("savedCountBadge");
 const requestCountBadge = document.getElementById("requestCountBadge");
 const newRequestView = document.getElementById("newRequestView");
+const savedItemsView = document.getElementById("savedItemsView");
 const myRequestsView = document.getElementById("myRequestsView");
 
 const liveApprovalTracker = document.getElementById("liveApprovalTracker");
@@ -90,21 +140,19 @@ const showFormAgainBtn = document.getElementById("showFormAgainBtn");
 const detectedModeLabel = document.getElementById("detectedModeLabel");
 const detectedDomainDisplay = document.getElementById("detectedDomainDisplay");
 const detectedUrlDisplay = document.getElementById("detectedUrlDisplay");
-const cartItemCountBadge = document.getElementById("cartItemCountBadge");
+const optionsCountBadge = document.getElementById("optionsCountBadge");
 const refreshTabBtn = document.getElementById("refreshTabBtn");
 
-const cartTamperAlert = document.getElementById("cartTamperAlert");
-const cartTamperText = document.getElementById("cartTamperText");
+const cartPageGuidanceCard = document.getElementById("cartPageGuidanceCard");
+const goToSavedFromCartBtn = document.getElementById("goToSavedFromCartBtn");
+const goToHistoryFromCartBtn = document.getElementById("goToHistoryFromCartBtn");
 
-const browsingModeCard = document.getElementById("browsingModeCard");
-const browsingModeTag = document.getElementById("browsingModeTag");
-const browsingModeHeadline = document.getElementById("browsingModeHeadline");
-const browsingModeSubtext = document.getElementById("browsingModeSubtext");
-const manualCheckoutFallbackBtn = document.getElementById("manualCheckoutFallbackBtn");
-
-const cartManifestCard = document.getElementById("cartManifestCard");
-const cartItemsList = document.getElementById("cartItemsList");
-const manifestTotalValue = document.getElementById("manifestTotalValue");
+const productOptionGroup = document.getElementById("productOptionGroup");
+const productOptionSelect = document.getElementById("productOptionSelect");
+const priceVerifiedTag = document.getElementById("priceVerifiedTag");
+const selectedOptionDiscountBar = document.getElementById("selectedOptionDiscountBar");
+const discountPctBadge = document.getElementById("discountPctBadge");
+const discountContextText = document.getElementById("discountContextText");
 
 const purchaseForm = document.getElementById("purchaseForm");
 const itemNameInput = document.getElementById("itemNameInput");
@@ -116,11 +164,37 @@ const currencySelect = document.getElementById("currencySelect");
 const currencyLockStatus = document.getElementById("currencyLockStatus");
 const categorySelect = document.getElementById("categorySelect");
 const reasonInput = document.getElementById("reasonInput");
+const saveForLaterBtn = document.getElementById("saveForLaterBtn");
 const submitRequestBtn = document.getElementById("submitRequestBtn");
 const submissionAlert = document.getElementById("submissionAlert");
 
+const savedItemsListContainer = document.getElementById("savedItemsListContainer");
+const selectAllSavedBtn = document.getElementById("selectAllSavedBtn");
+const clearSavedItemsBtn = document.getElementById("clearSavedItemsBtn");
+const savedComboCheckoutBox = document.getElementById("savedComboCheckoutBox");
+const comboSelectedCountLabel = document.getElementById("comboSelectedCountLabel");
+const comboTotalBadge = document.getElementById("comboTotalBadge");
+const comboPreviewTitleBox = document.getElementById("comboPreviewTitleBox");
+const comboReasonInput = document.getElementById("comboReasonInput");
+const comboSubmissionAlert = document.getElementById("comboSubmissionAlert");
+const submitComboRequestBtn = document.getElementById("submitComboRequestBtn");
+
 const requestsListContainer = document.getElementById("requestsListContainer");
 const refreshRequestsBtn = document.getElementById("refreshRequestsBtn");
+
+// Helper: Infer regional currency from country TLD (.lk -> LKR, .uk -> GBP, etc.)
+function inferTldCurrency(hostname) {
+  const h = (hostname || "").toLowerCase().trim();
+  if (h.endsWith(".lk")) return "LKR";
+  if (h.endsWith(".uk") || h.endsWith(".co.uk")) return "GBP";
+  if (h.endsWith(".in") || h.endsWith(".co.in")) return "INR";
+  if (h.endsWith(".au") || h.endsWith(".com.au")) return "AUD";
+  if (h.endsWith(".ca")) return "CAD";
+  if (h.endsWith(".sg") || h.endsWith(".com.sg")) return "SGD";
+  if (h.endsWith(".jp") || h.endsWith(".co.jp")) return "JPY";
+  if (/\.(de|fr|it|es|nl|be|at|ie|pt|fi|eu)$/.test(h)) return "EUR";
+  return null;
+}
 
 // Helper: Infer category from store hostname
 function inferCategoryFromHostname(hostname) {
@@ -170,14 +244,12 @@ function inferCategoryFromHostname(hostname) {
   return "SHOPPING";
 }
 
-// Helper: Check if URL is a dedicated Shopping Cart or Checkout page
 function isCartOrCheckoutUrl(urlString) {
   if (!urlString) return false;
   try {
     const parsed = new URL(urlString);
     const pathname = (parsed.pathname || "").toLowerCase();
     const search = (parsed.search || "").toLowerCase();
-
     if (
       /\/app\/\d+/i.test(pathname) ||
       /\/dp\/[a-z0-9]+/i.test(pathname) ||
@@ -187,7 +259,6 @@ function isCartOrCheckoutUrl(urlString) {
     ) {
       return false;
     }
-
     if (/\/(cart|shopping-cart|viewcart|basket|bag|checkout|checkouts|onepagecheckout)(\/|$)/i.test(pathname)) {
       return true;
     }
@@ -198,90 +269,45 @@ function isCartOrCheckoutUrl(urlString) {
   return false;
 }
 
-// Helper: Normalize item title for anti-tamper manifest comparison
-function normalizeManifestTitle(raw) {
-  return String(raw || "")
-    .replace(/\s+/g, " ")
-    .replace(/^Save\s+\d+%\s+on\s+/i, "")
-    .replace(/\s+on\s+Steam$/i, "")
-    .replace(/\(\s*[$€£₹RsA-Z.\s]*\d+[.,]\d{2}\s*\)\s*$/i, "")
-    .replace(/\[\s*\d+\s*items?\s*\]\s*$/i, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+function getCanonicalProductUrl(urlString) {
+  if (!urlString) return "";
+  try {
+    const withScheme = /^https?:\/\//i.test(urlString) ? urlString : `https://${urlString}`;
+    const parsed = new URL(withScheme);
+    const cleanPath = parsed.pathname.replace(/\/+$/, "");
+
+    const keptParams = [];
+    parsed.searchParams.forEach((val, key) => {
+      const lowerKey = key.toLowerCase();
+      if (
+        TRACKING_QUERY_PARAMS.has(lowerKey) ||
+        lowerKey.startsWith("utm_") ||
+        lowerKey.startsWith("pf_rd_") ||
+        lowerKey.startsWith("pd_rd_")
+      ) {
+        return;
+      }
+      keptParams.push(`${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
+    });
+
+    const queryStr = keptParams.length > 0 ? `?${keptParams.join("&")}` : "";
+    return `${parsed.origin}${cleanPath || ""}${queryStr}`;
+  } catch (_) {
+    return urlString;
+  }
 }
 
-/**
- * Verify if a live Cart Manifest matches an existing Request (Amount + Currency + Item Titles)
- */
-function doesCartManifestMatchRequest(liveManifest, req) {
-  if (!liveManifest || !req) return { match: false, reason: "MISSING_DATA" };
-
-  const reqAmount = Number(req.amount);
-  if (isNaN(reqAmount) || Math.abs(liveManifest.totalAmount - reqAmount) >= 0.02) {
-    return {
-      match: false,
-      reason: "AMOUNT_MISMATCH",
-      liveAmount: liveManifest.totalAmount,
-      approvedAmount: reqAmount
-    };
-  }
-
-  if (
-    liveManifest.currency &&
-    req.currency &&
-    liveManifest.currency.toUpperCase() !== req.currency.toUpperCase()
-  ) {
-    return { match: false, reason: "CURRENCY_MISMATCH" };
-  }
-
-  const rawApprovedName = String(req.itemName || "").trim();
-  if (rawApprovedName && Array.isArray(liveManifest.items) && liveManifest.items.length > 0) {
-    const hasTruncatedTail = /\+\s*\d+\s+more\s+items$/i.test(rawApprovedName);
-    const cleanedTail = rawApprovedName.replace(/\s*\+\s*\d+\s+more\s+items$/i, "");
-    const approvedSegments = cleanedTail
-      .split(/\s+\+\s+/)
-      .map((seg) => normalizeManifestTitle(seg.replace(/\s+x\d+\b/i, "")))
-      .filter((s) => s.length > 0 && s !== "shopping cart order");
-
-    if (approvedSegments.length > 0) {
-      if (!hasTruncatedTail && liveManifest.items.length !== approvedSegments.length) {
-        return { match: false, reason: "ITEM_COUNT_MISMATCH" };
-      }
-
-      const remainingApproved = [...approvedSegments];
-      for (const liveItem of liveManifest.items) {
-        const liveNorm = normalizeManifestTitle(liveItem.title);
-        if (!liveNorm) continue;
-
-        const matchIdx = remainingApproved.findIndex(
-          (appTitle) =>
-            appTitle === liveNorm ||
-            (appTitle.length >= 5 && liveNorm.includes(appTitle)) ||
-            (liveNorm.length >= 5 && appTitle.includes(liveNorm))
-        );
-
-        if (matchIdx !== -1) {
-          remainingApproved.splice(matchIdx, 1);
-        } else if (!hasTruncatedTail) {
-          return {
-            match: false,
-            reason: "UNAPPROVED_ITEM_SWAP",
-            unapprovedItem: liveItem.title
-          };
-        }
-      }
-    }
-  }
-
-  return { match: true, reason: "MATCH" };
+function getSavedItemsStorageKey() {
+  const emailScope = (childSession.email || "guest").trim().toLowerCase();
+  return `${SAVED_ITEMS_KEY_PREFIX}_${emailScope}`;
 }
 
 // Initialize on DOM load
 document.addEventListener("DOMContentLoaded", async () => {
   setupEventListeners();
-  await detectActiveTab();
   await loadAuthState();
+  await loadSavedProducts();
+  await detectActiveTab();
   startLivePolling();
 
   try {
@@ -300,33 +326,44 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function startLivePolling() {
   if (livePollInterval) clearInterval(livePollInterval);
-  livePollInterval = setInterval(async () => {
+  livePollInterval = setInterval(() => {
     if (childSession.token) {
-      await detectActiveTab(false);
-      await fetchMyRequests(false);
+      fetchMyRequests(false);
     }
-  }, 2500);
+  }, 3000);
 }
 
 // Event Listeners
 function setupEventListeners() {
-  const devReloadBtn = document.getElementById("devReloadBtn");
-  if (devReloadBtn) {
-    devReloadBtn.addEventListener("click", () => {
-      chrome.runtime.reload();
-      window.close();
-    });
-  }
-
   loginForm.addEventListener("submit", handleLogin);
   logoutBtn.addEventListener("click", handleLogout);
-  refreshTabBtn.addEventListener("click", async () => {
+  refreshTabBtn.addEventListener("click", () => {
     userDismissedTrackerForForm = false;
-    await detectActiveTab(true);
-    await fetchMyRequests(false);
+    detectActiveTab(true);
   });
   purchaseForm.addEventListener("submit", handlePurchaseSubmit);
+  saveForLaterBtn.addEventListener("click", handleSaveForLater);
+  clearSavedItemsBtn.addEventListener("click", handleClearAllSavedItems);
+  if (selectAllSavedBtn) {
+    selectAllSavedBtn.addEventListener("click", handleToggleSelectAllSaved);
+  }
+  if (submitComboRequestBtn) {
+    submitComboRequestBtn.addEventListener("click", handleComboPurchaseSubmit);
+  }
   refreshRequestsBtn.addEventListener("click", () => fetchMyRequests(true));
+
+  if (goToSavedFromCartBtn) {
+    goToSavedFromCartBtn.addEventListener("click", () => {
+      switchTab("savedItemsView");
+      renderSavedProductsList();
+    });
+  }
+  if (goToHistoryFromCartBtn) {
+    goToHistoryFromCartBtn.addEventListener("click", () => {
+      switchTab("myRequestsView");
+      fetchMyRequests();
+    });
+  }
 
   if (showFormAgainBtn) {
     showFormAgainBtn.addEventListener("click", () => {
@@ -336,26 +373,33 @@ function setupEventListeners() {
     });
   }
 
-  if (manualCheckoutFallbackBtn) {
-    manualCheckoutFallbackBtn.addEventListener("click", () => {
-      manualFallbackActive = true;
-      browsingModeCard.classList.add("hidden");
-      cartManifestCard.classList.add("hidden");
-      purchaseForm.classList.remove("hidden");
-      enableManualInputs();
-      itemNameInput.focus();
-    });
-  }
+  productOptionSelect.addEventListener("change", (e) => {
+    applySelectedOption(e.target.value);
+  });
 
   currencySelect.addEventListener("change", () => {
     updateCurrencySymbol(currencySelect.value);
   });
 
   tabNewRequest.addEventListener("click", () => switchTab("newRequestView"));
+  tabSavedItems.addEventListener("click", () => {
+    switchTab("savedItemsView");
+    renderSavedProductsList();
+  });
   tabMyRequests.addEventListener("click", () => {
     switchTab("myRequestsView");
     fetchMyRequests();
   });
+}
+
+function switchTab(viewId) {
+  tabNewRequest.classList.toggle("active", viewId === "newRequestView");
+  tabSavedItems.classList.toggle("active", viewId === "savedItemsView");
+  tabMyRequests.classList.toggle("active", viewId === "myRequestsView");
+
+  newRequestView.classList.toggle("hidden", viewId !== "newRequestView");
+  savedItemsView.classList.toggle("hidden", viewId !== "savedItemsView");
+  myRequestsView.classList.toggle("hidden", viewId !== "myRequestsView");
 }
 
 function showLiveApprovalTracker(req) {
@@ -370,7 +414,7 @@ function showLiveApprovalTracker(req) {
   const cleanDomain = getCleanDomainLabel(req.siteDomain || currentTabInfo.domain);
 
   trackerRequestId.textContent = req.id ? `REQ #${req.id}` : "SENT JUST NOW";
-  trackerItemTitle.textContent = req.itemName || itemNameInput.value || "Shopping Cart Order";
+  trackerItemTitle.textContent = req.itemName || itemNameInput.value || "Selected Product";
   trackerItemAmount.textContent = formattedAmount;
   trackerItemDomain.textContent = cleanDomain;
 
@@ -384,10 +428,10 @@ function showLiveApprovalTracker(req) {
     trackerLoaderAnim.classList.add("hidden");
     trackerApprovedIcon.classList.remove("hidden");
     trackerDeniedIcon.classList.add("hidden");
-    trackerHeadline.textContent = "CART APPROVED — READY TO PAY!";
+    trackerHeadline.textContent = "APPROVED — YOU CAN ADD TO CART!";
     trackerSubtext.textContent =
-      "Your parent approved this exact cart manifest! Continue to Payment is unlocked. Adding or swapping items will re-lock checkout.";
-    trackerAutoSyncTag.textContent = "CHECKOUT UNLOCKED";
+      "Your parent approved this request! Add to Cart is now unlocked on the approved product page(s).";
+    trackerAutoSyncTag.textContent = "READY TO BUY";
 
     triggerDirectTabUnlock();
   } else if (req.status === "DENIED") {
@@ -397,10 +441,10 @@ function showLiveApprovalTracker(req) {
     trackerLoaderAnim.classList.add("hidden");
     trackerApprovedIcon.classList.add("hidden");
     trackerDeniedIcon.classList.remove("hidden");
-    trackerHeadline.textContent = "CART REQUEST DECLINED";
+    trackerHeadline.textContent = "REQUEST NOT APPROVED";
     trackerSubtext.textContent =
-      "Your parent declined this cart. You can remove items in your cart and submit a revised cart request below.";
-    trackerAutoSyncTag.textContent = "PAYMENT GATE LOCKED";
+      "Your parent declined this request. You can talk with your parent or choose a different item below.";
+    trackerAutoSyncTag.textContent = "REMAINS LOCKED";
   } else {
     trackerStatusBadge.classList.add("pending");
     trackerStatusBadge.textContent = "[ WAITING FOR PARENT ]";
@@ -409,8 +453,8 @@ function showLiveApprovalTracker(req) {
     trackerDeniedIcon.classList.add("hidden");
     trackerHeadline.textContent = "WAITING FOR PARENT APPROVAL...";
     trackerSubtext.textContent =
-      "Cart details sent to your parent! Keep your cart open — Continue to Payment will unlock automatically once approved.";
-    trackerAutoSyncTag.textContent = "CHECKING APPROVAL...";
+      "Sent to your parent! Keep your store tab open — Add to Cart will unlock automatically as soon as they approve.";
+    trackerAutoSyncTag.textContent = "WAITING FOR RESPONSE";
   }
 }
 
@@ -427,9 +471,7 @@ async function triggerDirectTabUnlock() {
     chrome.tabs.sendMessage(tabs[0].id, {
       type: "VERIFY_AND_UNLOCK_TAB"
     }).catch(() => {});
-  } catch (err) {
-    console.debug("[Centinel Fin AI] Tab unlock message skipped:", err);
-  }
+  } catch (_) {}
 }
 
 function updateCurrencySymbol(currencyCode) {
@@ -438,22 +480,8 @@ function updateCurrencySymbol(currencyCode) {
   }
 }
 
-function switchTab(viewId) {
-  if (viewId === "newRequestView") {
-    tabNewRequest.classList.add("active");
-    tabMyRequests.classList.remove("active");
-    newRequestView.classList.remove("hidden");
-    myRequestsView.classList.add("hidden");
-  } else {
-    tabMyRequests.classList.add("active");
-    tabNewRequest.classList.remove("active");
-    myRequestsView.classList.remove("hidden");
-    newRequestView.classList.add("hidden");
-  }
-}
-
 /**
- * Inspect active tab and render either the Live Cart Manifest Receipt or Free Browsing Guidance
+ * Inspect active browser tab and extract product editions, live prices, and canonical URL
  */
 async function detectActiveTab(forceRescan = false) {
   try {
@@ -469,24 +497,53 @@ async function detectActiveTab(forceRescan = false) {
         domain: "",
         title: "",
         isCartOrCheckout: false,
-        cartManifest: null,
+        detectedOptions: [],
         selectedProductUrl: null
       };
-      detectedModeLabel.textContent = "NO STORE ACTIVE";
-      detectedDomainDisplay.textContent = "BROWSER TAB";
-      detectedUrlDisplay.textContent = "Open any online store and add items to your cart.";
-      cartItemCountBadge.classList.add("hidden");
-      showBrowsingGuidanceState(false, "OPEN AN ONLINE STORE", "Browse any online store, add items to your cart, and open your Shopping Cart page to request approval.");
+      detectedModeLabel.textContent = "NO STORE PAGE ACTIVE";
+      detectedDomainDisplay.textContent = "OPEN A STORE PRODUCT";
+      detectedUrlDisplay.textContent = "Visit any online store product page to auto-detect item & price.";
+      optionsCountBadge.classList.add("hidden");
+      productOptionGroup.classList.add("hidden");
+      if (cartPageGuidanceCard) cartPageGuidanceCard.classList.add("hidden");
+      purchaseForm.classList.remove("hidden");
+      enableManualInputs();
       return;
     }
 
     const parsedUrl = new URL(urlString);
-    currentTabInfo.url = urlString;
-    currentTabInfo.domain = parsedUrl.hostname;
-    currentTabInfo.isCartOrCheckout = isCartOrCheckoutUrl(urlString);
+    const canonicalUrl = getCanonicalProductUrl(urlString);
+    const isCartPage = isCartOrCheckoutUrl(urlString);
 
-    if (forceRescan || !categorySelect.dataset.userEdited) {
-      categorySelect.value = inferCategoryFromHostname(parsedUrl.hostname);
+    currentTabInfo.url = canonicalUrl;
+    currentTabInfo.domain = parsedUrl.hostname;
+    currentTabInfo.isCartOrCheckout = isCartPage;
+    currentTabInfo.selectedProductUrl = isCartPage ? null : canonicalUrl;
+
+    let cleanTitle = (activeTab.title || "")
+      .replace(/^Save\s+\d+%\s+on\s+/i, "")
+      .replace(/^Amazon\.[a-z.]+\s*:\s*/i, "")
+      .replace(/\s*\|\s*Product\s*\|.*$/i, "")
+      .replace(/\s+on\s+Steam$/i, "")
+      .replace(/\s+-\s+Steam$/i, "")
+      .replace(/\s+\|\s+Roblox$/i, "")
+      .replace(/\s*:\s*Amazon\.[a-z.]+.*$/i, "")
+      .replace(/\s*\|\s*eBay$/i, "")
+      .replace(/\s*-\s*Best Buy$/i, "")
+      .replace(/\s*-\s*Walmart\.com$/i, "")
+      .replace(/\s*:\s*Target$/i, "")
+      .replace(/\s*\|\s*[^|]{15,}$/, "")
+      .trim();
+    currentTabInfo.title = cleanTitle;
+
+    categorySelect.value = inferCategoryFromHostname(parsedUrl.hostname);
+    detectedDomainDisplay.textContent = currentTabInfo.domain;
+
+    // Default currency from country TLD (.lk -> LKR, etc.) before scraping
+    const tldCur = inferTldCurrency(parsedUrl.hostname);
+    if (tldCur && currencySelect.querySelector(`option[value="${tldCur}"]`)) {
+      currencySelect.value = tldCur;
+      updateCurrencySymbol(tldCur);
     }
 
     const extraction = await scrapeProductsFromTab(activeTab.id);
@@ -495,171 +552,52 @@ async function detectActiveTab(forceRescan = false) {
       currentTabInfo.isCartOrCheckout = extraction.isCartOrCheckout;
     }
 
-    detectedDomainDisplay.textContent = currentTabInfo.domain;
-
-    // --- CASE A: Active Tab IS a Shopping Cart / Checkout Page ---
     if (currentTabInfo.isCartOrCheckout) {
-      detectedModeLabel.textContent = "SHOPPING CART GATE";
-      detectedUrlDisplay.textContent = `${currentTabInfo.domain} (Shopping Cart / Checkout)`;
-
-      const manifest = extraction ? extraction.cartManifest : null;
-      currentTabInfo.cartManifest = manifest;
-
-      if (manifest && manifest.totalAmount > 0) {
-        manualFallbackActive = false;
-        renderCartManifestReceipt(manifest, extraction.defaultCategory);
-      } else if (!manualFallbackActive) {
-        cartItemCountBadge.textContent = "0 ITEMS";
-        cartItemCountBadge.classList.remove("hidden");
-        showBrowsingGuidanceState(
-          true,
-          "YOUR SHOPPING CART IS EMPTY",
-          "There are currently no priced items detected in your cart. Add products to your cart first, then click RE-SCAN CART."
-        );
-      }
+      currentTabInfo.selectedProductUrl = null;
+      currentTabInfo.detectedOptions = [];
+      detectedModeLabel.textContent = "SHOPPING CART PAGE";
+      detectedUrlDisplay.textContent = `${currentTabInfo.domain} (Open a product page to save or request)`;
+      optionsCountBadge.classList.add("hidden");
+      productOptionGroup.classList.add("hidden");
+      purchaseForm.classList.add("hidden");
+      if (cartPageGuidanceCard) cartPageGuidanceCard.classList.remove("hidden");
       return;
     }
 
-    // --- CASE B: Active Tab is a Normal Product / Storefront Page (Free Browsing) ---
-    currentTabInfo.cartManifest = null;
-    detectedModeLabel.textContent = "PRODUCT BROWSING MODE";
-    const pageTitle = (extraction && extraction.pageTitle) || activeTab.title || currentTabInfo.domain;
-    detectedUrlDisplay.textContent = pageTitle;
-    cartItemCountBadge.textContent = "UNLOCKED";
-    cartItemCountBadge.classList.remove("hidden");
-    cartTamperAlert.classList.add("hidden");
+    if (cartPageGuidanceCard) cartPageGuidanceCard.classList.add("hidden");
+    purchaseForm.classList.remove("hidden");
+    detectedModeLabel.textContent = "ACTIVE STORE PAGE";
+    detectedUrlDisplay.textContent = canonicalUrl;
 
-    if (!manualFallbackActive) {
-      showBrowsingGuidanceState(
-        false,
-        "ADD ITEMS TO YOUR CART FIRST",
-        "Product pages and Add to Cart buttons are unlocked! Add all desired items to your shopping cart, then open your Cart page to send the full basket to your parent."
-      );
+    if (extraction && Array.isArray(extraction.options) && extraction.options.length > 0) {
+      currentTabInfo.detectedOptions = extraction.options;
+      if (extraction.pageTitle) {
+        currentTabInfo.title = extraction.pageTitle;
+      }
+      renderProductOptionsDropdown(extraction.options);
+      await syncSavedItemsWithLivePrices(canonicalUrl, extraction.options);
+    } else {
+      currentTabInfo.detectedOptions = [];
+      optionsCountBadge.classList.add("hidden");
+      productOptionGroup.classList.add("hidden");
+      enableManualInputs();
+
+      if (extraction && extraction.defaultCategory) {
+        categorySelect.value = extraction.defaultCategory;
+      }
+
+      if ((forceRescan || !itemNameInput.value.trim()) && currentTabInfo.title) {
+        itemNameInput.value = currentTabInfo.title;
+      }
     }
   } catch (err) {
-    console.error("[Centinel Fin AI] Failed to inspect active tab:", err);
+    console.error("[Centinel Fin AI] Failed to read active tab:", err);
+    detectedDomainDisplay.textContent = "MANUAL ENTRY";
+    detectedUrlDisplay.textContent = "Enter store product details below.";
+    enableManualInputs();
   }
 }
 
-function showBrowsingGuidanceState(isEmptyCart, headline, subtext) {
-  cartManifestCard.classList.add("hidden");
-  purchaseForm.classList.add("hidden");
-  browsingModeCard.classList.remove("hidden");
-
-  if (isEmptyCart) {
-    browsingModeTag.textContent = "[ EMPTY CART ]";
-    browsingModeTag.classList.add("empty-cart");
-  } else {
-    browsingModeTag.textContent = "[ FREE BROWSING UNLOCKED ]";
-    browsingModeTag.classList.remove("empty-cart");
-  }
-
-  browsingModeHeadline.textContent = headline;
-  browsingModeSubtext.textContent = subtext;
-}
-
-/**
- * Render the Live Itemized Shopping Cart Receipt & Tamper-Lock Form Inputs
- */
-function renderCartManifestReceipt(manifest, defaultCategory) {
-  browsingModeCard.classList.add("hidden");
-  purchaseForm.classList.remove("hidden");
-  cartManifestCard.classList.remove("hidden");
-
-  const count = manifest.itemCount || manifest.items.length || 1;
-  cartItemCountBadge.textContent = `${count} ${count === 1 ? "ITEM" : "ITEMS"} IN CART`;
-  cartItemCountBadge.classList.remove("hidden");
-
-  const cur = (manifest.currency || "USD").toUpperCase();
-  const sym = CURRENCY_SYMBOLS[cur] || (cur + " ");
-
-  cartItemsList.innerHTML = "";
-
-  if (Array.isArray(manifest.items) && manifest.items.length > 0) {
-    manifest.items.forEach((item, idx) => {
-      const row = document.createElement("div");
-      row.className = "cart-item-row";
-
-      const indexStr = String(idx + 1).padStart(2, "0");
-      const qtyBadge = item.quantity && item.quantity > 1 ? ` (x${item.quantity})` : "";
-      const priceText = typeof item.amount === "number" ? `${sym}${item.amount.toFixed(2)}` : "Included";
-      const discountHtml = item.discountPct
-        ? `<span class="cart-item-discount">${escapeHtml(item.discountPct)}</span>`
-        : "";
-
-      row.innerHTML = `
-        <div class="cart-item-left">
-          <span class="cart-item-index">${indexStr}</span>
-          <span class="cart-item-name" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}${escapeHtml(qtyBadge)}</span>
-        </div>
-        <div class="cart-item-right">
-          ${discountHtml}
-          <span class="cart-item-price">${escapeHtml(priceText)}</span>
-        </div>
-      `;
-      cartItemsList.appendChild(row);
-    });
-  } else {
-    const fallbackRow = document.createElement("div");
-    fallbackRow.className = "cart-item-row";
-    fallbackRow.innerHTML = `
-      <div class="cart-item-left">
-        <span class="cart-item-index">01</span>
-        <span class="cart-item-name">${escapeHtml(manifest.summaryTitle)}</span>
-      </div>
-      <div class="cart-item-right">
-        <span class="cart-item-price">${escapeHtml(sym + manifest.totalAmount.toFixed(2))}</span>
-      </div>
-    `;
-    cartItemsList.appendChild(fallbackRow);
-  }
-
-  manifestTotalValue.textContent = `${sym}${manifest.totalAmount.toFixed(2)} ${cur}`;
-
-  currentTabInfo.selectedProductUrl = manifest.primaryUrl || currentTabInfo.url;
-
-  // Lock Cart Summary Title
-  itemNameInput.value = manifest.summaryTitle;
-  itemNameInput.readOnly = true;
-  itemNameInput.classList.add("neo-input-locked");
-  if (titleLockStatus) {
-    titleLockStatus.textContent = "[ CART LOCKED ]";
-    titleLockStatus.className = "locked-badge";
-  }
-
-  // Lock Cart Total Amount
-  amountInput.value = manifest.totalAmount.toFixed(2);
-  amountInput.readOnly = true;
-  amountInput.classList.add("neo-input-locked");
-  if (amountLockStatus) {
-    amountLockStatus.textContent = "[ CART LOCKED ]";
-    amountLockStatus.className = "locked-badge";
-  }
-
-  // Lock Store Currency
-  if (!currencySelect.querySelector(`option[value="${cur}"]`)) {
-    const optEl = document.createElement("option");
-    optEl.value = cur;
-    optEl.textContent = `${cur} (${sym.trim()})`;
-    currencySelect.appendChild(optEl);
-  }
-  currencySelect.value = cur;
-  updateCurrencySymbol(cur);
-  currencySelect.disabled = true;
-  currencySelect.classList.add("neo-select-locked");
-  if (currencyLockStatus) {
-    currencyLockStatus.textContent = "[ STORE ]";
-    currencyLockStatus.className = "locked-badge";
-  }
-
-  if (defaultCategory) {
-    categorySelect.value = defaultCategory;
-  }
-}
-
-/**
- * Communicate with content.js in active tab to extract live Cart Manifest
- */
 async function scrapeProductsFromTab(tabId) {
   if (!tabId) return null;
 
@@ -698,37 +636,644 @@ async function scrapeProductsFromTab(tabId) {
         return results[0].result;
       }
     }
-  } catch (err) {
-    console.warn("[Centinel Fin AI] Dynamic script extraction fallback skipped:", err);
-  }
+  } catch (_) {}
 
   return null;
+}
+
+function renderProductOptionsDropdown(options) {
+  const count = options.length;
+  optionsCountBadge.textContent = `${count} ${count === 1 ? "OPTION" : "OPTIONS"}`;
+  optionsCountBadge.classList.remove("hidden");
+
+  productOptionGroup.classList.remove("hidden");
+  productOptionSelect.innerHTML = "";
+
+  options.forEach((opt, index) => {
+    const optionEl = document.createElement("option");
+    optionEl.value = String(index);
+
+    const symbol = CURRENCY_SYMBOLS[opt.currency] || (opt.currency + " ");
+    const priceStr = `${symbol}${opt.amount.toFixed(2)}`;
+    const discountStr = opt.discountPct ? ` (${opt.discountPct})` : "";
+
+    const maxTitleLen = 26;
+    const shortTitle = opt.title.length > maxTitleLen ? opt.title.substring(0, maxTitleLen - 2) + ".." : opt.title;
+    optionEl.textContent = `${shortTitle} \u2014 ${priceStr}${discountStr}`;
+    productOptionSelect.appendChild(optionEl);
+  });
+
+  const manualOptionEl = document.createElement("option");
+  manualOptionEl.value = "MANUAL";
+  manualOptionEl.textContent = "Custom / Enter Details Manually...";
+  productOptionSelect.appendChild(manualOptionEl);
+
+  productOptionSelect.value = "0";
+  applySelectedOption("0");
+}
+
+function applySelectedOption(selectedValue) {
+  if (selectedValue === "MANUAL") {
+    enableManualInputs();
+    priceVerifiedTag.textContent = "CUSTOM ENTRY";
+    selectedOptionDiscountBar.classList.add("hidden");
+    itemNameInput.focus();
+    return;
+  }
+
+  const index = parseInt(selectedValue, 10);
+  const opt = currentTabInfo.detectedOptions[index];
+  if (!opt) return;
+
+  currentTabInfo.selectedProductUrl = getCanonicalProductUrl(opt.productUrl || currentTabInfo.url);
+  currentTabInfo.selectedDiscountPct = opt.discountPct || null;
+  currentTabInfo.selectedOriginalPrice = opt.originalPrice || null;
+
+  priceVerifiedTag.textContent = "STORE PRICE";
+
+  itemNameInput.value = opt.title;
+  itemNameInput.readOnly = true;
+  itemNameInput.classList.add("neo-input-locked");
+  if (titleLockStatus) {
+    titleLockStatus.textContent = "[ VERIFIED ]";
+    titleLockStatus.className = "locked-badge";
+  }
+
+  amountInput.value = opt.amount.toFixed(2);
+  amountInput.readOnly = true;
+  amountInput.classList.add("neo-input-locked");
+  if (amountLockStatus) {
+    amountLockStatus.textContent = "[ STORE PRICE ]";
+    amountLockStatus.className = "locked-badge";
+  }
+
+  if (opt.currency) {
+    const cur = opt.currency.toUpperCase();
+    if (!currencySelect.querySelector(`option[value="${cur}"]`)) {
+      const optEl = document.createElement("option");
+      optEl.value = cur;
+      const sym = CURRENCY_SYMBOLS[cur] || cur;
+      optEl.textContent = `${cur} (${sym})`;
+      currencySelect.appendChild(optEl);
+    }
+    currencySelect.value = cur;
+    updateCurrencySymbol(cur);
+  }
+  currencySelect.disabled = true;
+  currencySelect.classList.add("neo-select-locked");
+  if (currencyLockStatus) {
+    currencyLockStatus.textContent = "[ STORE ]";
+    currencyLockStatus.className = "locked-badge";
+  }
+
+  if (opt.category) {
+    categorySelect.value = opt.category;
+  }
+
+  if (opt.discountPct) {
+    discountPctBadge.textContent = opt.discountPct;
+    discountContextText.textContent = opt.originalPrice
+      ? `On Sale (Original: ${opt.originalPrice})`
+      : `Special Offer (${opt.discountPct})`;
+    selectedOptionDiscountBar.classList.remove("hidden");
+  } else {
+    selectedOptionDiscountBar.classList.add("hidden");
+  }
 }
 
 function enableManualInputs() {
   itemNameInput.readOnly = false;
   itemNameInput.classList.remove("neo-input-locked");
   if (titleLockStatus) {
-    titleLockStatus.textContent = "[ MANUAL ]";
+    titleLockStatus.textContent = "[ CUSTOM ]";
     titleLockStatus.className = "locked-badge manual";
   }
 
   amountInput.readOnly = false;
   amountInput.classList.remove("neo-input-locked");
   if (amountLockStatus) {
-    amountLockStatus.textContent = "[ MANUAL ]";
+    amountLockStatus.textContent = "[ CUSTOM ]";
     amountLockStatus.className = "locked-badge manual";
   }
 
   currencySelect.disabled = false;
   currencySelect.classList.remove("neo-select-locked");
   if (currencyLockStatus) {
-    currencyLockStatus.textContent = "[ MANUAL ]";
+    currencyLockStatus.textContent = "[ CUSTOM ]";
     currencyLockStatus.className = "locked-badge manual";
   }
 }
 
-// Auth State Management
+// ============================================================================
+// SMART SAVED COMBO CART (Save Product URLs & Combine Multiple Items into One Parent Request)
+// ============================================================================
+
+async function loadSavedProducts() {
+  try {
+    const scopedKey = getSavedItemsStorageKey();
+    const data = await chrome.storage.local.get([scopedKey, SAVED_ITEMS_KEY_PREFIX]);
+    if (Array.isArray(data[scopedKey])) {
+      savedProductsList = data[scopedKey].map((it) => ({ ...it, selected: it.selected !== false }));
+    } else if (childSession.email && Array.isArray(data[SAVED_ITEMS_KEY_PREFIX]) && data[SAVED_ITEMS_KEY_PREFIX].length > 0) {
+      savedProductsList = data[SAVED_ITEMS_KEY_PREFIX].map((it) => ({ ...it, selected: it.selected !== false }));
+      await chrome.storage.local.set({ [scopedKey]: savedProductsList });
+      await chrome.storage.local.remove([SAVED_ITEMS_KEY_PREFIX]);
+    } else {
+      savedProductsList = [];
+    }
+  } catch (_) {
+    savedProductsList = [];
+  }
+  updateSavedCountBadge();
+  renderSavedProductsList();
+}
+
+async function persistSavedProducts() {
+  try {
+    const scopedKey = getSavedItemsStorageKey();
+    await chrome.storage.local.set({ [scopedKey]: savedProductsList });
+  } catch (_) {}
+  updateSavedCountBadge();
+  renderSavedProductsList();
+}
+
+function updateSavedCountBadge() {
+  if (savedCountBadge) {
+    savedCountBadge.textContent = String(savedProductsList.length);
+  }
+  if (clearSavedItemsBtn) {
+    clearSavedItemsBtn.classList.toggle("hidden", savedProductsList.length === 0);
+  }
+  if (selectAllSavedBtn) {
+    selectAllSavedBtn.classList.toggle("hidden", savedProductsList.length <= 1);
+    const allSelected = savedProductsList.length > 0 && savedProductsList.every((it) => it.selected !== false);
+    selectAllSavedBtn.textContent = allSelected ? "UNSELECT ALL" : "SELECT ALL";
+  }
+}
+
+async function handleToggleSelectAllSaved() {
+  const allSelected = savedProductsList.length > 0 && savedProductsList.every((it) => it.selected !== false);
+  savedProductsList = savedProductsList.map((it) => ({ ...it, selected: !allSelected }));
+  await persistSavedProducts();
+}
+
+async function syncSavedItemsWithLivePrices(canonicalUrl, liveOptions) {
+  if (!canonicalUrl || !Array.isArray(liveOptions) || liveOptions.length === 0 || savedProductsList.length === 0) {
+    return;
+  }
+  let updated = false;
+  savedProductsList = savedProductsList.map((saved) => {
+    if (getCanonicalProductUrl(saved.productUrl) !== canonicalUrl) return saved;
+    const matchingOpt = liveOptions.find(
+      (o) => o.title.toLowerCase() === (saved.title || "").toLowerCase()
+    ) || (liveOptions.length === 1 ? liveOptions[0] : null);
+
+    if (matchingOpt && Math.abs(matchingOpt.amount - Number(saved.amount)) >= 0.01) {
+      updated = true;
+      return {
+        ...saved,
+        amount: matchingOpt.amount,
+        currency: matchingOpt.currency || saved.currency,
+        discountPct: matchingOpt.discountPct || null
+      };
+    }
+    return saved;
+  });
+
+  if (updated) {
+    await persistSavedProducts();
+  }
+}
+
+async function handleSaveForLater() {
+  hideAlert();
+
+  const title = itemNameInput.value.trim();
+  const amountStr = amountInput.value.trim();
+  const currency = currencySelect.value || "USD";
+  const category = categorySelect.value || "SHOPPING";
+  const productUrl = getCanonicalProductUrl(currentTabInfo.selectedProductUrl || currentTabInfo.url);
+
+  if (!productUrl || !productUrl.startsWith("http") || isCartOrCheckoutUrl(productUrl)) {
+    showAlert("Please save items directly from their product page so the product link can be reopened later.", "error");
+    return;
+  }
+
+  if (!title) {
+    showAlert("Please enter the product name in the PRODUCT NAME field before saving.", "error");
+    itemNameInput.focus();
+    return;
+  }
+
+  if (!amountStr) {
+    showAlert("Could not auto-detect the price on this page. Please enter the product price in the PRICE box above, then click Add to Saved Cart.", "error");
+    amountInput.focus();
+    return;
+  }
+
+  const amount = parseFloat(amountStr);
+  if (isNaN(amount) || amount <= 0) {
+    showAlert("Please enter a valid price greater than 0 in the PRICE box.", "error");
+    amountInput.focus();
+    return;
+  }
+
+  const domain = getCleanDomainLabel(productUrl);
+  const existingIdx = savedProductsList.findIndex(
+    (item) =>
+      getCanonicalProductUrl(item.productUrl).toLowerCase() === productUrl.toLowerCase() &&
+      (item.title || "").toLowerCase() === title.toLowerCase()
+  );
+
+  const savedEntry = {
+    id: existingIdx !== -1 ? savedProductsList[existingIdx].id : `saved_${Date.now()}`,
+    title: title,
+    amount: Number(amount.toFixed(2)),
+    currency: currency,
+    category: category,
+    discountPct: currentTabInfo.selectedDiscountPct || null,
+    domain: domain,
+    productUrl: productUrl,
+    selected: true,
+    savedAt: new Date().toISOString()
+  };
+
+  if (existingIdx !== -1) {
+    savedProductsList[existingIdx] = savedEntry;
+  } else {
+    savedProductsList.unshift(savedEntry);
+  }
+
+  await persistSavedProducts();
+
+  const origText = saveForLaterBtn.textContent;
+  saveForLaterBtn.textContent = "[ ADDED TO SAVED CART ]";
+  showAlert(`Added "${title}" to your SAVED CART (${savedProductsList.length} item${savedProductsList.length === 1 ? "" : "s"}). Open the SAVED tab to send a combined combo request!`, "success");
+  setTimeout(() => {
+    saveForLaterBtn.textContent = origText;
+  }, 1800);
+}
+
+async function handleClearAllSavedItems() {
+  savedProductsList = [];
+  await persistSavedProducts();
+}
+
+async function removeSavedProductById(savedId) {
+  savedProductsList = savedProductsList.filter((item) => item.id !== savedId);
+  await persistSavedProducts();
+}
+
+async function toggleSavedProductSelection(savedId, isSelected) {
+  savedProductsList = savedProductsList.map((item) =>
+    item.id === savedId ? { ...item, selected: Boolean(isSelected) } : item
+  );
+  await persistSavedProducts();
+}
+
+async function openSavedProductPage(item) {
+  if (!item || !item.productUrl) return;
+  try {
+    const targetUrl = getCanonicalProductUrl(item.productUrl);
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const existingTab = tabs.find(
+      (t) => t.url && getCanonicalProductUrl(t.url).toLowerCase() === targetUrl.toLowerCase()
+    );
+    if (existingTab && existingTab.id) {
+      await chrome.tabs.update(existingTab.id, { active: true });
+    } else {
+      await chrome.tabs.create({ url: item.productUrl, active: true });
+    }
+  } catch (_) {
+    window.open(item.productUrl, "_blank");
+  }
+}
+
+async function loadSavedProductIntoRequestForm(item) {
+  if (!item || !item.productUrl) return;
+
+  const savedCanonical = getCanonicalProductUrl(item.productUrl).toLowerCase();
+  const activeCanonical = getCanonicalProductUrl(currentTabInfo.url).toLowerCase();
+
+  if (!activeCanonical || activeCanonical !== savedCanonical) {
+    await openSavedProductPage(item);
+    return;
+  }
+
+  userDismissedTrackerForForm = true;
+  activeTrackedRequestId = null;
+  hideLiveApprovalTracker();
+  hideAlert();
+
+  if (cartPageGuidanceCard) cartPageGuidanceCard.classList.add("hidden");
+  purchaseForm.classList.remove("hidden");
+
+  await detectActiveTab(true);
+
+  if (Array.isArray(currentTabInfo.detectedOptions) && currentTabInfo.detectedOptions.length > 0) {
+    const matchIdx = currentTabInfo.detectedOptions.findIndex(
+      (o) => o.title.toLowerCase() === (item.title || "").toLowerCase()
+    );
+    if (matchIdx !== -1) {
+      productOptionSelect.value = String(matchIdx);
+      applySelectedOption(String(matchIdx));
+    }
+  }
+
+  switchTab("newRequestView");
+  reasonInput.focus();
+}
+
+function buildComboSummaryFromItems(selectedItems) {
+  if (!Array.isArray(selectedItems) || selectedItems.length === 0) {
+    return {
+      count: 0,
+      totalAmount: 0,
+      currency: "USD",
+      hasMixedCurrencies: false,
+      comboTitle: "",
+      itemLinks: []
+    };
+  }
+
+  const primaryCurrency = (selectedItems[0].currency || "USD").toUpperCase();
+  const hasMixedCurrencies = selectedItems.some(
+    (it) => (it.currency || "USD").toUpperCase() !== primaryCurrency
+  );
+  const sym = CURRENCY_SYMBOLS[primaryCurrency] || `${primaryCurrency} `;
+
+  const totalAmount = Number(
+    selectedItems.reduce((sum, it) => sum + (Number(it.amount) || 0), 0).toFixed(2)
+  );
+
+  let comboTitle = "";
+  if (selectedItems.length === 1) {
+    comboTitle = selectedItems[0].title;
+  } else {
+    const parts = selectedItems.map((it) => `${it.title} (${sym}${Number(it.amount).toFixed(2)})`);
+    const joined = parts.join(" + ");
+    if (joined.length <= 460) {
+      comboTitle = joined;
+    } else {
+      let acc = parts[0];
+      let included = 1;
+      for (let i = 1; i < parts.length; i++) {
+        if ((acc + " + " + parts[i]).length > 420) break;
+        acc += " + " + parts[i];
+        included++;
+      }
+      const rem = parts.length - included;
+      comboTitle = rem > 0 ? `${acc} + ${rem} more items` : acc;
+    }
+  }
+
+  const itemLinks = selectedItems
+    .map((it) => getCanonicalProductUrl(it.productUrl))
+    .filter(Boolean);
+
+  return {
+    count: selectedItems.length,
+    totalAmount,
+    currency: primaryCurrency,
+    hasMixedCurrencies,
+    comboTitle,
+    itemLinks
+  };
+}
+
+function updateSavedComboCheckoutSummary() {
+  if (!savedComboCheckoutBox) return;
+
+  if (!Array.isArray(savedProductsList) || savedProductsList.length === 0) {
+    savedComboCheckoutBox.classList.add("hidden");
+    return;
+  }
+
+  savedComboCheckoutBox.classList.remove("hidden");
+  const selectedItems = savedProductsList.filter((it) => it.selected !== false);
+  const summary = buildComboSummaryFromItems(selectedItems);
+
+  const sym = CURRENCY_SYMBOLS[summary.currency] || `${summary.currency} `;
+  comboSelectedCountLabel.textContent = `${summary.count} ${summary.count === 1 ? "ITEM" : "ITEMS"} SELECTED FOR COMBO`;
+  comboTotalBadge.textContent = `${sym}${summary.totalAmount.toFixed(2)} ${summary.currency}`;
+
+  if (summary.count === 0) {
+    comboPreviewTitleBox.textContent = "Check at least one item above to send a request to your parent.";
+    submitComboRequestBtn.disabled = true;
+    submitComboRequestBtn.textContent = "[ SELECT ITEMS ABOVE ]";
+  } else {
+    comboPreviewTitleBox.textContent = summary.comboTitle;
+    submitComboRequestBtn.disabled = false;
+    submitComboRequestBtn.textContent =
+      summary.count === 1
+        ? `[ SEND 1 ITEM TO PARENT (${sym}${summary.totalAmount.toFixed(2)}) ]`
+        : `[ SEND COMBO TO PARENT (${summary.count} ITEMS \u2014 ${sym}${summary.totalAmount.toFixed(2)}) ]`;
+  }
+}
+
+function showComboAlert(message, type) {
+  if (!comboSubmissionAlert) return;
+  comboSubmissionAlert.textContent = message;
+  comboSubmissionAlert.className = `alert-box alert-${type}`;
+  comboSubmissionAlert.classList.remove("hidden");
+}
+
+function hideComboAlert() {
+  if (!comboSubmissionAlert) return;
+  comboSubmissionAlert.classList.add("hidden");
+}
+
+async function handleComboPurchaseSubmit() {
+  hideComboAlert();
+
+  if (!childSession.token) {
+    showComboAlert("Please sign in before sending a combo request.", "error");
+    return;
+  }
+
+  const selectedItems = savedProductsList.filter((it) => it.selected !== false);
+  if (selectedItems.length === 0) {
+    showComboAlert("Please check at least one saved item to send to your parent.", "error");
+    return;
+  }
+
+  const summary = buildComboSummaryFromItems(selectedItems);
+  if (summary.hasMixedCurrencies) {
+    showComboAlert("All items in a single combo request must use the same currency (e.g. all USD or all LKR). Uncheck items from other currencies.", "error");
+    return;
+  }
+
+  const note = (comboReasonInput ? comboReasonInput.value : "").trim();
+  if (!note) {
+    showComboAlert("Please enter a short note for your parent explaining this combo.", "error");
+    if (comboReasonInput) comboReasonInput.focus();
+    return;
+  }
+
+  submitComboRequestBtn.disabled = true;
+  submitComboRequestBtn.textContent = "SENDING COMBO TO PARENT...";
+
+  try {
+    let primarySiteTarget = summary.itemLinks[0] || selectedItems[0].domain || "online-store";
+    if (primarySiteTarget.startsWith("http") && primarySiteTarget.length > 250) {
+      primarySiteTarget = new URL(primarySiteTarget).hostname;
+    }
+
+    const enrichedNote =
+      summary.itemLinks.length > 0
+        ? `${note}\n[CART_LINKS]${summary.itemLinks.join("|")}[/CART_LINKS]`
+        : note;
+
+    const category = selectedItems[0].category || "SHOPPING";
+    const idempotencyRaw = `${childSession.email || "child"}:${primarySiteTarget}:${summary.comboTitle.toLowerCase()}:${summary.totalAmount.toFixed(2)}:${summary.currency}`;
+    const idempotencyKey = await computeSha256(idempotencyRaw);
+
+    const payload = {
+      siteDomain: primarySiteTarget,
+      itemName: summary.comboTitle,
+      amount: summary.totalAmount,
+      currency: summary.currency,
+      category: category,
+      note: enrichedNote
+    };
+
+    const response = await fetch(`${CONFIG.apiBaseUrl}/purchase-requests`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${childSession.token}`,
+        "X-Idempotency-Key": idempotencyKey
+      },
+      body: JSON.stringify(payload)
+    });
+
+    let result = {};
+    const rawText = await response.text();
+    if (rawText) {
+      try {
+        result = JSON.parse(rawText);
+      } catch (_) {
+        result = { message: rawText };
+      }
+    }
+
+    if (response.status === 201 || response.status === 200 || response.status === 409) {
+      if (comboReasonInput) comboReasonInput.value = "";
+      userDismissedTrackerForForm = false;
+      const submittedReq = (result && result.id) ? result : {
+        id: result.id || null,
+        itemName: summary.comboTitle,
+        amount: summary.totalAmount,
+        currency: summary.currency,
+        siteDomain: primarySiteTarget,
+        status: "PENDING"
+      };
+      switchTab("newRequestView");
+      showLiveApprovalTracker(submittedReq);
+      fetchMyRequests();
+    } else if (response.status === 401 || response.status === 403) {
+      showComboAlert(result.message || "Your session has expired. Please sign in again.", "error");
+      if (response.status === 401) {
+        handleLogout();
+      }
+    } else {
+      showComboAlert(result.message || "Could not send combo request right now. Please try again.", "error");
+    }
+  } catch (err) {
+    console.error("[Centinel Fin AI] Combo submit error:", err);
+    showComboAlert("Unable to reach ParentGuard service. Please try again in a moment.", "error");
+  } finally {
+    updateSavedComboCheckoutSummary();
+  }
+}
+
+function formatSavedTime(isoString) {
+  if (!isoString) return "Saved recently";
+  try {
+    const d = new Date(isoString);
+    const diffMins = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (diffMins < 1) return "Saved just now";
+    if (diffMins < 60) return `Saved ${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `Saved ${diffHours}h ago`;
+    return `Saved ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  } catch (_) {
+    return "Saved";
+  }
+}
+
+function renderSavedProductsList() {
+  if (!savedItemsListContainer) return;
+
+  if (!Array.isArray(savedProductsList) || savedProductsList.length === 0) {
+    savedItemsListContainer.innerHTML = `
+      <div class="empty-state">
+        <span class="empty-title">YOUR SAVED CART IS EMPTY</span>
+        <span class="empty-sub">Click "+ ADD TO SAVED CART" on any product page to collect items here. You can visit them later or send them all together as one combo request to your parent!</span>
+      </div>
+    `;
+    updateSavedComboCheckoutSummary();
+    return;
+  }
+
+  savedItemsListContainer.innerHTML = "";
+
+  savedProductsList.forEach((item) => {
+    const isChecked = item.selected !== false;
+    const card = document.createElement("div");
+    card.className = `saved-item-card ${isChecked ? "selected-for-combo" : ""}`;
+
+    const sym = CURRENCY_SYMBOLS[item.currency] || ((item.currency || "USD") + " ");
+    const formattedPrice = `${sym}${Number(item.amount || 0).toFixed(2)}`;
+    const discountHtml = item.discountPct
+      ? `<span class="discount-pct-pill" style="margin-right: 4px;">${escapeHtml(item.discountPct)}</span>`
+      : "";
+
+    card.innerHTML = `
+      <div class="card-top-row">
+        <label class="saved-item-check-label">
+          <input type="checkbox" class="saved-combo-checkbox" ${isChecked ? "checked" : ""}>
+          <span class="card-item-title">${escapeHtml(item.title)}</span>
+        </label>
+        <div>
+          ${discountHtml}
+          <span class="card-amount-badge">${escapeHtml(formattedPrice)}</span>
+        </div>
+      </div>
+      <div class="saved-item-meta-row">
+        <span class="card-domain-tag">${escapeHtml(item.domain || getCleanDomainLabel(item.productUrl))}</span>
+        <span>${escapeHtml(formatSavedTime(item.savedAt))}</span>
+      </div>
+      <div class="saved-item-url-preview" title="${escapeHtml(item.productUrl)}">${escapeHtml(item.productUrl)}</div>
+      <div class="saved-item-actions">
+        <button type="button" class="saved-action-btn visit" data-action="visit">[ OPEN PAGE &rarr; ]</button>
+        <button type="button" class="saved-action-btn ask" data-action="ask">[ ASK SINGLE ]</button>
+        <button type="button" class="saved-action-btn remove" data-action="remove" title="Remove from saved cart">REMOVE</button>
+      </div>
+    `;
+
+    const checkbox = card.querySelector(".saved-combo-checkbox");
+    const visitBtn = card.querySelector("[data-action='visit']");
+    const askBtn = card.querySelector("[data-action='ask']");
+    const removeBtn = card.querySelector("[data-action='remove']");
+
+    if (checkbox) {
+      checkbox.addEventListener("change", (e) => toggleSavedProductSelection(item.id, e.target.checked));
+    }
+    if (visitBtn) visitBtn.addEventListener("click", () => openSavedProductPage(item));
+    if (askBtn) askBtn.addEventListener("click", () => loadSavedProductIntoRequestForm(item));
+    if (removeBtn) removeBtn.addEventListener("click", () => removeSavedProductById(item.id));
+
+    savedItemsListContainer.appendChild(card);
+  });
+
+  updateSavedComboCheckoutSummary();
+}
+
+// ============================================================================
+// AUTHENTICATION & SINGLE PURCHASE REQUEST SUBMISSION
+// ============================================================================
+
 async function loadAuthState() {
   const data = await chrome.storage.local.get(["childToken", "childEmail"]);
   if (data.childToken && data.childEmail) {
@@ -753,18 +1298,18 @@ function showLoggedOutState() {
   loggedInView.classList.add("hidden");
   appNav.classList.add("hidden");
   newRequestView.classList.add("hidden");
+  savedItemsView.classList.add("hidden");
   myRequestsView.classList.add("hidden");
   loggedOutView.classList.remove("hidden");
   childSession.token = null;
   childSession.email = null;
 }
 
-// Login Handler via Supabase Auth
 async function handleLogin(e) {
   e.preventDefault();
   loginErrorMsg.classList.add("hidden");
   loginSubmitBtn.disabled = true;
-  loginSubmitBtn.textContent = "AUTHENTICATING...";
+  loginSubmitBtn.textContent = "SIGNING IN...";
 
   const email = loginEmail.value.trim();
   const password = loginPassword.value;
@@ -782,7 +1327,7 @@ async function handleLogin(e) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error_description || data.msg || "Authentication failed. Check credentials.");
+      throw new Error(data.error_description || data.msg || "Sign in failed. Please check your email and password.");
     }
 
     if (data.access_token) {
@@ -795,15 +1340,16 @@ async function handleLogin(e) {
       });
 
       showLoggedInState();
+      await loadSavedProducts();
       await detectActiveTab(true);
       fetchMyRequests();
     }
   } catch (err) {
-    loginErrorMsg.textContent = err.message || "Unable to sign in. Please verify credentials.";
+    loginErrorMsg.textContent = err.message || "Unable to sign in. Please verify your account details.";
     loginErrorMsg.classList.remove("hidden");
   } finally {
     loginSubmitBtn.disabled = false;
-    loginSubmitBtn.textContent = "SIGN IN AS CHILD \u2192";
+    loginSubmitBtn.textContent = "SIGN IN \u2192";
   }
 }
 
@@ -811,6 +1357,8 @@ async function handleLogout() {
   await chrome.storage.local.remove(["childToken", "childEmail"]);
   childSession.token = null;
   childSession.email = null;
+  savedProductsList = [];
+  updateSavedCountBadge();
   showLoggedOutState();
 }
 
@@ -822,14 +1370,23 @@ async function computeSha256(text) {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Submit Shopping Cart Manifest Request
 async function handlePurchaseSubmit(e) {
   e.preventDefault();
   hideAlert();
 
   if (!childSession.token) {
-    showAlert("Please sign in as child before submitting requests.", "error");
+    showAlert("Please sign in before sending a request.", "error");
     showLoggedOutState();
+    return;
+  }
+
+  const targetCandidateUrl = currentTabInfo.selectedProductUrl || currentTabInfo.url || "";
+  if (
+    currentTabInfo.isCartOrCheckout ||
+    !currentTabInfo.selectedProductUrl ||
+    isCartOrCheckoutUrl(targetCandidateUrl)
+  ) {
+    showAlert("Please open the specific product page to send a request so your parent can view the item.", "error");
     return;
   }
 
@@ -839,50 +1396,38 @@ async function handlePurchaseSubmit(e) {
   const category = categorySelect.value;
   const note = reasonInput.value.trim();
 
-  if (!itemName || !amountStr || !note) {
-    showAlert("Please enter a note for your parent explaining this cart request.", "error");
+  if (!itemName) {
+    showAlert("Please enter the product name.", "error");
+    itemNameInput.focus();
+    return;
+  }
+
+  if (!amountStr) {
+    showAlert("Please enter the product price in the PRICE box above.", "error");
+    amountInput.focus();
+    return;
+  }
+
+  if (!note) {
+    showAlert("Please fill in a short note for your parent.", "error");
+    reasonInput.focus();
     return;
   }
 
   const amount = parseFloat(amountStr);
   if (isNaN(amount) || amount <= 0) {
-    showAlert("Cart total must be greater than 0.", "error");
+    showAlert("Please enter a valid price greater than 0.", "error");
     return;
   }
 
   submitRequestBtn.disabled = true;
-  submitRequestBtn.textContent = "SENDING CART TO PARENT...";
+  submitRequestBtn.textContent = "SENDING TO PARENT...";
 
   try {
-    let siteTarget = currentTabInfo.selectedProductUrl || currentTabInfo.domain || "online-store";
+    let siteTarget = currentTabInfo.selectedProductUrl;
     if (siteTarget.startsWith("http")) {
-      try {
-        const cleanUrlObj = new URL(siteTarget);
-        // Never send a session-private /cart or /checkout path as the primary merchant link
-        if (isCartOrCheckoutUrl(siteTarget)) {
-          siteTarget = cleanUrlObj.origin;
-        } else {
-          const originAndPath = `${cleanUrlObj.origin}${cleanUrlObj.pathname.replace(/\/+$/, "")}`;
-          siteTarget = originAndPath.length <= 250 ? originAndPath : cleanUrlObj.hostname;
-        }
-      } catch (_) {
-        siteTarget = currentTabInfo.domain || "online-store";
-      }
-    }
-
-    // Attach direct public product URLs for each cart item so the Parent Dashboard can open every item individually
-    let enrichedNote = note;
-    if (
-      currentTabInfo.cartManifest &&
-      Array.isArray(currentTabInfo.cartManifest.items) &&
-      currentTabInfo.cartManifest.items.length > 0
-    ) {
-      const itemLinks = currentTabInfo.cartManifest.items
-        .map((it) => (it && it.productUrl && !isCartOrCheckoutUrl(it.productUrl) ? it.productUrl : ""))
-        .filter(Boolean);
-      if (itemLinks.length > 0) {
-        enrichedNote = `${note}\n[CART_LINKS]${itemLinks.join("|")}[/CART_LINKS]`;
-      }
+      const canonical = getCanonicalProductUrl(siteTarget);
+      siteTarget = canonical.length <= 250 ? canonical : new URL(siteTarget).hostname;
     }
 
     const idempotencyRaw = `${childSession.email || "child"}:${siteTarget}:${itemName.toLowerCase()}:${amount.toFixed(2)}:${currency}`;
@@ -894,7 +1439,7 @@ async function handlePurchaseSubmit(e) {
       amount: amount,
       currency: currency,
       category: category,
-      note: enrichedNote
+      note: note
     };
 
     const response = await fetch(`${CONFIG.apiBaseUrl}/purchase-requests`, {
@@ -920,7 +1465,6 @@ async function handlePurchaseSubmit(e) {
     if (response.status === 201 || response.status === 200) {
       reasonInput.value = "";
       userDismissedTrackerForForm = false;
-      cartTamperAlert.classList.add("hidden");
       const submittedReq = (result && result.id) ? result : {
         id: result.id || null,
         itemName: itemName,
@@ -938,29 +1482,28 @@ async function handlePurchaseSubmit(e) {
       }
       fetchMyRequests();
     } else if (response.status === 401 || response.status === 403) {
-      showAlert(result.message || "Session expired or unauthorized. Please sign in again.", "error");
+      showAlert(result.message || "Your session has expired. Please sign in again.", "error");
       if (response.status === 401) {
         handleLogout();
       }
     } else {
-      showAlert(result.message || `Failed to submit request (HTTP ${response.status}).`, "error");
+      showAlert(result.message || "Could not send request right now. Please try again.", "error");
     }
   } catch (err) {
     console.error("[Centinel Fin AI] Purchase submit error:", err);
-    showAlert("Network error: Ensure Spring Boot backend is running on :8080.", "error");
+    showAlert("Unable to reach ParentGuard service. Please try again in a moment.", "error");
   } finally {
     submitRequestBtn.disabled = false;
-    submitRequestBtn.textContent = "[ SEND CART TO PARENT FOR APPROVAL ]";
+    submitRequestBtn.textContent = "[ ASK PARENT FOR THIS ITEM ]";
   }
 }
 
-// Fetch Child's Purchase Requests
 async function fetchMyRequests(manualRefresh = false) {
   if (!childSession.token) return;
 
   if (manualRefresh) {
     refreshRequestsBtn.disabled = true;
-    refreshRequestsBtn.textContent = "SYNCING...";
+    refreshRequestsBtn.textContent = "UPDATING...";
   }
 
   try {
@@ -992,87 +1535,64 @@ async function fetchMyRequests(manualRefresh = false) {
   }
 }
 
-/**
- * Synchronize Popup Tracker with Live Cart Manifest & Detect Post-Approval Cart Tampering
- */
 function syncLiveTrackerWithRequests(requests) {
-  if (!Array.isArray(requests) || requests.length === 0) {
-    cartTamperAlert.classList.add("hidden");
-    return;
-  }
+  if (!Array.isArray(requests) || requests.length === 0 || currentTabInfo.isCartOrCheckout) return;
 
   const sortedRequests = [...requests].sort((a, b) => (b.id || 0) - (a.id || 0));
-  const currentHostClean = (currentTabInfo.domain || "").replace(/^www\./i, "").toLowerCase();
 
-  // Filter requests belonging to current store domain
-  const domainRequests = sortedRequests.filter((r) => {
-    if (!currentHostClean) return false;
-    const reqHost = getCleanDomainLabel(r.siteDomain).replace(/^www\./i, "").toLowerCase();
-    return reqHost === currentHostClean || reqHost.includes(currentHostClean) || currentHostClean.includes(reqHost);
-  });
-
-  // --- When on a Shopping Cart / Checkout Page with a Live Cart Manifest ---
-  if (currentTabInfo.isCartOrCheckout && currentTabInfo.cartManifest) {
-    const liveManifest = currentTabInfo.cartManifest;
-
-    // 1. Check if any APPROVED or PENDING request matches the EXACT current Cart Manifest (Total + Items)
-    const exactCartMatch = domainRequests.find((r) => {
-      if (r.status !== "APPROVED" && r.status !== "PENDING") return false;
-      return doesCartManifestMatchRequest(liveManifest, r).match;
-    });
-
-    if (exactCartMatch) {
-      cartTamperAlert.classList.add("hidden");
-      if (!userDismissedTrackerForForm) {
-        showLiveApprovalTracker(exactCartMatch);
-      }
-      return;
-    }
-
-    // 2. No exact match! If we were previously showing a tracker for an older cart state, exit tracker immediately!
-    if (activeTrackedRequestId) {
-      const tracked = sortedRequests.find((r) => r.id === activeTrackedRequestId);
-      // Only keep showing DENIED if the child hasn't changed the cart since denial
-      if (tracked && tracked.status === "DENIED" && doesCartManifestMatchRequest(liveManifest, tracked).match) {
-        if (!userDismissedTrackerForForm) {
-          showLiveApprovalTracker(tracked);
-        }
-        return;
-      }
-      activeTrackedRequestId = null;
-      hideLiveApprovalTracker();
-    }
-
-    // 3. Check if child had a recent APPROVED request for this store whose manifest no longer matches (Tamper / Cart Stuffing / Swap!)
-    const previousApproved = domainRequests.find((r) => r.status === "APPROVED");
-    if (previousApproved) {
-      const check = doesCartManifestMatchRequest(liveManifest, previousApproved);
-      if (!check.match) {
-        const sym = CURRENCY_SYMBOLS[liveManifest.currency] || "$";
-        if (check.reason === "UNAPPROVED_ITEM_SWAP" || check.reason === "ITEM_COUNT_MISMATCH") {
-          cartTamperText.textContent = `Cart items changed since REQ #${previousApproved.id} was approved. Unapproved items cannot proceed to payment without fresh parent approval.`;
-        } else {
-          cartTamperText.textContent = `Cart total changed (${sym}${liveManifest.totalAmount.toFixed(2)} vs approved ${sym}${Number(previousApproved.amount).toFixed(2)}). Submit your updated cart for parent approval.`;
-        }
-        cartTamperAlert.classList.remove("hidden");
-        return;
-      }
-    }
-
-    cartTamperAlert.classList.add("hidden");
-    return;
-  }
-
-  // --- Outside Cart Page: If tracking a just-submitted manual fallback request, keep updating ---
-  if (activeTrackedRequestId && !userDismissedTrackerForForm) {
+  if (activeTrackedRequestId) {
     const tracked = sortedRequests.find((r) => r.id === activeTrackedRequestId);
     if (tracked) {
       showLiveApprovalTracker(tracked);
+      return;
     }
+  }
+
+  if (userDismissedTrackerForForm) return;
+
+  const currentUrlClean = getCanonicalProductUrl(currentTabInfo.url || "").toLowerCase();
+  const currentTitleClean = (itemNameInput.value || currentTabInfo.title || "").trim().toLowerCase();
+  const currentAmount = parseFloat(amountInput.value || "0");
+
+  const matchingForPage = sortedRequests.find((r) => {
+    if (r.status !== "PENDING" && r.status !== "APPROVED") return false;
+    const reqSiteClean = getCanonicalProductUrl(r.siteDomain || "").toLowerCase();
+    const reqTitleClean = (r.itemName || "").trim().toLowerCase();
+    const reqAmount = Number(r.amount);
+
+    // Also check if this product URL is part of an approved/pending Combo Request ([CART_LINKS])
+    const linkMatch = String(r.note || "").match(/\[CART_LINKS\]([\s\S]*?)\[\/CART_LINKS\]/i);
+    if (linkMatch && linkMatch[1] && currentUrlClean) {
+      const comboUrls = linkMatch[1].split("|").map((u) => getCanonicalProductUrl(u.trim()).toLowerCase());
+      if (comboUrls.some((u) => u && u.split("?")[0] === currentUrlClean.split("?")[0])) {
+        return true;
+      }
+    }
+
+    const exactPageUrlMatch =
+      currentUrlClean &&
+      reqSiteClean &&
+      reqSiteClean.includes("/") &&
+      currentUrlClean.split("?")[0] === reqSiteClean.split("?")[0];
+
+    const exactItemTitleMatch =
+      currentTitleClean &&
+      reqTitleClean &&
+      currentTitleClean === reqTitleClean;
+
+    const amountMatches = !currentAmount || isNaN(currentAmount) || Math.abs(reqAmount - currentAmount) < 0.02;
+
+    if (reqSiteClean.includes("/")) {
+      return exactPageUrlMatch && amountMatches;
+    }
+    return exactItemTitleMatch && amountMatches;
+  });
+
+  if (matchingForPage) {
+    showLiveApprovalTracker(matchingForPage);
   }
 }
 
-// Helper: Extract clean domain from full URL or domain string
 function getCleanDomainLabel(siteDomainOrUrl) {
   if (!siteDomainOrUrl) return "Online Store";
   try {
@@ -1083,14 +1603,13 @@ function getCleanDomainLabel(siteDomainOrUrl) {
   return siteDomainOrUrl;
 }
 
-// Render Requests in List View
 function renderRequestsList(requests) {
   if (!Array.isArray(requests) || requests.length === 0) {
     requestCountBadge.textContent = "0";
     requestsListContainer.innerHTML = `
       <div class="empty-state">
-        <span class="empty-title">NO REQUESTS YET</span>
-        <span class="empty-sub">When you submit a shopping cart for checkout approval, it will appear here.</span>
+        <span class="empty-title">NO REQUESTS SENT YET</span>
+        <span class="empty-sub">When you ask your parent to approve a product or combo, its status will appear here.</span>
       </div>
     `;
     return;
@@ -1121,34 +1640,31 @@ function renderRequestsList(requests) {
     const cleanDomain = getCleanDomainLabel(req.siteDomain);
 
     const proofRowId = `crypto-proof-${req.id}`;
-    const showCryptoRow = req.status === "APPROVED";
+    const showApprovedRow = req.status === "APPROVED";
     const cleanNoteText = req.note ? String(req.note).replace(/\s*\[CART_LINKS\][\s\S]*?\[\/CART_LINKS\]/gi, "").trim() : "";
 
     card.innerHTML = `
       <div class="card-top-row">
-        <span class="card-item-title">${escapeHtml(req.itemName || "Shopping Cart Order")}</span>
+        <span class="card-item-title">${escapeHtml(req.itemName || "Product Request")}</span>
         <span class="card-amount-badge">${escapeHtml(formattedAmount)}</span>
       </div>
       <div class="card-middle-row">
         <span class="card-domain-tag">${escapeHtml(cleanDomain)}</span>
         <span class="card-status-badge ${statusClass}">[ ${statusText} ]</span>
       </div>
-      ${showCryptoRow ? `<div id="${proofRowId}" class="crypto-proof-row verified"><span>RSA-2048 CART PROOF</span><span>[ VERIFYING... ]</span></div>` : ""}
+      ${showApprovedRow ? `<div id="${proofRowId}" class="crypto-proof-row verified"><span>PARENT APPROVAL</span><span>[ READY TO BUY ]</span></div>` : ""}
       ${cleanNoteText ? `<div class="card-note-row">"${escapeHtml(cleanNoteText)}"</div>` : ""}
     `;
 
     requestsListContainer.appendChild(card);
 
-    if (showCryptoRow && window.ParentGuardCrypto) {
+    if (showApprovedRow && window.ParentGuardCrypto) {
       window.ParentGuardCrypto.verifyPurchaseApproval(req, CONFIG.apiBaseUrl).then((res) => {
         const proofEl = document.getElementById(proofRowId);
         if (!proofEl) return;
         if (res.valid) {
           proofEl.className = "crypto-proof-row verified";
-          proofEl.innerHTML = `<span>RSA-2048 VERIFIED</span><span>[ EXACT CART UNLOCKED ]</span>`;
-        } else {
-          proofEl.className = "crypto-proof-row verified";
-          proofEl.innerHTML = `<span>PARENT APPROVAL</span><span>[ EXACT CART UNLOCKED ]</span>`;
+          proofEl.innerHTML = `<span>PARENT APPROVAL</span><span>[ UNLOCKED &amp; READY ]</span>`;
         }
       });
     }
