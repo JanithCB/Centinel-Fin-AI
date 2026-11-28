@@ -1115,6 +1115,11 @@
       return true;
     }
 
+    // Do not misclassify an explicit "Buy Now" button (e.g. Daraz sharing "add-to-cart-buy-now-btn")
+    if (sig.labels.some((lbl) => INSTANT_BUY_PATTERNS.some((rx) => rx.test(lbl))) || sig.id === "buy-now-button") {
+      return false;
+    }
+
     return (
       sig.id === "add-to-cart-button" ||
       sig.nameAttr === "submit.add-to-cart" ||
@@ -1136,6 +1141,12 @@
     if (!sig) return false;
 
     if (sig.labels.some((lbl) => PRODUCT_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) {
+      return false;
+    }
+
+    // Never lock if primary visible text says "Add to Cart / Bag / Basket"
+    const primaryLabel = sig.labels[0] || "";
+    if (ADD_TO_CART_PATTERNS.some((rx) => rx.test(primaryLabel)) || sig.id === "add-to-cart-button") {
       return false;
     }
 
@@ -1353,15 +1364,21 @@
   window.__PARENTGUARD_CONTENT_INITIALIZED__ = true;
 
   let verifiedDomainApprovals = [];
+  let lastLockCurrencyCode = inferTldCurrency(window.location.hostname || "") || "USD";
 
-  function formatProductLockLabel(amountStr) {
+  function formatProductLockLabel(amountStr, currencyCode) {
     const num = parseFloat(amountStr || "");
+    const cur = (currencyCode || lastLockCurrencyCode || "USD").toUpperCase();
+    const sym = cur === "LKR" ? "Rs. " : (cur === "EUR" ? "\u20AC" : (cur === "GBP" ? "\u00A3" : (cur === "INR" ? "\u20B9" : "$")));
     return !isNaN(num) && num > 0
-      ? `[ LOCKED ($${num.toFixed(2)}) — ASK PARENT ]`
+      ? `[ LOCKED (${sym}${num.toFixed(2)}) — ASK PARENT ]`
       : "[ LOCKED — ASK PARENT ]";
   }
 
   function handleBlockedAuxEvent(e) {
+    if (typeof chrome !== "undefined" && (!chrome.runtime || !chrome.runtime.id)) {
+      return;
+    }
     const btn = e.currentTarget;
     if (btn && btn.getAttribute("data-parentguard-unlocked") === "true" && verifiedDomainApprovals.length > 0) {
       return;
@@ -1454,6 +1471,9 @@
 
   // Click-Time Just-In-Time (JIT) Gate
   function handleBlockedClick(e) {
+    if (typeof chrome !== "undefined" && (!chrome.runtime || !chrome.runtime.id)) {
+      return;
+    }
     const btn = e.currentTarget;
 
     if (btn && btn.getAttribute("data-parentguard-unlocked") === "true" && verifiedDomainApprovals.length > 0) {
@@ -1642,8 +1662,39 @@
     } catch (_) {}
   }
 
+  function releaseStaleLockOnAddToCart(button) {
+    if (!button) return;
+    if (
+      button.classList.contains("parentguard-locked-btn") ||
+      button.getAttribute("data-parentguard-locked") === "true" ||
+      button.getAttribute("data-parentguard-intercepted") === "true"
+    ) {
+      button.classList.remove("parentguard-locked-btn");
+      button.removeAttribute("data-parentguard-locked");
+      button.removeAttribute("data-parentguard-intercepted");
+      button.removeAttribute("data-parentguard-unlocked");
+      button.disabled = false;
+      const origHref = button.getAttribute("data-parentguard-orig-href");
+      if (origHref) {
+        button.setAttribute("href", origHref);
+      }
+      if (typeof button.removeEventListener === "function") {
+        button.removeEventListener("click", handleBlockedClick, true);
+        button.removeEventListener("mousedown", handleBlockedAuxEvent, true);
+        button.removeEventListener("pointerdown", handleBlockedAuxEvent, true);
+        button.removeEventListener("keydown", handleBlockedAuxEvent, true);
+      }
+      interceptedButtons.delete(button);
+    }
+  }
+
   function scanPage() {
     const extraction = extractPageProducts();
+    if (extraction && Array.isArray(extraction.options) && extraction.options[0] && extraction.options[0].currency) {
+      lastLockCurrencyCode = extraction.options[0].currency;
+    } else if (extraction && extraction.cartCurrency) {
+      lastLockCurrencyCode = extraction.cartCurrency;
+    }
 
     if (isDedicatedCartOrCheckoutPage()) {
       verifyAndUnlockApprovedButtons();
@@ -1662,6 +1713,11 @@
     );
     let newlyAdded = false;
     for (const el of candidates) {
+      if (isAddToCartButton(el)) {
+        // Ensure Add to Cart buttons never carry stale lock styling/attributes across extension reloads
+        releaseStaleLockOnAddToCart(el);
+        continue;
+      }
       if (isProductIngressButton(el)) {
         interceptButton(el, defaultAmountToBind);
         newlyAdded = true;
