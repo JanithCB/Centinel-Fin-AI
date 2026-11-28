@@ -109,7 +109,7 @@ export default function ApprovalsPage() {
         prev.map((r) => (r.id === requestId ? { ...r, ...updated, status: "APPROVED" } : r))
       );
       setActionSuccess(
-        `Request #${requestId} approved! Cryptographic RSA-2048 signature generated.`
+        `Request #${requestId} approved! Purchase is now unlocked for your child.`
       );
     } catch (err: any) {
       setActionError(err?.message || `Failed to approve request #${requestId}.`);
@@ -282,11 +282,11 @@ export default function ApprovalsPage() {
               Parent Approvals Center
             </h1>
             <span className="px-2.5 py-0.5 bg-violet border-2 border-ink text-ink font-mono text-[11px] font-bold uppercase rounded shadow-[2px_2px_0px_#151515]">
-              PG-4 SUPERVISOR
+              PARENT CONTROLS
             </span>
           </div>
           <p className="font-body-sm text-xs sm:text-sm text-outline mt-1">
-            Real-time human-in-the-loop authorization hub. Verify merchant links and approve requests to generate RSA-2048 signatures.
+            Review your family&apos;s purchase requests, inspect product links, and approve or decline items in real time.
           </p>
         </div>
 

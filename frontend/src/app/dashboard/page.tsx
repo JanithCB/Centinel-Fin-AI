@@ -237,7 +237,7 @@ export default function DashboardPage() {
         prev.map((r) => (r.id === requestId ? { ...r, ...updated, status: "APPROVED" } : r))
       );
       setActionSuccess(
-        `Request #${requestId} approved. Cryptographic RSA-2048 signature generated.`
+        `Request #${requestId} approved. Purchase is now unlocked for your child.`
       );
     } catch (err: any) {
       setActionError(err?.message || "Failed to approve request.");
@@ -384,9 +384,6 @@ export default function DashboardPage() {
           <Link href="/" className="font-headline-sm font-bold text-ink uppercase tracking-tight hover:text-primary transition-colors">
             PARENTGUARD
           </Link>
-          <span className="bg-surface-container text-ink font-mono text-xs px-2.5 py-1 rounded border-2 border-ink font-bold">
-            v1.0-MVP
-          </span>
           {profile && (
             <span className={`px-2.5 py-1 rounded border-2 border-ink text-xs font-bold uppercase tracking-wider ${
               profile.role === "PARENT" ? "bg-primary text-on-primary-fixed" : "bg-sky text-ink"
@@ -602,7 +599,7 @@ export default function DashboardPage() {
                     {requestStats.primaryCurrency}
                   </strong>{" "}
                   across {requestStats.approvedCount} authorized purchase
-                  {requestStats.approvedCount === 1 ? "" : "s"}. Clicking Approve generates a tamper-proof RSA-2048 signature.
+                  {requestStats.approvedCount === 1 ? "" : "s"}. Review and authorize your child&apos;s purchase requests below.
                 </p>
               </div>
             </div>

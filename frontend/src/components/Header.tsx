@@ -50,20 +50,8 @@ export default function Header() {
               CENTINEL FIN AI <span className="text-on-surface-variant font-body-sm text-body-sm">// PARENTGUARD</span>
             </span>
           </Link>
-          <span className="hidden xl:inline-flex items-center px-2 py-0.5 bg-mint border-[2px] border-ink text-ink font-label-sm text-label-sm uppercase tracking-widest shadow-[2px_2px_0_#151515] shrink-0">
-            PHASE 1 FOUNDATION
-          </span>
         </div>
         <nav className="flex items-center gap-2.5 lg:gap-4 shrink-0">
-          <Link
-            href="/centinel_dev_log_3d.html"
-            target="_blank"
-            className="hidden sm:flex font-label-md text-label-md uppercase tracking-wider px-3 py-2 bg-mint border-[2px] border-ink text-ink shadow-[3px_3px_0_#151515] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#151515] transition-all items-center gap-1.5"
-          >
-            <span className="w-2 h-2 rounded-full bg-ink animate-pulse"></span>
-            <span>Architecture 3D</span>
-          </Link>
-
           {userEmail ? (
             <>
               <Link

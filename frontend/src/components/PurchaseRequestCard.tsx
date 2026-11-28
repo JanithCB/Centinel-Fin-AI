@@ -102,7 +102,7 @@ export default function PurchaseRequestCard({
               {isApproved && request.rsaSignature && (
                 <span className="px-2 py-0.5 bg-mint/50 border border-ink text-ink font-mono text-[10px] font-bold uppercase rounded inline-flex items-center gap-1">
                   <span className="material-symbols-outlined text-[12px]">shield</span>
-                  <span>RSA-2048 SIGNED</span>
+                  <span>VERIFIED APPROVAL</span>
                 </span>
               )}
               {isDenied && (
@@ -291,7 +291,7 @@ export default function PurchaseRequestCard({
             className="ml-auto px-3.5 py-2 bg-paper text-ink font-bold text-xs uppercase rounded border-2 border-ink shadow-[2px_2px_0px_#151515] hover:bg-surface-container inline-flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm text-ink">verified</span>
-            <span>Cryptographic Proof</span>
+            <span>Approval Details</span>
           </button>
         )}
 

@@ -85,7 +85,7 @@ describe('ApprovalsPage Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Parent Approvals Center/i)).toBeInTheDocument()
-      expect(screen.getByText(/PG-4 SUPERVISOR/i)).toBeInTheDocument()
+      expect(screen.getByText(/PARENT CONTROLS/i)).toBeInTheDocument()
       expect(screen.getByText(/Hollow Knight Game/i)).toBeInTheDocument()
       expect(screen.getByText('store.steampowered.com')).toBeInTheDocument()
       expect(screen.getByText(/Leo Turner/i)).toBeInTheDocument()
@@ -155,7 +155,7 @@ describe('ApprovalsPage Component', () => {
 
     await waitFor(() => {
       expect(ApiClient.approvePurchaseRequest).toHaveBeenCalledWith(202)
-      expect(screen.getByText(/Cryptographic RSA-2048 signature generated/i)).toBeInTheDocument()
+      expect(screen.getByText(/Purchase is now unlocked for your child/i)).toBeInTheDocument()
     })
   })
 

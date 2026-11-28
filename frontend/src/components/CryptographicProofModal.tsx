@@ -72,10 +72,10 @@ export default function CryptographicProofModal({
                 id="crypto-proof-modal-title"
                 className="font-headline-sm font-bold text-ink uppercase text-base"
               >
-                Cryptographic Approval Proof
+                Verified Approval Details
               </h3>
               <p className="font-caption text-xs text-outline">
-                RSA-2048 Non-Repudiation Guarantee (NB6005CEM CW1 Task 1.c)
+                Official Parent Authorization Record
               </p>
             </div>
           </div>
@@ -183,7 +183,7 @@ export default function CryptographicProofModal({
                     : "Backend Key Discovery Online"}
                 </p>
                 <p className="font-caption text-[10px] text-outline">
-                  Chrome Extension (PG-5) verifies this signature offline via WebCrypto API before unlocking DOM.
+                  ParentGuard Browser Extension automatically verifies this approval before unlocking the product for your child.
                 </p>
               </div>
             </div>
