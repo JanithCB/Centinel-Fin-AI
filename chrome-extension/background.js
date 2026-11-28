@@ -8,9 +8,12 @@
  * - Relays API requests to Spring Boot backend (http://localhost:8080) to avoid HTTPS->HTTP mixed-content blocks on external stores
  */
 
+const EXTENSION_BUILD_ID = "pg-universal-v3.0";
+
 const DEFAULT_CONFIG = {
   apiBaseUrl: "http://localhost:8080",
-  version: "1.0.0"
+  version: "1.0.0",
+  buildId: EXTENSION_BUILD_ID
 };
 
 // Helper: Ensure content script and CSS are injected into a tab
@@ -49,6 +52,16 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
   console.log("[Centinel Fin AI] Service worker initialized with API:", current.apiBaseUrl || DEFAULT_CONFIG.apiBaseUrl);
 
+  // If a reload was triggered from the popup header or build-sync, refresh that active tab cleanly
+  try {
+    const pending = await chrome.storage.local.get(["pendingReloadTabId"]);
+    if (pending && pending.pendingReloadTabId) {
+      const targetTabId = pending.pendingReloadTabId;
+      await chrome.storage.local.remove(["pendingReloadTabId"]);
+      chrome.tabs.reload(targetTabId).catch(() => {});
+    }
+  } catch (_) {}
+
   // Proactive auto-injection into all existing open web tabs upon installation or developer reload
   try {
     const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
@@ -76,7 +89,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.type) return false;
 
   if (message.type === "PING") {
-    sendResponse({ status: "OK", timestamp: Date.now() });
+    sendResponse({ status: "OK", buildId: EXTENSION_BUILD_ID, timestamp: Date.now() });
     return false;
   }
 

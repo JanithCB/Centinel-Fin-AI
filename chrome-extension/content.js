@@ -291,13 +291,44 @@
       .trim();
   }
 
-  // Helper: Check if a URL path is a dedicated Shopping Cart or Checkout route
-  function isCartOrCheckoutPath(urlOrPath) {
-    if (!urlOrPath) return false;
-    let pathname = String(urlOrPath).toLowerCase();
+  /**
+   * Universal Root Store Domain Resolver:
+   * Maps subdomains like www.daraz.lk, cart.daraz.lk, checkout.daraz.lk -> daraz.lk
+   * and store.steampowered.com -> steampowered.com, www.amazon.co.uk -> amazon.co.uk
+   */
+  function getRootStoreDomain(hostnameOrUrl) {
+    let host = String(hostnameOrUrl || window.location.hostname || "").toLowerCase().trim();
+    try {
+      if (host.startsWith("http://") || host.startsWith("https://")) {
+        host = new URL(host).hostname.toLowerCase();
+      } else if (host.includes("/")) {
+        host = host.split("/")[0];
+      }
+    } catch (_) {}
+    host = host.replace(/^www\./i, "");
+    if (!host || host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+      return host;
+    }
+    const parts = host.split(".").filter(Boolean);
+    if (parts.length <= 2) return host;
+    if (/\.(co|com|org|net|edu|gov)\.[a-z]{2}$/i.test(host)) {
+      return parts.slice(-3).join(".");
+    }
+    return parts.slice(-2).join(".");
+  }
+
+  // Helper: Check if a URL or path is a dedicated Shopping Cart or Checkout route across any web application
+  function isCartOrCheckoutPath(urlOrPath, optionalSearch, optionalHost) {
+    if (!urlOrPath && !optionalHost) return false;
+    let pathname = String(urlOrPath || "").toLowerCase();
+    let search = String(optionalSearch || "").toLowerCase();
+    let host = String(optionalHost || "").toLowerCase();
     try {
       if (pathname.startsWith("http://") || pathname.startsWith("https://")) {
-        pathname = new URL(pathname).pathname.toLowerCase();
+        const parsed = new URL(pathname);
+        pathname = parsed.pathname.toLowerCase();
+        search = search || parsed.search.toLowerCase();
+        host = host || parsed.hostname.toLowerCase();
       }
     } catch (_) {}
 
@@ -305,39 +336,44 @@
       /\/app\/\d+/i.test(pathname) ||
       /\/dp\/[a-z0-9]+/i.test(pathname) ||
       /\/gp\/product\//i.test(pathname) ||
-      /\/products?\//i.test(pathname) ||
+      (/\/products?\//i.test(pathname) && !/\/products?\/cart/i.test(pathname)) ||
       /\/item\//i.test(pathname)
     ) {
       return false;
     }
 
-    if (/\/(cart|shopping-cart|viewcart|basket|bag|checkout|checkouts|onepagecheckout)(\/|$)/i.test(pathname)) {
+    if (/^(cart|checkout|pay|billing)\./i.test(host)) {
+      return true;
+    }
+
+    if (
+      /\/(cart|shopping-cart|viewcart|basket|bag|trolley|checkout|checkouts|onepagecheckout|shipping|payment|order-review|place-order)(\/|$)/i.test(
+        pathname
+      )
+    ) {
       return true;
     }
     if (pathname.includes("/gp/cart") || pathname.includes("/gp/buy")) {
+      return true;
+    }
+    if (
+      search.includes("route=checkout") ||
+      search.includes("page=cart") ||
+      search.includes("step=contact_information") ||
+      search.includes("step=shipping") ||
+      search.includes("step=payment")
+    ) {
       return true;
     }
     return false;
   }
 
   function isDedicatedCartOrCheckoutPage() {
-    const pathname = (window.location.pathname || "").toLowerCase();
-    const search = (window.location.search || "").toLowerCase();
-
-    if (
-      /\/app\/\d+/i.test(pathname) ||
-      /\/dp\/[a-z0-9]+/i.test(pathname) ||
-      /\/gp\/product\//i.test(pathname) ||
-      /\/products?\//i.test(pathname) ||
-      /\/item\//i.test(pathname)
-    ) {
-      return false;
-    }
-
-    if (isCartOrCheckoutPath(pathname) || search.includes("step=contact_information")) {
-      return true;
-    }
-    return false;
+    return isCartOrCheckoutPath(
+      window.location.pathname || "",
+      window.location.search || "",
+      window.location.hostname || ""
+    );
   }
 
   /**
@@ -374,25 +410,36 @@
     }
   }
 
-  // Helper: Scrape Cart Total on /cart or /checkout pages (for Smart Cart Safety Limit)
+  // Helper: Scrape Cart Total on /cart or /checkout pages across global & regional web apps
   function extractCartTotal(metaCurrencyHint) {
+    const fallbackCur = metaCurrencyHint || inferTldCurrency(window.location.hostname || "") || null;
     const candidates = [
       () => {
         const estRow = document.querySelector(".cart_totals_area, .estimated_total_box, #cart_estimated_total");
-        if (estRow) return extractActivePriceFromBox(estRow, metaCurrencyHint);
+        if (estRow) return extractActivePriceFromBox(estRow, fallbackCur);
         const bodyText = document.body ? (document.body.innerText || document.body.textContent || "") : "";
-        const match = bodyText.match(/Estimated\s+total[\s\S]{0,60}?([$€£₹RsA-Z\s]*\d{1,3}(?:[.,]\d{3})*[.,]\d{2})/i);
-        return match ? parsePriceText(match[1], metaCurrencyHint) : null;
+        const match = bodyText.match(
+          /(?:Estimated\s+total|Order\s+Total|Grand\s+Total|Total\s+Amount|Subtotal)[\s\S]{0,60}?((?:Rs\.?|LKR|USD|EUR|GBP|INR|[$€£₹])\s*\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?|\d{1,3}(?:,\d{3})+(?:\.\d{2})?\s*(?:LKR|USD|EUR|GBP|INR))/i
+        );
+        return match ? parsePriceText(match[1], fallbackCur) : null;
       },
       () => {
         const el = document.querySelector("#sc-subtotal-amount-activecart, #sc-subtotal-amount-buybox");
-        return el ? parsePriceText(el.textContent, metaCurrencyHint) : null;
+        return el ? parsePriceText(el.textContent, fallbackCur) : null;
       },
       () => {
         const el = document.querySelector(
-          ".totals__subtotal-value, .cart__subtotal, .order-total .amount, .cart-subtotal .amount, [data-testid*='subtotal'], [data-checkout-subtotal], .cart-total .price, .order-summary .price"
+          ".checkout-order-total-fee, [class*='checkout-order-total' i], .totals__subtotal-value, .cart__subtotal, .order-total .amount, .cart-subtotal .amount, [data-testid*='subtotal'], [data-checkout-subtotal], .cart-total .price, .order-summary .price, [class*='summary-total' i], [class*='total-price' i]"
         );
-        return el ? parsePriceText(el.textContent, metaCurrencyHint) : null;
+        return el ? extractActivePriceFromBox(el, fallbackCur) || parsePriceText(el.textContent, fallbackCur) : null;
+      },
+      () => {
+        const liveRows = extractLiveCartItems(fallbackCur);
+        if (liveRows.length > 0 && liveRows.every((r) => typeof r.amount === "number" && r.amount > 0)) {
+          const sum = liveRows.reduce((acc, r) => acc + r.amount, 0);
+          return { amount: Number(sum.toFixed(2)), currency: liveRows[0].currency || fallbackCur || "USD" };
+        }
+        return null;
       }
     ];
 
@@ -470,8 +517,15 @@
   function discoverStoreCartUrl() {
     try {
       const hostname = (window.location.hostname || "").toLowerCase();
+      if (hostname.includes("daraz.lk")) return "https://cart.daraz.lk/cart";
+      if (hostname.includes("daraz.pk")) return "https://cart.daraz.pk/cart";
+      if (hostname.includes("daraz.com.bd")) return "https://cart.daraz.com.bd/cart";
+      if (hostname.includes("ebay.com")) return "https://cart.ebay.com";
+      if (hostname.includes("amazon.")) return `${window.location.origin}/gp/cart/view.html`;
+      if (hostname.includes("steampowered.com")) return "https://store.steampowered.com/cart";
+
       const cartLink = document.querySelector(
-        "a[href*='/cart'], a[href*='/gp/cart'], a[href*='/basket'], a[href*='/bag']"
+        "a[href*='/cart'], a[href*='/gp/cart'], a[href*='/basket'], a[href*='/bag'], a[href*='route=checkout/cart']"
       );
       if (cartLink && cartLink.getAttribute) {
         const href = cartLink.getAttribute("href");
@@ -479,8 +533,6 @@
           return new URL(href, window.location.origin).href;
         }
       }
-      if (hostname.includes("amazon.")) return `${window.location.origin}/gp/cart/view.html`;
-      if (hostname.includes("steampowered.com")) return "https://store.steampowered.com/cart";
     } catch (_) {}
     return `${window.location.origin}/cart`;
   }
@@ -915,11 +967,12 @@
       const cleanItemUrl = getCanonicalProductUrl(item.productUrl || window.location.href);
       const cleanItemTitle = cleanStoreTitle(item.title || document.title || "Store Item");
       const normItemTitle = normalizeEditionTitle(cleanItemTitle);
+      const itemRootDomain = getRootStoreDomain(item.domain || window.location.hostname);
 
-      // Match existing entry only when BOTH the domain/URL AND normalized edition title match,
+      // Match existing entry only when BOTH the root store domain/URL AND normalized edition title match,
       // so distinct editions/DLCs added on the same page are preserved individually.
       const existingIdx = ledger.findIndex((i) => {
-        if (i.domain !== item.domain) return false;
+        if (getRootStoreDomain(i.domain) !== itemRootDomain) return false;
         const normExisting = normalizeEditionTitle(i.title || "");
         const titleMatches = normExisting && normItemTitle && normExisting === normItemTitle;
         const urlMatches =
@@ -935,7 +988,7 @@
         amount: typeof item.amount === "number" && !isNaN(item.amount) ? Number(item.amount.toFixed(2)) : null,
         currency: item.currency || "USD",
         productUrl: cleanItemUrl,
-        domain: item.domain,
+        domain: itemRootDomain,
         addedAt: Date.now()
       };
 
@@ -955,22 +1008,15 @@
     }
   }
 
-  function handleSilentAddToCartCapture(e) {
-    if (isDedicatedCartOrCheckoutPage()) return;
+  let lastCaptureTs = 0;
 
-    const target = e.target;
-    if (!target) return;
+  function captureCurrentProductFromElement(triggerEl) {
+    const now = Date.now();
+    if (now - lastCaptureTs < 400) return;
+    lastCaptureTs = now;
 
-    const btn = target.closest
-      ? target.closest(
-          "button, a, input[type='button'], input[type='submit'], [role='button'], .btn_addtocart, [id*='add-to-cart' i], [class*='add-to-cart' i]"
-        )
-      : null;
-
-    if (!btn || !isAddToCartButton(btn)) return;
-
-    const container = btn.closest
-      ? btn.closest(".game_area_purchase_game, form, .product-form, [class*='product' i], main, article") || document.body
+    const container = triggerEl && triggerEl.closest
+      ? triggerEl.closest(".game_area_purchase_game, form, .product-form, [class*='product' i], main, article") || document.body
       : document.body;
 
     const pageExtraction = extractPageProducts();
@@ -979,7 +1025,11 @@
 
     let priceObj = extractActivePriceFromBox(container, tldCurrency);
     if (!priceObj && pageExtraction && pageExtraction.activePrice) {
-      priceObj = { amount: pageExtraction.activePrice, currency: tldCurrency || "USD" };
+      const optCur =
+        pageExtraction.options && pageExtraction.options[0] && pageExtraction.options[0].currency
+          ? pageExtraction.options[0].currency
+          : tldCurrency || "USD";
+      priceObj = { amount: pageExtraction.activePrice, currency: optCur };
     } else if (!priceObj && pageExtraction && pageExtraction.options && pageExtraction.options.length > 0) {
       priceObj = {
         amount: pageExtraction.options[0].amount,
@@ -987,10 +1037,10 @@
       };
     }
 
-    let title = btn.getAttribute("data-parentguard-title");
-    if (!title && container) {
+    let title = triggerEl && triggerEl.getAttribute ? triggerEl.getAttribute("data-parentguard-title") : null;
+    if (!title && container && container !== document.body) {
       const containerH1 = container.querySelector(
-        "h1, h2, .game_area_purchase_game_dropdown_selection, [class*='title' i]"
+        "h1, h2, .game_area_purchase_game_dropdown_selection, [class*='pdp-mod-product-badge-title' i]"
       );
       if (containerH1) {
         title = (containerH1.textContent || "").replace(/^Buy\s+/i, "").trim();
@@ -1003,31 +1053,59 @@
       title = document.title || "Store Item";
     }
 
-    const itemToRecord = {
+    recordCartLedgerItem({
       title: cleanStoreTitle(title),
       amount: priceObj ? priceObj.amount : null,
       currency: priceObj ? priceObj.currency : (tldCurrency || "USD"),
       productUrl: getCanonicalProductUrl(window.location.href),
-      domain: hostname
-    };
+      domain: getRootStoreDomain(hostname)
+    });
+  }
 
-    recordCartLedgerItem(itemToRecord);
+  function handleSilentAddToCartCapture(e) {
+    if (isDedicatedCartOrCheckoutPage()) return;
+
+    const target = e.target;
+    if (!target || !target.closest) return;
+
+    // Support native buttons, links, inputs, AND custom React/Vue div/span buttons across any web app
+    const btn = target.closest(
+      "button, a, input[type='button'], input[type='submit'], [role='button'], .btn_addtocart, [id*='add-to-cart' i], [class*='add-to-cart' i], [class*='addtocart' i], [class*='buy-now' i], [class*='pdp-button' i]"
+    );
+
+    if (!btn) return;
+    if (isInsideSlideOutCartDrawer(btn)) return;
+    if (!isAddToCartButton(btn) && !isProductBuyNowCaptureTrigger(btn)) return;
+
+    captureCurrentProductFromElement(btn);
+  }
+
+  function handleSilentFormSubmitCapture(e) {
+    if (isDedicatedCartOrCheckoutPage()) return;
+    const form = e.target;
+    if (!form || !form.getAttribute) return;
+    const action = String(form.getAttribute("action") || "").toLowerCase();
+    if (action.includes("/cart/add") || action.includes("add-to-cart") || action.includes("route=checkout/cart/add")) {
+      captureCurrentProductFromElement(form);
+    }
   }
 
   document.addEventListener("click", handleSilentAddToCartCapture, true);
+  document.addEventListener("submit", handleSilentFormSubmitCapture, true);
 
   // Patterns for Add-to-Cart Buttons (Freely clickable; triggers Silent Cart Capture)
   const ADD_TO_CART_PATTERNS = [
     /\badd\s+to\s+(shopping\s+|my\s+)?(cart|bag|basket|trolley)\b/i,
-    /\bin\s*cart\b/i
+    /\bin\s*cart\b/i,
+    /^\+\s*cart$/i
   ];
 
-  // Patterns for Instant-Buy Buttons on Product Pages (Bypasses cart; locked until approved)
+  // Patterns for Buy-Now / Pre-Order Buttons on Product Pages (Also unblocked on product pages; triggers Silent Cart Capture before checkout gate!)
   const INSTANT_BUY_PATTERNS = [
     /\bbuy\s+(it\s+)?now\b/i,
     /\binstant\s+buy\b/i,
-    /\b1[-\s]?click\s+buy\b/i,
-    /\b1[-\s]?click\s+checkout\b/i
+    /\border\s+now\b/i,
+    /\bpre[-\s]?order(\s+now)?\b/i
   ];
 
   // Patterns strictly excluded from locking/capture (Wishlists, Demos, Free items, Navigation)
@@ -1052,18 +1130,29 @@
   // Patterns for Cart / Checkout Payment Gate Buttons (Protected by Smart Cart Safety Limit)
   const CART_PAYMENT_GATE_PATTERNS = [
     /\bcontinue\s+to\s+(payment|checkout|shipping|delivery|billing)\b/i,
-    /\bproceed\s+to\s+(checkout|payment)\b/i,
+    /\bproceed\s+to\s+(checkout|payment|pay)\b/i,
     /\bgo\s+to\s+(checkout|payment)\b/i,
     /\bcheck\s*out(\s+now)?\b/i,
     /\bcheckout\b/i,
     /\bpay\s+now\b/i,
+    /\bconfirm\s+and\s+pay\b/i,
     /\bplace\s+(your\s+)?order\b/i,
+    /\bconfirm\s+order\b/i,
     /\bcomplete\s+(purchase|order|payment)\b/i,
     /\bsubmit\s+(order|payment)\b/i,
     /\bpurchase\s+(for\s+myself|as\s+a\s+gift)\b/i
   ];
 
-  function extractButtonSignals(element) {
+  function isInsideSlideOutCartDrawer(element) {
+    if (!element || !element.closest) return false;
+    return Boolean(
+      element.closest(
+        "#CartDrawer, [id*='cart-drawer' i], [class*='cart-drawer' i], [class*='mini-cart' i], [class*='side-cart' i], [class*='drawer__cart' i], [role='dialog'][aria-label*='cart' i], [role='dialog'][aria-label*='bag' i]"
+      )
+    );
+  }
+
+  function extractButtonSignals(element, allowCustomDivSpan) {
     if (!element || element.nodeType !== Node.ELEMENT_NODE) return null;
     const tagName = element.tagName.toUpperCase();
     const role = (element.getAttribute ? element.getAttribute("role") : "") || "";
@@ -1071,7 +1160,8 @@
       tagName === "BUTTON" ||
       tagName === "A" ||
       tagName === "INPUT" ||
-      role.toLowerCase() === "button";
+      role.toLowerCase() === "button" ||
+      (allowCustomDivSpan && (tagName === "DIV" || tagName === "SPAN"));
     if (!isClickableTag) return null;
 
     const visibleText = (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
@@ -1104,7 +1194,7 @@
       return false;
     }
 
-    const sig = extractButtonSignals(element);
+    const sig = extractButtonSignals(element, true);
     if (!sig) return false;
 
     if (sig.labels.some((lbl) => PRODUCT_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) {
@@ -1115,7 +1205,6 @@
       return true;
     }
 
-    // Do not misclassify an explicit "Buy Now" button (e.g. Daraz sharing "add-to-cart-buy-now-btn")
     if (sig.labels.some((lbl) => INSTANT_BUY_PATTERNS.some((rx) => rx.test(lbl))) || sig.id === "buy-now-button") {
       return false;
     }
@@ -1124,6 +1213,7 @@
       sig.id === "add-to-cart-button" ||
       sig.nameAttr === "submit.add-to-cart" ||
       sig.nameAttr === "add" ||
+      sig.nameAttr === "add-to-cart" ||
       sig.className.includes("btn_addtocart") ||
       sig.className.includes("add-to-cart") ||
       sig.className.includes("add_to_cart") ||
@@ -1133,52 +1223,53 @@
     );
   }
 
-  function isInstantBuyButton(element) {
+  function isProductBuyNowCaptureTrigger(element) {
     if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
     if (isDedicatedCartOrCheckoutPage()) return false;
 
-    const sig = extractButtonSignals(element);
+    const sig = extractButtonSignals(element, true);
     if (!sig) return false;
+    if (sig.labels.some((lbl) => PRODUCT_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) return false;
 
-    if (sig.labels.some((lbl) => PRODUCT_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) {
-      return false;
-    }
-
-    // Never lock if primary visible text says "Add to Cart / Bag / Basket"
-    const primaryLabel = sig.labels[0] || "";
-    if (ADD_TO_CART_PATTERNS.some((rx) => rx.test(primaryLabel)) || sig.id === "add-to-cart-button") {
-      return false;
-    }
-
-    if (sig.labels.some((lbl) => INSTANT_BUY_PATTERNS.some((rx) => rx.test(lbl)))) {
-      return true;
-    }
-
-    return sig.id === "buy-now-button";
+    return (
+      sig.labels.some((lbl) => INSTANT_BUY_PATTERNS.some((rx) => rx.test(lbl))) ||
+      sig.id === "buy-now-button"
+    );
   }
 
-  // Product-Page Ingress Button: Only lock Instant-Buy buttons that bypass the cart!
-  // Normal "Add to Cart" is NOT locked, allowing child to build their cart freely.
+  // On Product Pages, neither Add-to-Cart NOR Buy-Now is locked (both silently capture the product URL & price!).
+  // Only Checkout buttons inside open Slide-Out Cart Drawers or Dedicated Cart/Checkout pages are locked.
+  function isInstantBuyButton() {
+    return false;
+  }
+
   function isProductIngressButton(element) {
-    return isInstantBuyButton(element);
+    if (isInsideSlideOutCartDrawer(element)) {
+      return matchesCheckoutGateSignals(element);
+    }
+    return false;
   }
 
   function matchesProductIngressTextOrAttr(element) {
-    return isInstantBuyButton(element);
+    return isProductIngressButton(element);
   }
 
-  function isCartPaymentGateButton(element) {
+  function matchesCheckoutGateSignals(element) {
     if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
-    if (!isDedicatedCartOrCheckoutPage()) return false;
-
     if (
       element.closest &&
-      (element.closest("#parentguard-barrier-root, header nav") || element.classList.contains("parentguard-in-place-shield"))
+      (element.closest("#parentguard-barrier-root, header nav") ||
+        (element.classList && element.classList.contains("parentguard-in-place-shield")))
     ) {
       return false;
     }
 
-    const sig = extractButtonSignals(element);
+    // Avoid matching large container divs when checking custom React/Vue buttons
+    if ((element.tagName === "DIV" || element.tagName === "SPAN") && element.children && element.children.length > 2) {
+      return false;
+    }
+
+    const sig = extractButtonSignals(element, true);
     if (!sig) return false;
 
     if (sig.labels.some((lbl) => PRODUCT_EXCLUSION_PATTERNS.some((rx) => rx.test(lbl)))) {
@@ -1195,6 +1286,11 @@
       sig.id === "checkout" ||
       sig.className.includes("checkout-button")
     );
+  }
+
+  function isCartPaymentGateButton(element) {
+    if (!isDedicatedCartOrCheckoutPage() && !isInsideSlideOutCartDrawer(element)) return false;
+    return matchesCheckoutGateSignals(element);
   }
 
   // Helper: Check if a URL string contains a specific product path beyond just the domain root
@@ -1338,6 +1434,7 @@
   window.__PARENTGUARD_PRODUCT_UTILS__ = {
     parsePriceText,
     inferTldCurrency,
+    getRootStoreDomain,
     extractActivePriceFromBox,
     extractLiveCartItems,
     cleanStoreTitle,
@@ -1349,6 +1446,7 @@
     doesLiveCartMatchApproval,
     isProductIngressButton,
     isAddToCartButton,
+    isProductBuyNowCaptureTrigger,
     isInstantBuyButton,
     isCartPaymentGateButton,
     isRecentActiveApproval,
@@ -1590,13 +1688,13 @@
       const res = await chrome.runtime.sendMessage({ type: "FETCH_MY_REQUESTS" });
       if (!res || !res.success || !Array.isArray(res.data)) return;
 
-      const currentHost = getCleanHostKey(window.location.hostname);
+      const currentRoot = getRootStoreDomain(window.location.hostname);
       const candidateApprovals = res.data
         .filter((req) => {
           if (req.status !== "APPROVED" || !req.rsaSignature) return false;
           if (!isRecentActiveApproval(req)) return false;
-          const reqDomain = (req.siteDomain || "").toLowerCase();
-          return reqDomain.includes(currentHost) || currentHost.includes(reqDomain);
+          const reqRoot = getRootStoreDomain(req.siteDomain || "");
+          return Boolean(currentRoot && reqRoot && (reqRoot === currentRoot || reqRoot.includes(currentRoot) || currentRoot.includes(reqRoot)));
         })
         .sort((a, b) => (b.id || 0) - (a.id || 0));
 
@@ -1611,17 +1709,15 @@
 
       verifiedDomainApprovals = cryptoVerified;
 
-      // --- CASE 1: On /cart or /checkout page -> Fail-Closed Smart Cart Safety Limit + Item Integrity ---
-      if (isDedicatedCartOrCheckoutPage()) {
+      // --- CASE 1: On /cart, /checkout, or Slide-Out Cart Drawer -> Fail-Closed Smart Cart Safety Limit + Item Integrity ---
+      if (isDedicatedCartOrCheckoutPage() || interceptedButtons.size > 0) {
         const cartTotalObj = extractCartTotal();
         const liveCartTotal = cartTotalObj ? cartTotalObj.amount : 0;
         const liveCartItems = extractLiveCartItems();
-        // Use the most recent active approval (Fixes P0-2: never sum all lifetime historical approvals)
         const latestActiveApproval = cryptoVerified[0] || null;
         const approvedCeiling = latestActiveApproval ? Number(latestActiveApproval.amount) || 0 : 0;
         const itemsMatch = doesLiveCartMatchApproval(liveCartItems, latestActiveApproval);
 
-        // Fail-Closed: Only release cart lock when liveCartTotal is positively read (> 0), within approvedCeiling, and items match
         if (approvedCeiling > 0 && liveCartTotal > 0 && liveCartTotal <= approvedCeiling + 0.02 && itemsMatch) {
           releaseAllLocksOnPage();
           return;
@@ -1635,7 +1731,7 @@
         }
 
         const gateCandidates = document.querySelectorAll(
-          "button, a, input[type='submit'], input[type='button'], [role='button']"
+          "button, a, input[type='submit'], input[type='button'], [role='button'], div[class*='btn' i], div[class*='checkout' i]"
         );
         for (const el of gateCandidates) {
           if (isCartPaymentGateButton(el)) {
@@ -1645,30 +1741,17 @@
         }
         return;
       }
-
-      // --- CASE 2: On Product Pages -> Unlock ONLY the specific approved edition button ---
-      if (interceptedButtons.size === 0) return;
-
-      interceptedButtons.forEach((btn) => {
-        const matchingApproval = cryptoVerified.find((req) =>
-          doesProductButtonMatchApproval(btn, req, window.location.href, document.title)
-        );
-        if (matchingApproval) {
-          unlockButtonWithProof(btn, matchingApproval);
-        } else if (btn.getAttribute("data-parentguard-unlocked") === "true") {
-          relockButton(btn);
-        }
-      });
     } catch (_) {}
   }
 
-  function releaseStaleLockOnAddToCart(button) {
-    if (!button) return;
-    if (
-      button.classList.contains("parentguard-locked-btn") ||
-      button.getAttribute("data-parentguard-locked") === "true" ||
-      button.getAttribute("data-parentguard-intercepted") === "true"
-    ) {
+  function releaseStaleProductPageLocks() {
+    const lockedEls = document.querySelectorAll(
+      ".parentguard-locked-btn, [data-parentguard-locked='true'], [data-parentguard-intercepted='true']"
+    );
+    for (const button of lockedEls) {
+      if (isInsideSlideOutCartDrawer(button) && matchesCheckoutGateSignals(button)) {
+        continue;
+      }
       button.classList.remove("parentguard-locked-btn");
       button.removeAttribute("data-parentguard-locked");
       button.removeAttribute("data-parentguard-intercepted");
@@ -1686,6 +1769,12 @@
       }
       interceptedButtons.delete(button);
     }
+    const staleShields = document.querySelectorAll(".parentguard-in-place-shield");
+    for (const shield of staleShields) {
+      if (!isInsideSlideOutCartDrawer(shield)) {
+        shield.remove();
+      }
+    }
   }
 
   function scanPage() {
@@ -1701,25 +1790,17 @@
       return;
     }
 
-    const defaultAmountToBind =
-      extraction && extraction.activePrice
-        ? extraction.activePrice
-        : (extraction && Array.isArray(extraction.options) && extraction.options.length === 1
-            ? extraction.options[0].amount
-            : null);
+    // On product pages: keep ALL Add-to-Cart & Buy-Now buttons 100% unlocked,
+    // and only gate Checkout buttons inside open Slide-Out Cart Drawers.
+    releaseStaleProductPageLocks();
 
-    const candidates = document.querySelectorAll(
+    const drawerCandidates = document.querySelectorAll(
       "button, a, input[type='submit'], input[type='button'], [role='button']"
     );
     let newlyAdded = false;
-    for (const el of candidates) {
-      if (isAddToCartButton(el)) {
-        // Ensure Add to Cart buttons never carry stale lock styling/attributes across extension reloads
-        releaseStaleLockOnAddToCart(el);
-        continue;
-      }
-      if (isProductIngressButton(el)) {
-        interceptButton(el, defaultAmountToBind);
+    for (const el of drawerCandidates) {
+      if (isInsideSlideOutCartDrawer(el) && matchesCheckoutGateSignals(el)) {
+        interceptButton(el, null);
         newlyAdded = true;
       }
     }

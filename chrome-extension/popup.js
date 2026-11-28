@@ -155,7 +155,9 @@ const submitActiveCartBtn = document.getElementById("submitActiveCartBtn");
 
 const activeCartLedgerBanner = document.getElementById("activeCartLedgerBanner");
 const activeCartLedgerCountText = document.getElementById("activeCartLedgerCountText");
+const reviewCapturedCartBtn = document.getElementById("reviewCapturedCartBtn");
 const goToStoreCartBtn = document.getElementById("goToStoreCartBtn");
+const backToProductFormBtn = document.getElementById("backToProductFormBtn");
 
 const productOptionGroup = document.getElementById("productOptionGroup");
 const productOptionSelect = document.getElementById("productOptionSelect");
@@ -254,25 +256,64 @@ function inferCategoryFromHostname(hostname) {
   return "SHOPPING";
 }
 
+const EXTENSION_BUILD_ID = "pg-universal-v3.0";
+
+function getRootStoreDomain(hostnameOrUrl) {
+  let host = String(hostnameOrUrl || "").toLowerCase().trim();
+  try {
+    if (host.startsWith("http://") || host.startsWith("https://")) {
+      host = new URL(host).hostname.toLowerCase();
+    } else if (host.includes("/")) {
+      host = host.split("/")[0];
+    }
+  } catch (_) {}
+  host = host.replace(/^www\./i, "");
+  if (!host || host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+    return host;
+  }
+  const parts = host.split(".").filter(Boolean);
+  if (parts.length <= 2) return host;
+  if (/\.(co|com|org|net|edu|gov)\.[a-z]{2}$/i.test(host)) {
+    return parts.slice(-3).join(".");
+  }
+  return parts.slice(-2).join(".");
+}
+
 function isCartOrCheckoutUrl(urlString) {
   if (!urlString) return false;
   try {
     const parsed = new URL(urlString);
     const pathname = (parsed.pathname || "").toLowerCase();
     const search = (parsed.search || "").toLowerCase();
+    const host = (parsed.hostname || "").toLowerCase();
     if (
       /\/app\/\d+/i.test(pathname) ||
       /\/dp\/[a-z0-9]+/i.test(pathname) ||
       /\/gp\/product\//i.test(pathname) ||
-      /\/products?\//i.test(pathname) ||
+      (/\/products?\//i.test(pathname) && !/\/products?\/cart/i.test(pathname)) ||
       /\/item\//i.test(pathname)
     ) {
       return false;
     }
-    if (/\/(cart|shopping-cart|viewcart|basket|bag|checkout|checkouts|onepagecheckout)(\/|$)/i.test(pathname)) {
+    if (/^(cart|checkout|pay|billing)\./i.test(host)) {
       return true;
     }
-    if (pathname.includes("/gp/cart") || pathname.includes("/gp/buy") || search.includes("step=contact_information")) {
+    if (
+      /\/(cart|shopping-cart|viewcart|basket|bag|trolley|checkout|checkouts|onepagecheckout|shipping|payment|order-review|place-order)(\/|$)/i.test(
+        pathname
+      )
+    ) {
+      return true;
+    }
+    if (
+      pathname.includes("/gp/cart") ||
+      pathname.includes("/gp/buy") ||
+      search.includes("route=checkout") ||
+      search.includes("page=cart") ||
+      search.includes("step=contact_information") ||
+      search.includes("step=shipping") ||
+      search.includes("step=payment")
+    ) {
       return true;
     }
   } catch (_) {}
@@ -364,8 +405,41 @@ function getSavedItemsStorageKey() {
   return `${SAVED_ITEMS_KEY_PREFIX}_${emailScope}`;
 }
 
+async function triggerFullExtensionAndTabReload() {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs && tabs[0] && tabs[0].id) {
+      await chrome.storage.local.set({ pendingReloadTabId: tabs[0].id });
+    }
+  } catch (_) {}
+  chrome.runtime.reload();
+  window.close();
+}
+
+async function ensureFreshExtensionBuild() {
+  try {
+    const ping = await chrome.runtime.sendMessage({ type: "PING" }).catch(() => null);
+    if (ping && ping.buildId === EXTENSION_BUILD_ID) {
+      return true;
+    }
+    const guard = await chrome.storage.local.get(["lastAutoReloadTs"]);
+    const now = Date.now();
+    if (guard && guard.lastAutoReloadTs && now - guard.lastAutoReloadTs < 10000) {
+      return true;
+    }
+    await chrome.storage.local.set({ lastAutoReloadTs: now });
+    await triggerFullExtensionAndTabReload();
+    return false;
+  } catch (_) {
+    return true;
+  }
+}
+
 // Initialize on DOM load
 document.addEventListener("DOMContentLoaded", async () => {
+  const isFresh = await ensureFreshExtensionBuild();
+  if (!isFresh) return;
+
   setupEventListeners();
   await loadAuthState();
   await loadSavedProducts();
@@ -417,6 +491,20 @@ function setupEventListeners() {
   }
   if (goToStoreCartBtn) {
     goToStoreCartBtn.addEventListener("click", handleGoToStoreCart);
+  }
+  if (reviewCapturedCartBtn) {
+    reviewCapturedCartBtn.addEventListener("click", async () => {
+      if (backToProductFormBtn) backToProductFormBtn.classList.remove("hidden");
+      await renderActiveCartView(currentTabInfo.domain, null, currencySelect.value || "USD", null);
+    });
+  }
+  if (backToProductFormBtn) {
+    backToProductFormBtn.addEventListener("click", async () => {
+      backToProductFormBtn.classList.add("hidden");
+      if (activeCartRequestCard) activeCartRequestCard.classList.add("hidden");
+      if (purchaseForm) purchaseForm.classList.remove("hidden");
+      await updateActiveCartBannerOnProductPage(currentTabInfo.domain);
+    });
   }
   refreshRequestsBtn.addEventListener("click", () => fetchMyRequests(true));
 
@@ -863,11 +951,15 @@ function doCartTitlesMatch(titleA, titleB) {
 
 async function renderActiveCartView(domain, liveCartTotal, liveCurrency, extraction) {
   const allLedger = await loadCartLedger();
-  const cleanDomain = getCleanDomainLabel(domain).toLowerCase();
+  const rootDomain = getRootStoreDomain(domain);
   const isSameDomain = (d) => {
-    const cleanD = getCleanDomainLabel(d || "").toLowerCase();
-    return Boolean(cleanD && cleanDomain && (cleanD.includes(cleanDomain) || cleanDomain.includes(cleanD)));
+    const cleanD = getRootStoreDomain(d || "");
+    return Boolean(cleanD && rootDomain && (cleanD === rootDomain || cleanD.includes(rootDomain) || rootDomain.includes(cleanD)));
   };
+
+  if (backToProductFormBtn) {
+    backToProductFormBtn.classList.toggle("hidden", Boolean(currentTabInfo.isCartOrCheckout));
+  }
 
   let domainItems = allLedger.filter((i) => isSameDomain(i.domain));
   const liveRows = extraction && Array.isArray(extraction.cartItems) ? extraction.cartItems : [];
@@ -1007,10 +1099,10 @@ async function renderActiveCartView(domain, liveCartTotal, liveCurrency, extract
 
 async function updateActiveCartBannerOnProductPage(domain) {
   const allLedger = await loadCartLedger();
-  const cleanDomain = getCleanDomainLabel(domain).toLowerCase();
+  const rootDomain = getRootStoreDomain(domain);
   const domainItems = allLedger.filter((i) => {
-    const d = getCleanDomainLabel(i.domain || "").toLowerCase();
-    return d.includes(cleanDomain) || cleanDomain.includes(d);
+    const d = getRootStoreDomain(i.domain || "");
+    return Boolean(d && rootDomain && (d === rootDomain || d.includes(rootDomain) || rootDomain.includes(d)));
   });
 
   if (domainItems.length > 0 && activeCartLedgerBanner) {
@@ -1021,7 +1113,7 @@ async function updateActiveCartBannerOnProductPage(domain) {
     });
     const sym = CURRENCY_SYMBOLS[cur] || "$";
     if (activeCartLedgerCountText) {
-      activeCartLedgerCountText.textContent = `${domainItems.length} ${domainItems.length === 1 ? "item" : "items"} captured in store cart (${sym}${sum.toFixed(2)})`;
+      activeCartLedgerCountText.textContent = `${domainItems.length} ${domainItems.length === 1 ? "item" : "items"} (${sym}${sum.toFixed(2)})`;
     }
     activeCartLedgerBanner.classList.remove("hidden");
   } else if (activeCartLedgerBanner) {
@@ -1035,9 +1127,14 @@ async function handleGoToStoreCart() {
     if (tabs && tabs[0] && tabs[0].id) {
       let cartUrl = currentTabInfo.storeCartUrl || `https://${currentTabInfo.domain}/cart`;
       if (!currentTabInfo.storeCartUrl) {
-        if (currentTabInfo.domain.includes("steampowered.com")) {
+        const d = (currentTabInfo.domain || "").toLowerCase();
+        if (d.includes("steampowered.com")) {
           cartUrl = "https://store.steampowered.com/cart";
-        } else if (currentTabInfo.domain.includes("amazon.")) {
+        } else if (d.includes("daraz.lk")) {
+          cartUrl = "https://cart.daraz.lk/cart";
+        } else if (d.includes("ebay.com")) {
+          cartUrl = "https://cart.ebay.com";
+        } else if (d.includes("amazon.")) {
           cartUrl = `https://${currentTabInfo.domain}/gp/cart/view.html`;
         }
       }
@@ -1958,16 +2055,16 @@ function syncLiveTrackerWithRequests(requests) {
 
   // On /cart pages, sync live status with any active PENDING or recent APPROVED request for this store & total
   if (currentTabInfo.isCartOrCheckout) {
-    const cleanCartDomain = getCleanDomainLabel(currentTabInfo.domain || "").toLowerCase();
+    const cleanCartRoot = getRootStoreDomain(currentTabInfo.domain || "");
     const matchingCartReq = sortedRequests.find((r) => {
       if (r.status !== "PENDING" && r.status !== "APPROVED") return false;
-      const reqDomain = getCleanDomainLabel(r.siteDomain || "").toLowerCase();
-      const domainMatches = cleanCartDomain && reqDomain && (reqDomain.includes(cleanCartDomain) || cleanCartDomain.includes(reqDomain));
+      const reqRoot = getRootStoreDomain(r.siteDomain || "");
+      const domainMatches = cleanCartRoot && reqRoot && (reqRoot === cleanCartRoot || reqRoot.includes(cleanCartRoot) || cleanCartRoot.includes(reqRoot));
       if (!domainMatches) return false;
       if (currentActiveCartTotal > 0) {
         return Math.abs(Number(r.amount) - currentActiveCartTotal) < 0.05;
       }
-      return String(r.siteDomain || "").toLowerCase().includes("/cart");
+      return isCartOrCheckoutUrl(r.siteDomain || "") || String(r.siteDomain || "").toLowerCase().includes("/cart");
     });
     if (matchingCartReq) {
       showLiveApprovalTracker(matchingCartReq);

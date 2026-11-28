@@ -130,11 +130,14 @@
         </div>
       </div>
 
-      <!-- Active Shopping Cart Request Card (Shown when popup is opened on /cart) -->
+      <!-- Active Shopping Cart Request Card (Shown on /cart or when reviewing captured cart) -->
       <div id="activeCartRequestCard" class="active-cart-card hidden">
         <div class="cart-manifest-header">
           <span class="tag-label">[ STORE CART MANIFEST ]</span>
-          <span id="activeCartItemCountTag" class="cart-count-pill">0 ITEMS</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button type="button" id="backToProductFormBtn" class="neo-btn-sm neo-btn-ghost hidden" style="padding: 1px 5px; font-size: 9px;">&larr; PRODUCT</button>
+            <span id="activeCartItemCountTag" class="cart-count-pill">0 ITEMS</span>
+          </div>
         </div>
 
         <div id="activeCartEmptyNotice" class="empty-state py-8 hidden">
@@ -177,12 +180,17 @@
       <!-- Active Cart Ledger Banner on Product Pages -->
       <div id="activeCartLedgerBanner" class="cart-ledger-banner hidden">
         <div class="cart-ledger-info">
-          <span class="cart-ledger-tag">STORE CART</span>
-          <span id="activeCartLedgerCountText" class="cart-ledger-text">0 items captured</span>
+          <span class="cart-ledger-tag">CART</span>
+          <span id="activeCartLedgerCountText" class="cart-ledger-text">0 items</span>
         </div>
-        <button type="button" id="goToStoreCartBtn" class="neo-btn-sm neo-btn-secondary">
-          [ OPEN CART ]
-        </button>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <button type="button" id="reviewCapturedCartBtn" class="neo-btn-sm neo-btn-primary" style="padding: 3px 6px; font-size: 9px;">
+            REQUEST CART
+          </button>
+          <button type="button" id="goToStoreCartBtn" class="neo-btn-sm neo-btn-secondary" style="padding: 3px 6px; font-size: 9px;">
+            OPEN CART
+          </button>
+        </div>
       </div>
 
       <!-- Purchase Request Form -->
