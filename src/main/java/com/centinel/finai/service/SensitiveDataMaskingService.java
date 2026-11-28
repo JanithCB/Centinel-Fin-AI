@@ -58,9 +58,14 @@ public class SensitiveDataMaskingService {
         return masked;
     }
 
+    private static final java.util.Set<String> SAFE_PRODUCT_QUERY_KEYS = java.util.Set.of(
+            "id", "item", "item_id", "itemid", "product_id", "productid",
+            "variant", "variant_id", "sku", "pid", "asin", "model", "color", "size", "edition"
+    );
+
     /**
-     * Sanitizes a merchant URL by stripping query parameters, user credentials, and fragments
-     * while preserving the clean merchant domain and product path for parent verification.
+     * Sanitizes a merchant URL by stripping tracking query parameters, user credentials, and fragments
+     * while preserving the clean merchant domain, product path, and essential product/variant query IDs.
      *
      * @param url the full URL or domain
      * @return the sanitized product URL or base domain
@@ -78,9 +83,32 @@ public class SensitiveDataMaskingService {
             if (host != null) {
                 String cleanHost = host.replaceFirst("^www\\.", "");
                 String path = uri.getRawPath();
+                if (path != null) {
+                    path = path.replaceAll("/+$", "");
+                }
+                // Strip session-private cart/checkout paths down to clean merchant host
+                if (path != null && path.toLowerCase().matches("^/(cart|shopping-cart|viewcart|basket|bag|checkout|checkouts|onepagecheckout|gp/cart|gp/buy)(/.*)?$")) {
+                    return cleanHost;
+                }
                 if (path != null && !path.isEmpty() && !path.equals("/")) {
                     String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase() : "https";
-                    String cleanFullUrl = scheme + "://" + cleanHost + path;
+                    StringBuilder safeQuery = new StringBuilder();
+                    String rawQuery = uri.getRawQuery();
+                    if (rawQuery != null && !rawQuery.isEmpty()) {
+                        for (String pair : rawQuery.split("&")) {
+                            int eqIdx = pair.indexOf('=');
+                            if (eqIdx > 0 && eqIdx < pair.length() - 1) {
+                                String k = pair.substring(0, eqIdx).toLowerCase();
+                                String v = pair.substring(eqIdx + 1);
+                                if (SAFE_PRODUCT_QUERY_KEYS.contains(k) && v.matches("^[a-zA-Z0-9_-]{1,64}$")) {
+                                    if (safeQuery.length() > 0) safeQuery.append('&');
+                                    safeQuery.append(pair.substring(0, eqIdx)).append('=').append(v);
+                                }
+                            }
+                        }
+                    }
+                    String querySuffix = safeQuery.length() > 0 ? "?" + safeQuery : "";
+                    String cleanFullUrl = scheme + "://" + cleanHost + path + querySuffix;
                     return cleanFullUrl.length() <= 255 ? cleanFullUrl : cleanHost;
                 }
                 return cleanHost;

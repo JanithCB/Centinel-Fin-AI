@@ -83,4 +83,19 @@ public class SensitiveDataMaskingServiceTest {
         assertThat(maskingService.maskSensitiveData(null)).isNull();
         assertThat(maskingService.maskSensitiveData("")).isEmpty();
     }
+
+    @Test
+    void maskUrl_preservesSafeProductVariantQueryIdsAndStripsTrackingParams() {
+        String shopifyVariantUrl = "https://www.shop.example.com/products/headset?variant=441928&utm_source=ads&fbclid=xyz";
+        assertThat(maskingService.maskUrl(shopifyVariantUrl))
+                .isEqualTo("https://shop.example.com/products/headset?variant=441928");
+
+        String steamUrl = "https://store.steampowered.com/app/3768760/007_First_Light/?snr=1_7_15__13";
+        assertThat(maskingService.maskUrl(steamUrl))
+                .isEqualTo("https://store.steampowered.com/app/3768760/007_First_Light");
+
+        String cartUrl = "https://store.steampowered.com/cart/?snr=1_5_9_";
+        assertThat(maskingService.maskUrl(cartUrl))
+                .isEqualTo("store.steampowered.com");
+    }
 }
