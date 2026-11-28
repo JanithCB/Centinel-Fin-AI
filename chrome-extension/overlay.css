@@ -4,7 +4,7 @@
 /* Intercepted and Locked Native Cart / Payment Button */
 .parentguard-locked-btn {
   position: relative !important;
-  pointer-events: none !important;
+  pointer-events: auto !important;
   cursor: not-allowed !important;
   opacity: 0.42 !important;
   filter: grayscale(85%) !important;
